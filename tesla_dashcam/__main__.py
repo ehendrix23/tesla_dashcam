@@ -381,7 +381,7 @@ def main() -> None:
                      MOVIE_QUALITY[args.quality]
                      ]
 
-    ffmpeg_command = [FFMPEG] + \
+    ffmpeg_command = [ffmpeg] + \
         ffmpeg_concat_input + \
         ffmpeg_params + \
         ['-y', args.output]

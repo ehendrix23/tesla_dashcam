@@ -14,6 +14,19 @@ into one picture, with the video for all the minutes further put together into o
 This is not limited to just the saved 10 minute footage. One can combine video files of different times footage
 was saved into one folder and then run this program to have to all combined into one movie.
 
+Notes
+-----
+
+The video files for the same minute between the 3 cameras are not always the same length. If there is a difference in
+their duration then a black screen will be shown for the camera which video ended before the others (within the minute).
+It is thus possible within a video to see a black screen for one of the cameras, and then when that minute has passed
+for it to show video again.
+
+The date and time shown within the video comes from the timestamp embedded in the saved videos themselves, not from the
+filename. This is also why, for example, it might start at 16:42:35 and not 16:42:00 (as shown in the video examples).
+This ensures that the time shown is as accurate as Tesla is providing it.
+Current caveat however is that the order for concatenating all the videos together is based on filename. (See TODO)
+
 Requirements
 -------------
 
@@ -99,6 +112,7 @@ Usage
 layout:
 
 WIDESCREEN: Resolution: 1920x480
+Video example: https://youtu.be/nPleIhVxyhQ
 
 ::
 
@@ -108,6 +122,7 @@ WIDESCREEN: Resolution: 1920x480
 
 
 FULLSCREEN: Resolution: 1280x960
+Video example: https://youtu.be/P5k9PXPGKWQ
 
 ::
 
@@ -140,7 +155,7 @@ Using defaults:
 
 .. code:: bash
 
-    python3 -m tesla_dashcam --source \Users\me\Desktop\Tesla\2019-02-27_14-02-03 --output \Users\me\Desktop\my_dashcam.mp4
+    python3 -m tesla_dashcam --source /Users/me/Desktop/Tesla/2019-02-27_14-02-03 --output /Users/me/Desktop/my_dashcam.mp4
 
 Without timestamp:
 
@@ -154,7 +169,7 @@ Without timestamp:
 
 .. code:: bash
 
-    python3 -m tesla_dashcam --source \Users\me\Desktop\Tesla\2019-02-27_14-02-03 --output \Users\me\Desktop\my_dashcam.mp4 --no-timestamp
+    python3 -m tesla_dashcam --source /Users/me/Desktop/Tesla/2019-02-27_14-02-03 --output /Users/me/Desktop/my_dashcam.mp4 --no-timestamp
 
 
 Layout so front is shown top middle with side cameras below it (FULLSCREEN):
@@ -169,7 +184,7 @@ Layout so front is shown top middle with side cameras below it (FULLSCREEN):
 
 .. code:: bash
 
-    python3 -m tesla_dashcam --source \Users\me\Desktop\Tesla\2019-02-27_14-02-03 --output \Users\me\Desktop\my_dashcam.mp4 --layout FULLSCREEN
+    python3 -m tesla_dashcam --source /Users/me/Desktop/Tesla/2019-02-27_14-02-03 --output /Users/me/Desktop/my_dashcam.mp4 --layout FULLSCREEN
 
 
 Specify location of ffmpeg binay (in case ffmpeg is not in path):
@@ -184,7 +199,7 @@ Specify location of ffmpeg binay (in case ffmpeg is not in path):
 
 .. code:: bash
 
-    python3 -m tesla_dashcam --source \Users\me\Desktop\Tesla\2019-02-27_14-02-03 --output \Users\me\Desktop\my_dashcam.mp4 --ffmpeg \Applications\ffmpeg
+    python3 -m tesla_dashcam --source /Users/me/Desktop/Tesla/2019-02-27_14-02-03 --output /Users/me/Desktop/my_dashcam.mp4 --ffmpeg /Applications/ffmpeg
 
 Layout of FULLSCREEN with a different font for timestamp and path for ffmpeg:
 
@@ -192,13 +207,13 @@ Layout of FULLSCREEN with a different font for timestamp and path for ffmpeg:
 
 .. code:: bash
 
-    python3 -m tesla_dashcam --source \Users\me\Desktop\Tesla\2019-02-27_14-02-03 --output \Users\me\Desktop\my_dashcam.mp4 --layout FULLSCREEN --ffmpeg c:\ffmpeg\ffmpeg.exe --font "C\:\\Windows\\Fonts\\Courier New.ttf"
+    python3 -m tesla_dashcam --source c:\Tesla\2019-02-27_14-02-03 --output c:\Tesla\my_dashcam.mp4 --layout FULLSCREEN --ffmpeg c:\ffmpeg\ffmpeg.exe --font "C\:\\Windows\\Fonts\\Courier New.ttf"
 
 * Mac:
 
 .. code:: bash
 
-    python3 -m tesla_dashcam --source \Users\me\Desktop\Tesla\2019-02-27_14-02-03 --output \Users\me\Desktop\my_dashcam.mp4 --layout FULLSCREEN --ffmpeg \Applications\ffmpeg --font '/Library/Fonts/Courier New.ttf'
+    python3 -m tesla_dashcam --source /Users/me/Desktop/Tesla/2019-02-27_14-02-03 --output /Users/me/Desktop/my_dashcam.mp4 --layout FULLSCREEN --ffmpeg /Applications/ffmpeg --font '/Library/Fonts/Courier New.ttf'
 
 
 Support
@@ -220,4 +235,5 @@ TODO
 
 * Option to specify resolutions as an argument
 * Option for end-user layout
-* Use create time in clips to synchronize
+* Use timestamp in video to determine order instead of file name
+* Use timestamp in video to ensure full synchronization between the 3 cameras
