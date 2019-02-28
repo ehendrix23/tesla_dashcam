@@ -128,4 +128,4 @@ setup(
     cmdclass={
         'upload': UploadCommand,
     },
-)w
+)
