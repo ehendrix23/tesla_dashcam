@@ -26,7 +26,7 @@ Further, Python 3.5 or higher has to be installed as well.
 Installation
 -------------
 
-This package is available from `pypi <https://pypi.org/project/aioharmony/>`__. Installing it from there will ensure all
+This package is available from `pypi <https://pypi.org/project/tesla-dashcam/>`__. Installing it from there will ensure all
 other package requirements (except ffmpeg) are installed as well.
 
 Install from pypi is done through:
@@ -110,12 +110,12 @@ layout:
 Release Notes
 -------------
 
-0.1.0. Initial Release
+0.1.1. Initial Release
 
 
 TODO
 ----
 
-* Redo discovery for asyncio. This will be done once XMPP is re-implemented by Logitech
-* More items can be done from the Harmony iOS app; determining what could be done within the library as well
-* Is it possible to update device configuration?
+* Option to specify resolutions as an argument
+* Option for end-user layout
+* Use create time in clips to synchronize
