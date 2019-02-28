@@ -38,7 +38,7 @@ MOVIE_LAYOUT = {
         'front_x': 320,  # Middle of video
         'front_y': 0,    # Top of video
         'right_x': 640,  # Right of left clip
-        'right_y': 320,  # Bottom of video
+        'right_y': 480,  # Bottom of video
     },
 }
 
@@ -328,7 +328,7 @@ def main() -> None:
             base_filter.format(duration=duration) + \
             ffmpeg_filter.format(epoch_time=epoch_timestamp)
         ffmpeg_command = [
-            FFMPEG,
+            ffmpeg,
             '-i',
             left_camera,
             '-i',
@@ -343,7 +343,6 @@ def main() -> None:
 
         # Run the command.
         try:
-            # print(ffmpeg_command)
             run(ffmpeg_command, capture_output=True, check=True)
         except CalledProcessError as exc:
             print("Error trying to create clip for {base_name}. RC: {rc}\n"
