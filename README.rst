@@ -23,8 +23,10 @@ It is thus possible within a video to see a black screen for one of the cameras,
 for it to show video again.
 
 The date and time shown within the video comes from the timestamp embedded in the saved videos themselves, not from the
-filename. This is also why, for example, it might start at 16:42:35 and not 16:42:00 (as shown in the video examples).
-This ensures that the time shown is as accurate as Tesla is providing it.
+filename. Date and time shown within video is based on PC's timezone.
+Tesla embeds the date and time within the video file, and that is what will be displayed comes. This means that the video might
+not start exactly at 0 seconds. In the provided video examples one can see that it starts at 16:42:35 and not 16:42:00.
+
 Current caveat however is that the order for concatenating all the videos together is based on filename. (See TODO)
 
 Requirements
@@ -57,24 +59,25 @@ Usage
 
     tesla_dashcam - Tesla DashCam Creator
 
-    usage:  [-h] --source SOURCE --output OUTPUT
+    usage:  [-h] --output OUTPUT
         [--layout {WIDESCREEN,FULLSCREEN}]
         [--quality {LOWEST,LOWER,LOW,MEDIUM,HIGH}]
         [--compression {ultrafast,superfast,veryfast,faster,fast,medium,slow,slower,veryslow}]
         [--encoding {x264,x265}] [--timestamp] [--no-timestamp]
         [--ffmpeg FFMPEG] [--font FONT]
+        source
 
     tesla_dashcam - Tesla DashCam Creator
 
     required arguments:
-      --source SOURCE       Folder containing the saved camera files (default:
+      source                Folder containing the saved camera files (default:
                             None)
-
-      --output OUTPUT       Path/Filename for the new movie file. (default: None)
 
     optional arguments:
 
       -h, --help            show this help message and exit
+
+      --output OUTPUT       Path/Filename for the new movie file. (default: None)
 
       --layout {WIDESCREEN,FULLSCREEN}
                             Layout of the video. Widescreen puts video of all 3
@@ -149,13 +152,27 @@ Using defaults:
 
 .. code:: bash
 
-    python3 -m tesla_dashcam --source c:\Tesla\2019-02-27_14-02-03 --output c:\Tesla\my_dashcam.mp4
+    python3 -m tesla_dashcam c:\Tesla\2019-02-27_14-02-03
 
 * Mac:
 
 .. code:: bash
 
-    python3 -m tesla_dashcam --source /Users/me/Desktop/Tesla/2019-02-27_14-02-03 --output /Users/me/Desktop/my_dashcam.mp4
+    python3 -m tesla_dashcam /Users/me/Desktop/Tesla/2019-02-27_14-02-03
+
+Specify video file and location:
+
+* Windows:
+
+.. code:: bash
+
+    python3 -m tesla_dashcam --output c:\Tesla\My_Video_Trip.mp4 c:\Tesla\2019-02-27_14-02-03
+
+* Mac:
+
+.. code:: bash
+
+    python3 -m tesla_dashcam --output /Users/me/Desktop/Tesla/My_Video_Trip.mp4 /Users/me/Desktop/Tesla/2019-02-27_14-02-03
 
 Without timestamp:
 
@@ -163,13 +180,13 @@ Without timestamp:
 
 .. code:: bash
 
-    python3 -m tesla_dashcam --source c:\Tesla\2019-02-27_14-02-03 --output c:\Tesla\my_dashcam.mp4 --no-timestamp
+    python3 -m tesla_dashcam --no-timestamp c:\Tesla\2019-02-27_14-02-03
 
 * Mac:
 
 .. code:: bash
 
-    python3 -m tesla_dashcam --source /Users/me/Desktop/Tesla/2019-02-27_14-02-03 --output /Users/me/Desktop/my_dashcam.mp4 --no-timestamp
+    python3 -m tesla_dashcam --no-timestamp /Users/me/Desktop/Tesla/2019-02-27_14-02-03
 
 
 Layout so front is shown top middle with side cameras below it (FULLSCREEN):
@@ -178,13 +195,13 @@ Layout so front is shown top middle with side cameras below it (FULLSCREEN):
 
 .. code:: bash
 
-    python3 -m tesla_dashcam --source c:\Tesla\2019-02-27_14-02-03 --output c:\Tesla\my_dashcam.mp4 --layout FULLSCREEN
+    python3 -m tesla_dashcam --layout FULLSCREEN c:\Tesla\2019-02-27_14-02-03
 
 * Mac:
 
 .. code:: bash
 
-    python3 -m tesla_dashcam --source /Users/me/Desktop/Tesla/2019-02-27_14-02-03 --output /Users/me/Desktop/my_dashcam.mp4 --layout FULLSCREEN
+    python3 -m tesla_dashcam --layout FULLSCREEN /Users/me/Desktop/Tesla/2019-02-27_14-02-03
 
 
 Specify location of ffmpeg binay (in case ffmpeg is not in path):
@@ -193,13 +210,13 @@ Specify location of ffmpeg binay (in case ffmpeg is not in path):
 
 .. code:: bash
 
-    python3 -m tesla_dashcam --source c:\Tesla\2019-02-27_14-02-03 --output c:\Tesla\my_dashcam.mp4 --ffmpeg c:\ffmpeg\ffmpeg.exe
+    python3 -m tesla_dashcam --ffmpeg c:\ffmpeg\ffmpeg.exe c:\Tesla\2019-02-27_14-02-03
 
 * Mac:
 
 .. code:: bash
 
-    python3 -m tesla_dashcam --source /Users/me/Desktop/Tesla/2019-02-27_14-02-03 --output /Users/me/Desktop/my_dashcam.mp4 --ffmpeg /Applications/ffmpeg
+    python3 -m tesla_dashcam --ffmpeg /Applications/ffmpeg /Users/me/Desktop/Tesla/2019-02-27_14-02-03
 
 Layout of FULLSCREEN with a different font for timestamp and path for ffmpeg:
 
@@ -207,13 +224,13 @@ Layout of FULLSCREEN with a different font for timestamp and path for ffmpeg:
 
 .. code:: bash
 
-    python3 -m tesla_dashcam --source c:\Tesla\2019-02-27_14-02-03 --output c:\Tesla\my_dashcam.mp4 --layout FULLSCREEN --ffmpeg c:\ffmpeg\ffmpeg.exe --font "C\:\\Windows\\Fonts\\Courier New.ttf"
+    python3 -m tesla_dashcam --layout FULLSCREEN --ffmpeg c:\ffmpeg\ffmpeg.exe --font "C\:\\Windows\\Fonts\\Courier New.ttf" c:\Tesla\2019-02-27_14-02-03
 
 * Mac:
 
 .. code:: bash
 
-    python3 -m tesla_dashcam --source /Users/me/Desktop/Tesla/2019-02-27_14-02-03 --output /Users/me/Desktop/my_dashcam.mp4 --layout FULLSCREEN --ffmpeg /Applications/ffmpeg --font '/Library/Fonts/Courier New.ttf'
+    python3 -m tesla_dashcam --layout FULLSCREEN --ffmpeg /Applications/ffmpeg --font '/Library/Fonts/Courier New.ttf' /Users/me/Desktop/Tesla/2019-02-27_14-02-03
 
 
 Support
@@ -227,13 +244,21 @@ However, any issues or requests can be reported on `GitHub <https://github.com/e
 Release Notes
 -------------
 
-0.1.4. Initial Release
-0.1.5  Fixed issue on Windows
+0.1.4.
+    Initial Release
+0.1.5
+    Fixed font issue on Windows
+0.1.6
+    Output folder is now optional
+    source is positional argument (in preparation for self-contained executable and drag&drop)
 
 
 TODO
 ----
 
+* Create self-contained executable for MacOS and Windows
+* Support drag&drop of video folder
+* Create GUI for options
 * Option to specify resolutions as an argument
 * Option for end-user layout
 * Use timestamp in video to determine order instead of file name

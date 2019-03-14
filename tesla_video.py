@@ -422,6 +422,4 @@ def main() -> None:
         print("Movie {base_name} has been created, enjoy.".format(
             base_name=movie_filename))
 
-
-if __name__ == '__main__':
-    sys.exit(main())
+sys.exit(main())
