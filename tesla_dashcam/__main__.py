@@ -122,12 +122,13 @@ def main() -> None:
         description='tesla_dashcam - Tesla DashCam Creator',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument('source',
+    parser.add_argument('--source',
+                        required=True,
                         type=str,
                         help='Folder containing the saved camera files')
 
     parser.add_argument('--output',
-                        required=False,
+                        required=True,
                         type=str,
                         help='Path/Filename for the new movie file.')
 
@@ -365,24 +366,6 @@ def main() -> None:
             dashcam_clips.append(temp_movie_name)
 
     # Now that all individuals clips are done, concatanate them all together.
-    if args.output is None:
-        # Get the actual folder name as we're using that to create the movie
-        # name
-        folder, movie_filename = os.path.split(args.source)
-        # If there was a trailing seperator provided then it will be empty,
-        # redo split then.
-        if movie_filename == '':
-            movie_filename = os.path.split(folder)[1]
-
-        # Now add full path to it.
-        movie_filename = os.path.join(args.source, movie_filename)
-    else:
-        movie_filename = args.output
-
-    # Make sure it ends in .mp4
-    if os.path.splitext(movie_filename)[1] != 'mp4':
-        movie_filename = movie_filename + '.mp4'
-
     concat_filter_complex = concat_filter_complex + \
         "concat=n={total_clips}:v=1:a=0 [v]".format(
             total_clips=len(dashcam_clips),
@@ -402,10 +385,10 @@ def main() -> None:
     ffmpeg_command = [ffmpeg] + \
         ffmpeg_concat_input + \
         ffmpeg_params + \
-        ['-y', movie_filename]
+        ['-y', args.output]
 
     # Creating movie
-    print("Creating movie {}, please be patient.".format(movie_filename))
+    print("Creating movie {}, please be patient.".format(args.output))
 
     try:
         run(ffmpeg_command, capture_output=True, check=True)
@@ -413,14 +396,14 @@ def main() -> None:
         print("Error trying to create movie {base_name}. RC: {rc}\n"
               "Command: {command}\n"
               "Error: {stderr}\n\n".format(
-                base_name=movie_filename,
+                base_name=args.output,
                 rc=exc.returncode,
                 command=exc.cmd,
                 stderr=exc.stderr,
                 ))
     else:
         print("Movie {base_name} has been created, enjoy.".format(
-            base_name=movie_filename))
+            base_name=args.output))
 
 
 if __name__ == '__main__':
