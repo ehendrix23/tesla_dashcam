@@ -56,7 +56,8 @@ MOVIE_ENCODING = {
 
 DEFAULT_FONT = {
     'darwin': '/Library/Fonts/Arial.ttf',
-    'windows': 'C\:\\Windows\\Fonts\\arial.ttf',
+    'win32': 'C\:\\Windows\\Fonts\\arial.ttf',
+    'cygwin': 'C\:\\Windows\\Fonts\\arial.ttf',
 }
 
 

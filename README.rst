@@ -227,7 +227,8 @@ However, any issues or requests can be reported on `GitHub <https://github.com/e
 Release Notes
 -------------
 
-0.1.1. Initial Release
+0.1.4. Initial Release
+0.1.5  Fixed issue on Windows
 
 
 TODO
