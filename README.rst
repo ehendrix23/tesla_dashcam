@@ -14,6 +14,16 @@ into one picture, with the video for all the minutes further put together into o
 This is not limited to just the saved 10 minute footage. One can combine video files of different times footage
 was saved into one folder and then run this program to have to all combined into one movie.
 
+Binaries
+--------
+
+Stand-alone binaries can be retrieved:
+
+- Windows: https://github.com/ehendrix23/tesla_dashcam/dist/tesla_dashcam.exe
+- MacOS (OSX): https://github.com/ehendrix23/tesla_dashcam/dist/tesla_dashcam
+
+ffmpeg still has to be downloaded and installed separately.
+
 Notes
 -----
 
@@ -35,7 +45,7 @@ Requirements
 This package relies on `ffmpeg <https://ffmpeg.org>`__ to be installed, this is a free, open source cross-platform
 solution to convert video. It has to be downloaded and installed separately.
 
-`Python <https://www.python.org>`__ 3.5 or higher is also required.
+`Python <https://www.python.org>`__ 3.5 or higher is required (unless stand-alone binaries are used).
 
 
 Installation
@@ -59,74 +69,88 @@ Usage
 
     tesla_dashcam - Tesla DashCam Creator
 
-    usage:  [-h] --output OUTPUT
-        [--layout {WIDESCREEN,FULLSCREEN}]
-        [--quality {LOWEST,LOWER,LOW,MEDIUM,HIGH}]
-        [--compression {ultrafast,superfast,veryfast,faster,fast,medium,slow,slower,veryslow}]
-        [--encoding {x264,x265}] [--timestamp] [--no-timestamp]
-        [--ffmpeg FFMPEG] [--font FONT]
-        source
+    usage: tesla_dashcam.py [-h] [--output OUTPUT]
+                            [--layout {WIDESCREEN,FULLSCREEN,PERSPECTIVE}]
+                            [--quality {LOWEST,LOWER,LOW,MEDIUM,HIGH}]
+                            [--compression {ultrafast,superfast,veryfast,faster,fast,medium,slow,slower,veryslow}]
+                            [--encoding {x264,x265}] [--timestamp]
+                            [--no-timestamp] [--halign {LEFT,CENTER,RIGHT}]
+                            [--valign {TOP,MIDDLE,BOTTOM}] [--font FONT]
+                            [--fontsize FONTSIZE] [--fontcolor FONTCOLOR]
+                            [--ffmpeg FFMPEG]
+                            source
 
     tesla_dashcam - Tesla DashCam Creator
 
-    required arguments:
-      source                Folder containing the saved camera files (default:
-                            None)
+    positional arguments:
+      source                Folder containing the saved camera files
 
     optional arguments:
-
       -h, --help            show this help message and exit
-
-      --output OUTPUT       Path/Filename for the new movie file. (default: None)
-
-      --layout {WIDESCREEN,FULLSCREEN}
-                            Layout of the video. Widescreen puts video of all 3
-                            cameras next to each other. Fullscreen puts the front
-                            camera on top in middle and side cameras below it next
-                            to each other (default: WIDESCREEN)
-
+      --output OUTPUT       Path/Filename for the new movie file.
+      --layout {WIDESCREEN,FULLSCREEN,PERSPECTIVE}
+                            Layout of the created video.
+                                PERSPECTIVE: Front camera center top, side cameras next to it in perspective.
+                                WIDESCREEN: Output from all 3 cameras are next to each other.
+                                FULLSCREEN: Front camera center top, side cameras underneath it.
       --quality {LOWEST,LOWER,LOW,MEDIUM,HIGH}
                             Define the quality setting for the video, higher
                             quality means bigger file size but might not be
-                            noticeable. (default: LOWER)
-
+                            noticeable.
       --compression {ultrafast,superfast,veryfast,faster,fast,medium,slow,slower,veryslow}
                             Speed to optimize video. Faster speed results in a
                             bigger file. This does not impact the quality of the
                             video, just how much time is used to compress it.
-                            (default: medium)
-
       --encoding {x264,x265}
-                            Encoding to use. x264 is can be viewed on more devices
+                            Encoding to use. x264 can be viewed on more devices
                             but results in bigger file. x265 is newer encoding
-                            standard (default: x264)
-
-      --timestamp           Include timestamp in video (default)
+                            standard but not all devices support this yet.
+      --timestamp           Include timestamp in video
       --no-timestamp        Do not include timestamp in video
-
-      --ffmpeg FFMPEG       Path and filename for ffmpeg. Specify if ffmpeg is not
-                            within path. (default: ffmpeg)
-
+      --halign {LEFT,CENTER,RIGHT}
+                            Horizontal alignment for timestamp
+      --valign {TOP,MIDDLE,BOTTOM}
+                            Vertical Alignment for timestamp
       --font FONT           Fully qualified filename (.ttf) to the font to be
-                            chosen for timestamp. (default:
-                            /Library/Fonts/Arial.ttf)
+                            chosen for timestamp.
+      --fontsize FONTSIZE   Font size for timestamp.
+      --fontcolor FONTCOLOR
+                            Font color for timestamp. Any color is accepted as a color string or RGB value.
+                            Some potential values are:
+                                white
+                                yellowgreen
+                                yellowgreen@0.9
+                                Red
+                                0x2E8B57
+                            For more information on this see ffmpeg documentation for color: https://ffmpeg.org/ffmpeg-utils.html#Color
+      --ffmpeg FFMPEG       Path and filename for ffmpeg. Specify if ffmpeg is not
+                            within path.
 
 
-layout:
+Layout:
+-------
+
+PERSPECTIVE: Resolution: 980x380
+::
+
+    +---------------+----------------+---------------+
+    | Diagonal Left | Front Camera   | Diagonal Right|
+    | Camera        |                | Camera        |
+    +---------------+----------------+---------------+
+
+Video example: https://youtu.be/fTUZQ-Ej5AY
+
 
 WIDESCREEN: Resolution: 1920x480
-Video example: https://youtu.be/nPleIhVxyhQ
-
 ::
 
     +---------------+----------------+---------------+
     | Left Camera   | Front Camera   | Right Camera  |
     +---------------+----------------+---------------+
 
+Video example: https://youtu.be/nPleIhVxyhQ
 
 FULLSCREEN: Resolution: 1280x960
-Video example: https://youtu.be/P5k9PXPGKWQ
-
 ::
 
     +---------------+----------------+
@@ -135,6 +159,7 @@ Video example: https://youtu.be/P5k9PXPGKWQ
     | Left Camera   |  Right Camera  |
     +---------------+----------------+
 
+Video example: https://youtu.be/P5k9PXPGKWQ
 
 
 Examples
@@ -144,7 +169,7 @@ To show help:
 
 .. code:: bash
 
-    python3 -m tesla_dashcam -h
+    python3 tesla_dashcam.py -h
 
 Using defaults:
 
@@ -152,13 +177,13 @@ Using defaults:
 
 .. code:: bash
 
-    python3 -m tesla_dashcam c:\Tesla\2019-02-27_14-02-03
+    python3 tesla_dashcam.py c:\Tesla\2019-02-27_14-02-03
 
 * Mac:
 
 .. code:: bash
 
-    python3 -m tesla_dashcam /Users/me/Desktop/Tesla/2019-02-27_14-02-03
+    python3 tesla_dashcam.py /Users/me/Desktop/Tesla/2019-02-27_14-02-03
 
 Specify video file and location:
 
@@ -166,13 +191,13 @@ Specify video file and location:
 
 .. code:: bash
 
-    python3 -m tesla_dashcam --output c:\Tesla\My_Video_Trip.mp4 c:\Tesla\2019-02-27_14-02-03
+    python3 tesla_dashcam.py --output c:\Tesla\My_Video_Trip.mp4 c:\Tesla\2019-02-27_14-02-03
 
 * Mac:
 
 .. code:: bash
 
-    python3 -m tesla_dashcam --output /Users/me/Desktop/Tesla/My_Video_Trip.mp4 /Users/me/Desktop/Tesla/2019-02-27_14-02-03
+    python3 tesla_dashcam.py --output /Users/me/Desktop/Tesla/My_Video_Trip.mp4 /Users/me/Desktop/Tesla/2019-02-27_14-02-03
 
 Without timestamp:
 
@@ -180,28 +205,43 @@ Without timestamp:
 
 .. code:: bash
 
-    python3 -m tesla_dashcam --no-timestamp c:\Tesla\2019-02-27_14-02-03
+    python3 tesla_dashcam.py --no-timestamp c:\Tesla\2019-02-27_14-02-03
 
 * Mac:
 
 .. code:: bash
 
-    python3 -m tesla_dashcam --no-timestamp /Users/me/Desktop/Tesla/2019-02-27_14-02-03
+    python3 tesla_dashcam.py --no-timestamp /Users/me/Desktop/Tesla/2019-02-27_14-02-03
 
 
-Layout so front is shown top middle with side cameras below it (FULLSCREEN):
+Put timestamp center top in yellowgreen:
 
 * Windows:
 
 .. code:: bash
 
-    python3 -m tesla_dashcam --layout FULLSCREEN c:\Tesla\2019-02-27_14-02-03
+    python3 tesla_dashcam.py --fontcolor yellowgreen@0.9 -halign CENTER -valign TOP c:\Tesla\2019-02-27_14-02-03
 
 * Mac:
 
 .. code:: bash
 
-    python3 -m tesla_dashcam --layout FULLSCREEN /Users/me/Desktop/Tesla/2019-02-27_14-02-03
+    python3 tesla_dashcam.py --fontcolor yellowgreen@0.9 -halign CENTER -valign TOP /Users/me/Desktop/Tesla/2019-02-27_14-02-03
+
+
+Layout so front is shown top middle with side cameras below it and font size of 24 (FULLSCREEN):
+
+* Windows:
+
+.. code:: bash
+
+    python3 tesla_dashcam.py --layout FULLSCREEN --fontsize 24 c:\Tesla\2019-02-27_14-02-03
+
+* Mac:
+
+.. code:: bash
+
+    python3 tesla_dashcam.py --layout FULLSCREEN --fontsize 24 /Users/me/Desktop/Tesla/2019-02-27_14-02-03
 
 
 Specify location of ffmpeg binay (in case ffmpeg is not in path):
@@ -210,13 +250,13 @@ Specify location of ffmpeg binay (in case ffmpeg is not in path):
 
 .. code:: bash
 
-    python3 -m tesla_dashcam --ffmpeg c:\ffmpeg\ffmpeg.exe c:\Tesla\2019-02-27_14-02-03
+    python3 tesla_dashcam.py --ffmpeg c:\ffmpeg\ffmpeg.exe c:\Tesla\2019-02-27_14-02-03
 
 * Mac:
 
 .. code:: bash
 
-    python3 -m tesla_dashcam --ffmpeg /Applications/ffmpeg /Users/me/Desktop/Tesla/2019-02-27_14-02-03
+    python3 tesla_dashcam.py --ffmpeg /Applications/ffmpeg /Users/me/Desktop/Tesla/2019-02-27_14-02-03
 
 Layout of FULLSCREEN with a different font for timestamp and path for ffmpeg:
 
@@ -224,13 +264,13 @@ Layout of FULLSCREEN with a different font for timestamp and path for ffmpeg:
 
 .. code:: bash
 
-    python3 -m tesla_dashcam --layout FULLSCREEN --ffmpeg c:\ffmpeg\ffmpeg.exe --font "C\:\\Windows\\Fonts\\Courier New.ttf" c:\Tesla\2019-02-27_14-02-03
+    python3 tesla_dashcam.py --layout FULLSCREEN --ffmpeg c:\ffmpeg\ffmpeg.exe --font "C\:\\Windows\\Fonts\\Courier New.ttf" c:\Tesla\2019-02-27_14-02-03
 
 * Mac:
 
 .. code:: bash
 
-    python3 -m tesla_dashcam --layout FULLSCREEN --ffmpeg /Applications/ffmpeg --font '/Library/Fonts/Courier New.ttf' /Users/me/Desktop/Tesla/2019-02-27_14-02-03
+    python3 tesla_dashcam.py --layout FULLSCREEN --ffmpeg /Applications/ffmpeg --font '/Library/Fonts/Courier New.ttf' /Users/me/Desktop/Tesla/2019-02-27_14-02-03
 
 
 Support
@@ -244,13 +284,20 @@ However, any issues or requests can be reported on `GitHub <https://github.com/e
 Release Notes
 -------------
 
-0.1.4.
-    Initial Release
-0.1.5
-    Fixed font issue on Windows
-0.1.6
-    Output folder is now optional
-    source is positional argument (in preparation for self-contained executable and drag&drop)
+0.1.4:
+    - Initial Release
+0.1.5:
+    - Fixed font issue on Windows
+0.1.6:
+    - Output folder is now optional
+    - source is positional argument (in preparation for self-contained executable and drag&drop)
+0.1.7:
+    - Added perspective layout (thanks to `lairdb <https://model3ownersclub.com/members/lairdb.16314/>`__ from `model3ownersclub <https://model3ownersclub.com>`__ forums to provide this layout).
+    - Perspective is now default layout.
+    - Added font size option to set the font size for timestamp
+    - Added font color option to set the font color for timestamp
+    - Added halign option to horizontally align timestamp (left, center, right)
+    - Added valign option to vertically align timestamp (top, middle, bottom)
 
 
 TODO
