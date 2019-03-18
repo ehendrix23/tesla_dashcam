@@ -19,8 +19,11 @@ Binaries
 
 Stand-alone binaries can be retrieved:
 
-- Windows: https://github.com/ehendrix23/tesla_dashcam/dist/tesla_dashcam.exe
-- MacOS (OSX): https://github.com/ehendrix23/tesla_dashcam/dist/tesla_dashcam
+- Windows: https://github.com/ehendrix23/tesla_dashcam/releases/download/0.1.7/tesla_dashcam.exe
+- MacOS (OSX): https://github.com/ehendrix23/tesla_dashcam/releases/download/0.1.7/tesla_dashcam
+
+    On MacOS, after download remove .dms from filename. Then open Terminal and make it executable using the command: 'chmod a+x ~/Downloads/tesla_dashcam'
+
 
 ffmpeg still has to be downloaded and installed separately.
 
