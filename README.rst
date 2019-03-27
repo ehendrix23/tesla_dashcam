@@ -72,51 +72,82 @@ Usage
 
     tesla_dashcam - Tesla DashCam Creator
 
-    usage: tesla_dashcam.py [-h] [--output OUTPUT]
-                            [--layout {WIDESCREEN,FULLSCREEN,PERSPECTIVE}]
-                            [--quality {LOWEST,LOWER,LOW,MEDIUM,HIGH}]
-                            [--compression {ultrafast,superfast,veryfast,faster,fast,medium,slow,slower,veryslow}]
-                            [--encoding {x264,x265}] [--timestamp]
+    usage: tesla_dashcam.py [-h] [--version] [--output OUTPUT]
+                            [--keep-intermediate]
+                            [--layout {WIDESCREEN,FULLSCREEN,DIAGONAL,PERSPECTIVE}]
+                            [--mirror | --rear] [--swap] [--no-swap]
+                            [--slowdown SLOW_DOWN] [--speedup SPEED_UP]
+                            [--encoding {x264,x265} | --enc ENC] [--no-gpu]
                             [--no-timestamp] [--halign {LEFT,CENTER,RIGHT}]
                             [--valign {TOP,MIDDLE,BOTTOM}] [--font FONT]
                             [--fontsize FONTSIZE] [--fontcolor FONTCOLOR]
+                            [--quality {LOWEST,LOWER,LOW,MEDIUM,HIGH}]
+                            [--compression {ultrafast,superfast,veryfast,faster,fast,medium,slow,slower,veryslow}]
                             [--ffmpeg FFMPEG]
                             source
 
     tesla_dashcam - Tesla DashCam Creator
 
     positional arguments:
-      source                Folder containing the saved camera files
+      source                Folder containing the saved camera files.
 
     optional arguments:
       -h, --help            show this help message and exit
-      --output OUTPUT       Path/Filename for the new movie file.
-      --layout {WIDESCREEN,FULLSCREEN,PERSPECTIVE}
+      --version             show program's version number and exit
+      --output OUTPUT       Path/Filename for the new movie file. Intermediate files will be stored in same folder.
+                            If not provided then resulting movie files will be created within same folder as source files. (default: None)
+      --keep-intermediate   Do not remove the intermediate video files that are
+                            created (default: False)
+      --layout {WIDESCREEN,FULLSCREEN,DIAGONAL,PERSPECTIVE}
                             Layout of the created video.
-                                PERSPECTIVE: Front camera center top, side cameras next to it in perspective.
-                                WIDESCREEN: Output from all 3 cameras are next to each other.
                                 FULLSCREEN: Front camera center top, side cameras underneath it.
-      --quality {LOWEST,LOWER,LOW,MEDIUM,HIGH}
-                            Define the quality setting for the video, higher
-                            quality means bigger file size but might not be
-                            noticeable.
-      --compression {ultrafast,superfast,veryfast,faster,fast,medium,slow,slower,veryslow}
-                            Speed to optimize video. Faster speed results in a
-                            bigger file. This does not impact the quality of the
-                            video, just how much time is used to compress it.
+                                WIDESCREEN: Output from all 3 cameras are next to each other.
+                                PERSPECTIVE: Front camera center top, side cameras next to it in perspective.
+                             (default: FULLSCREEN)
+      --mirror              Video from side cameras as if being viewed through the
+                            sidemirrors. Cannot be used in combination with
+                            --rear. (default: True)
+      --rear                Video from side cameras as if looking backwards.
+                            Cannot be used in combination with --mirror. (default:
+                            False)
+      --swap                Swap left and rear cameras, default when layout
+                            FULLSCREEN with --rear option is chosen. (default:
+                            None)
+      --no-swap             Do not swap left and rear cameras, default with all
+                            other options. (default: None)
+      --slowdown SLOW_DOWN  Slow down video output. Number is a multiplier,
+                            providing 2 means half the speed. (default: None)
+      --speedup SPEED_UP    Speed up the video. Number is a multiplier, providing
+                            2 means twice the speed. (default: None)
       --encoding {x264,x265}
-                            Encoding to use. x264 can be viewed on more devices
-                            but results in bigger file. x265 is newer encoding
-                            standard but not all devices support this yet.
-      --timestamp           Include timestamp in video
-      --no-timestamp        Do not include timestamp in video
+                            Encoding to use for video creation.
+                                x264: standard encoding, can be viewed on most devices but results in bigger file.
+                                x265: newer encoding standard but not all devices support this yet.
+                             (default: x264)
+      --enc ENC             Provide a custom encoding for video creation.
+                            Note: when using this option the --gpu option is ignored. To use GPU hardware acceleration specify a encoding that provides this. (default: None)
+      --no-gpu              Use GPU acceleration, only enable if supported by hardware.
+                             MAC: All MACs with Haswell CPU or later  support this (Macs after 2013).
+                                  See following link as well:
+                                     https://en.wikipedia.org/wiki/List_of_Macintosh_models_grouped_by_CPU_type#Haswell
+                             Windows and Linux: PCs with NVIDIA graphic cards support this as well.
+                                                For more information on supported cards see:
+                                     https://developer.nvidia.com/video-encode-decode-gpu-support-matrix (default: False)
+      --ffmpeg FFMPEG       Path and filename for ffmpeg. Specify if ffmpeg is not
+                            within path. (default: ffmpeg)
+
+    Timestamp:
+      Options for timestamp:
+
+      --no-timestamp        Include timestamp in video (default: False)
       --halign {LEFT,CENTER,RIGHT}
-                            Horizontal alignment for timestamp
+                            Horizontal alignment for timestamp (default: CENTER)
       --valign {TOP,MIDDLE,BOTTOM}
-                            Vertical Alignment for timestamp
+                            Vertical Alignment for timestamp (default: BOTTOM)
       --font FONT           Fully qualified filename (.ttf) to the font to be
-                            chosen for timestamp.
-      --fontsize FONTSIZE   Font size for timestamp.
+                            chosen for timestamp. (default:
+                            /Library/Fonts/Arial.ttf)
+      --fontsize FONTSIZE   Font size for timestamp. (default: 16)
       --fontcolor FONTCOLOR
                             Font color for timestamp. Any color is accepted as a color string or RGB value.
                             Some potential values are:
@@ -124,16 +155,38 @@ Usage
                                 yellowgreen
                                 yellowgreen@0.9
                                 Red
-                                0x2E8B57
-                            For more information on this see ffmpeg documentation for color: https://ffmpeg.org/ffmpeg-utils.html#Color
-      --ffmpeg FFMPEG       Path and filename for ffmpeg. Specify if ffmpeg is not
-                            within path.
+                            :    0x2E8B57
+                            For more information on this see ffmpeg documentation for color: https://ffmpeg.org/ffmpeg-utils.html#Color (default: white)
+
+    Video Quality:
+      Options for resulting video quality and size:
+
+      --quality {LOWEST,LOWER,LOW,MEDIUM,HIGH}
+                            Define the quality setting for the video, higher
+                            quality means bigger file size but might not be
+                            noticeable. (default: LOWER)
+      --compression {ultrafast,superfast,veryfast,faster,fast,medium,slow,slower,veryslow}
+                            Speed to optimize video. Faster speed results in a
+                            bigger file. This does not impact the quality of the
+                            video, just how much time is used to compress it.
+                            (default: medium)
 
 
 Layout:
 -------
 
-PERSPECTIVE: Resolution: 980x380
+`FULLSCREEN:` Resolution: 1280x960
+::
+
+    +---------------+----------------+
+    |           Front Camera         |
+    +---------------+----------------+
+    | Left Camera   |  Right Camera  |
+    +---------------+----------------+
+
+Video example: https://youtu.be/P5k9PXPGKWQ
+
+`PERSPECTIVE:` Resolution: 980x380
 ::
 
     +---------------+----------------+---------------+
@@ -144,7 +197,7 @@ PERSPECTIVE: Resolution: 980x380
 Video example: https://youtu.be/fTUZQ-Ej5AY
 
 
-WIDESCREEN: Resolution: 1920x480
+`WIDESCREEN:` Resolution: 1920x480
 ::
 
     +---------------+----------------+---------------+
@@ -153,16 +206,7 @@ WIDESCREEN: Resolution: 1920x480
 
 Video example: https://youtu.be/nPleIhVxyhQ
 
-FULLSCREEN: Resolution: 1280x960
-::
 
-    +---------------+----------------+
-    |           Front Camera         |
-    +---------------+----------------+
-    | Left Camera   |  Right Camera  |
-    +---------------+----------------+
-
-Video example: https://youtu.be/P5k9PXPGKWQ
 
 
 Examples
@@ -301,6 +345,23 @@ Release Notes
     - Added font color option to set the font color for timestamp
     - Added halign option to horizontally align timestamp (left, center, right)
     - Added valign option to vertically align timestamp (top, middle, bottom)
+0.1.8:
+    - Added GPU hardware accelerated encoding for Mac and PCs with NVIDIA. On Mac it is enabled by default
+    - Added option to have video from side cameras be shown as if one were to look at it through the mirror (option --mirror). This is now the default
+    - Added option --rear to show video from side cameras as if one was looking to the rear of the car. This was how it was originally.
+    - Added option to swap left and right camera in output. Mostly beneficial in FULLSCREEN with --rear option as it then seems like it is from a rear camera
+    - Added option to speedup (--speedup) or slowdown (--slowdown) the video.
+    - Added option to provide a different encoder for ffmpeg to use. This is for those more experienced with ffmpeg.
+    - Set FULLSCREEN back as the default layout
+    - For output (--output) one can now also just specify a folder name. The resulting filename will be based on the name of the folder it is then put in
+    - The intermediate files (combining of the 3 cameras into 1 video file per minute) will now be written to the output folder if one provided.
+    - The intermediate files will be deleted once the complete video file is created. This can be disabled through option --keep-intermediate
+    - Added a default font path for Linux systems
+    - Help output (-h) will show what default value is for each parameter
+    - Added --version to get the version number
+    - Now able to handle if a camera file is missing, a black screen will be shown for that duration for the missing file
+    - Releases will now also include self-contained executable for MacOS and Windows (located on github)
+
 
 
 TODO
