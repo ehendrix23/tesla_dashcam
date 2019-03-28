@@ -1,5 +1,6 @@
 import argparse
 import os
+import shutil
 import sys
 from datetime import datetime
 from glob import glob
@@ -157,7 +158,6 @@ def get_metadata(ffmpeg, filenames):
     ffmpeg_command.append('-hide_banner')
 
     command_result = run(ffmpeg_command, capture_output=True, text=True)
-    print(command_result)
     input_counter = 0
     file = ''
     metadata = []
@@ -202,7 +202,9 @@ def get_metadata(ffmpeg, filenames):
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description='tesla_dashcam - Tesla DashCam Creator',
+        description='tesla_dashcam - Tesla DashCam & Senty Video Creator',
+        epilog='This program requires ffmpeg which can be downloaded from: '
+               'https://ffmpeg.org/download.html',
         formatter_class=SmartFormatter)
         # formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
@@ -285,16 +287,16 @@ def main() -> None:
     speed_group.add_argument('--slowdown',
                               dest='slow_down',
                               type=int,
-                              help="Slow down video output. Number is a "
-                                   "multiplier, providing 2 means half the "
-                                   "speed."
+                              help="Slow down video output. Accepts a number "
+                                   "that is then used as multiplier, "
+                                   "providing 2 means half the speed."
                               )
     swap_cameras.add_argument('--speedup',
                               dest='speed_up',
                               type=int,
-                              help="Speed up the video. Number is a "
-                                   "multiplier, providing 2 means twice the "
-                                   "speed."
+                              help="Speed up the video. Accepts a number "
+                                   "that is then used as a multiplier, "
+                                   "providing 2 means twice the speed."
                               )
 
     encoding_group = parser.add_mutually_exclusive_group()
@@ -818,29 +820,58 @@ def main() -> None:
                      ffmpeg_params + \
                      ['-y', movie_filename]
 
-    # Creating movie
-    print("Creating movie {}, please be patient.".format(movie_filename))
-
-    try:
-        run(ffmpeg_command, capture_output=True, check=True)
-    except CalledProcessError as exc:
-        print("Error trying to create movie {base_name}. RC: {rc}\n"
-              "Command: {command}\n"
-              "Error: {stderr}\n\n".format(
-            base_name=movie_filename,
-            rc=exc.returncode,
-            command=exc.cmd,
-            stderr=exc.stderr,
-        ))
-    else:
-        print("Movie {base_name} has been created, enjoy.".format(
-            base_name=movie_filename))
-
-    if not args.keep_intermediate:
-        for file in dashcam_clips:
+    if len(dashcam_clips) == 1:
+        # There really was only one, no need to create, just move
+        # intermediate file.
+        # Remove file 1st if it exist otherwise on Windows we can't rename.
+        if os.path.isfile(movie_filename):
             try:
-                os.remove(file)
+                os.remove(movie_filename)
             except OSError as exc:
                 print("Error trying to remove file %s: %s", file, exc)
+
+        if not args.keep_intermediate:
+            try:
+                shutil.move(dashcam_clips[0], movie_filename)
+            except OSError as exc:
+                print("Error trying to move file %s to %s: %s",
+                      dashcam_clips[0],
+                      movie_filename,
+                      exc)
+        else:
+            try:
+                shutil.copyfile(dashcam_clips[0], movie_filename)
+            except OSError as exc:
+                print("Error trying to copy file %s to %s: %s",
+                      dashcam_clips[0],
+                      movie_filename,
+                      exc)
+
+
+    elif len(dashcam_clips) > 1:
+        # Creating movie
+        print("Creating movie {}, please be patient.".format(movie_filename))
+
+        try:
+            run(ffmpeg_command, capture_output=True, check=True)
+        except CalledProcessError as exc:
+            print("Error trying to create movie {base_name}. RC: {rc}\n"
+                  "Command: {command}\n"
+                  "Error: {stderr}\n\n".format(
+                base_name=movie_filename,
+                rc=exc.returncode,
+                command=exc.cmd,
+                stderr=exc.stderr,
+            ))
+        else:
+            print("Movie {base_name} has been created, enjoy.".format(
+                base_name=movie_filename))
+
+        if not args.keep_intermediate:
+            for file in dashcam_clips:
+                try:
+                    os.remove(file)
+                except OSError as exc:
+                    print("Error trying to remove file %s: %s", file, exc)
 
 sys.exit(main())

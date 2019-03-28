@@ -354,6 +354,7 @@ Release Notes
     - Added option to provide a different encoder for ffmpeg to use. This is for those more experienced with ffmpeg.
     - Now able to handle if a camera file is missing, a black screen will be shown for that duration for the missing file
     - For output (--output) one can now also just specify a folder name. The resulting filename will be based on the name of the folder it is then put in
+    - If there is only 1 video file for merging then will now just rename intermediate (or copy if --keep-intermediate is set).
     - The intermediate files (combining of the 3 cameras into 1 video file per minute) will now be written to the output folder if one provided.
     - The intermediate files will be deleted once the complete video file is created. This can be disabled through option --keep-intermediate
     - Set FULLSCREEN back as the default layout
