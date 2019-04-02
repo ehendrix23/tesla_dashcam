@@ -130,10 +130,10 @@ MOVIE_LAYOUT = {
 }
 
 MOVIE_QUALITY = {
-    'HIGH': '18',
+    'HIGH':   '18',
     'MEDIUM': '20',
-    'LOW': '23',
-    'LOWER': '28',
+    'LOW':    '23',
+    'LOWER':  '28',
     'LOWEST': '33',
 }
 
@@ -156,13 +156,13 @@ DEFAULT_FONT = {
 }
 
 HALIGN = {
-    'LEFT': '10',
+    'LEFT':   '10',
     'CENTER': '(w/2-text_w/2)',
-    'RIGHT': '(w-text_w)',
+    'RIGHT':  '(w-text_w)',
 }
 
 VALIGN = {
-    'TOP': '10',
+    'TOP':    '10',
     'MIDDLE': '(h/2-(text_h/2))',
     'BOTTOM': '(h-(text_h*2))',
 }
@@ -1668,5 +1668,6 @@ def main() -> None:
         folders = get_movie_files(args.source, args.exclude_subdirs, ffmpeg)
         process_folders(folders, video_settings, False, False)
 
+    print()
 
 sys.exit(main())
