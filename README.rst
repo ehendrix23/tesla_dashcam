@@ -5,7 +5,7 @@ Python program that provides an easy method to merge saved Tesla Dashcam footage
 
 When saving Tesla Dashcam footage a folder is created on the USB drive and within it multiple MP4 video files are
 created. Currently the dashcam leverages three (3) cameras (front, left repeater, and right repeater) and will create a
-file for each of them. Every minute is stored into a seperate file as well. This means that when saving dashcam footage
+file for each of them. Every minute is stored into a separate file as well. This means that when saving dashcam footage
 there is a total of 30 files video files.
 
 Using this Python program, one can combine all of these into 1 video file. The video of the three cameras is merged
@@ -19,13 +19,18 @@ Binaries
 
 Stand-alone binaries can be retrieved:
 
-- Windows: https://github.com/ehendrix23/tesla_dashcam/releases/download/0.1.7/tesla_dashcam.exe
-- MacOS (OSX): https://github.com/ehendrix23/tesla_dashcam/releases/download/0.1.7/tesla_dashcam
+- Windows: https://github.com/ehendrix23/tesla_dashcam/releases/download/0.1.8/tesla_dashcam.zip
+- MacOS (OSX): https://github.com/ehendrix23/tesla_dashcam/releases/download/0.1.8/tesla_dashcam.dmg
 
-    On MacOS, after download remove .dms from filename. Then open Terminal and make it executable using the command: 'chmod a+x ~/Downloads/tesla_dashcam'
+`ffmpeg <https://www.ffmpeg.org/legal.html>`_ is included within the respective package.
+ffmpeg is a separately licensed product under the `GNU Lesser General Public License (LGPL) version 2.1 or later <http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html>`_.
+FFmpeg incorporates several optional parts and optimizations that are covered by the GNU General Public License (GPL) version 2 or later. If those parts get used the GPL applies to all of FFmpeg.
+For more information on ffmpeg license please see: https://www.ffmpeg.org/legal.html
 
+Windows binary of ffmpeg was downloaded from: https://ffmpeg.zeranoe.com/builds/
 
-ffmpeg still has to be downloaded and installed separately.
+MacOS binary of ffmpeg was downloaded from: https://evermeet.cx/ffmpeg/
+
 
 Notes
 -----
@@ -46,7 +51,7 @@ Requirements
 -------------
 
 This package relies on `ffmpeg <https://ffmpeg.org>`__ to be installed, this is a free, open source cross-platform
-solution to convert video. It has to be downloaded and installed separately.
+solution to convert video.
 
 `Python <https://www.python.org>`__ 3.5 or higher is required (unless stand-alone binaries are used).
 
@@ -359,10 +364,13 @@ Release Notes
     - The intermediate files will be deleted once the complete video file is created. This can be disabled through option --keep-intermediate
     - Set FULLSCREEN back as the default layout
     - Added a default font path for Linux systems
+    - Fixed (I believe) cygwin path for fonts.
     - Help output (-h) will show what default value is for each parameter
     - Cleaned up help output
     - Added --version to get the version number
-    - Releases will now also include self-contained executable for MacOS and Windows (located on github)
+    - Releases will now be bundled in a ZIP file (Windows) or a DMG file (MacOS) with self-contained executables in them. This means Python does not need to be installed anymore (located on github)
+    - ffmpeg executable binary for Windows and MacOS added into respective bundle.
+    - Default path for ffmpeg will be set to same path as tesla_dashcam is located in, if not exist then default will be based that ffmpeg is part of PATH.
 
 
 
