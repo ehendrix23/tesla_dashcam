@@ -4,13 +4,21 @@ import shutil
 import sys
 from datetime import datetime
 from glob import glob
+from pathlib import Path
 from re import search
 from subprocess import CalledProcessError, run
 
 from tzlocal import get_localzone
 
-VERSION='0.1.8b1'
-FFMPEG = 'ffmpeg'
+VERSION='0.1.8'
+
+FFMPEG = {
+    'darwin': 'ffmpeg',
+    'win32':  'ffmpeg.exe',
+    'cygwin': 'ffmpeg',
+    'linux':  'ffmpeg',
+}
+
 MOVIE_LAYOUT = {
     # Layout:
     #  [Left_Clip][Front_Clip][Right_Clip]
@@ -113,7 +121,7 @@ MOVIE_ENCODING = {
 DEFAULT_FONT = {
     'darwin': '/Library/Fonts/Arial.ttf',
     'win32':  'C\:\\Windows\\Fonts\\arial.ttf',
-    'cygwin': 'C\:\\Windows\\Fonts\\arial.ttf',
+    'cygwin': '/cygdrive/c/Windows/Fonts/arial.ttf',
     'linux':  '/usr/share/fonts/truetype/freefont/FreeSans.ttf',
 }
 
@@ -201,6 +209,21 @@ def get_metadata(ffmpeg, filenames):
 
 
 def main() -> None:
+
+    # If compiled then getting path of executable is different.
+    if getattr(sys, 'frozen', False):
+        ffmpeg_path = os.path.dirname(sys.executable)
+    else:
+        ffmpeg_path = Path(__file__).parent
+
+    ffmpeg_default = os.path.join(ffmpeg_path, FFMPEG.get(sys.platform,
+                                                          'ffmpeg'))
+
+    # Check if ffmpeg exist, if not then hope it is in default path or
+    # provided.
+    if not os.path.isfile(ffmpeg_default):
+        ffmpeg_default = FFMPEG.get(sys.platform, 'ffmpeg')
+
     parser = argparse.ArgumentParser(
         description='tesla_dashcam - Tesla DashCam & Senty Video Creator',
         epilog='This program requires ffmpeg which can be downloaded from: '
@@ -448,7 +471,7 @@ def main() -> None:
     parser.add_argument('--ffmpeg',
                         required=False,
                         type=str,
-                        default=FFMPEG,
+                        default=ffmpeg_default,
                         help='Path and filename for ffmpeg. Specify if '
                              'ffmpeg is not within path.')
 
@@ -838,6 +861,9 @@ def main() -> None:
                       dashcam_clips[0],
                       movie_filename,
                       exc)
+            else:
+                print("Movie {base_name} has been created, enjoy.".format(
+                    base_name=movie_filename))
         else:
             try:
                 shutil.copyfile(dashcam_clips[0], movie_filename)
@@ -846,7 +872,9 @@ def main() -> None:
                       dashcam_clips[0],
                       movie_filename,
                       exc)
-
+            else:
+                print("Movie {base_name} has been created, enjoy.".format(
+                    base_name=movie_filename))
 
     elif len(dashcam_clips) > 1:
         # Creating movie
@@ -873,5 +901,7 @@ def main() -> None:
                     os.remove(file)
                 except OSError as exc:
                     print("Error trying to remove file %s: %s", file, exc)
+
+    print()
 
 sys.exit(main())
