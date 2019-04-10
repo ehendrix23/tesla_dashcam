@@ -554,7 +554,6 @@ Release Notes
     - Releases will now be bundled in a ZIP file (Windows) or a DMG file (MacOS) with self-contained executables in them. This means Python does not need to be installed anymore (located on github)
     - ffmpeg executable binary for Windows and MacOS added into respective bundle.
     - Default path for ffmpeg will be set to same path as tesla_dashcam is located in, if not exist then default will be based that ffmpeg is part of PATH.
-<<<<<<< HEAD
 0.1.9:
     - Added scanning of sub-folders clip files. Each folder will be processed and resulting movie file created. This can be disabled through parameter --exclude_subdirs
     - Added option to merge the video files from multiple sub-folders into 1 movie file. Use parameter --merge to enable.
@@ -570,10 +569,6 @@ Release Notes
     - DockerFile added making it easy to run tesla_dashcam within Docker (jeanfabrice)
     - Fixed: combining clips to movie would not use GPU or provided encoding.
     - Added additional check that video file exist before merging into movie.
-=======
-
-
->>>>>>> Release 0.1.8 (#5)
 
 TODO
 ----
