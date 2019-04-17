@@ -34,7 +34,7 @@ if VERSION['beta'] > -1:
         beta=VERSION['beta']
     )
 
-MONITOR_SLEEP_TIME = 30
+MONITOR_SLEEP_TIME = 5
 
 GITHUB = {
     'URL': 'https://api.github.com',
@@ -793,7 +793,7 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
     # Reason to also do it with 1 is to put the name correctly for the
     # movie
     # especially if a filename was given.
-    if video_settings['merge_subdirs'] or len(dashcam_clips) == 1:
+    if video_settings['merge_subdirs'] or len(folders) == 1:
         print("\tCreating movie {}, please be patient.".format(
             video_settings['movie_filename']))
 
@@ -1449,6 +1449,8 @@ def main() -> None:
                     # Nothing found, sleep for 1 minute and check again.
                     if got_drive:
                         print("TeslaCam drive has been ejected.")
+                        print("Monitoring for TeslaCam Drive to be inserted. "
+                              "Press CTRL-C to stop")
 
                     sleep(MONITOR_SLEEP_TIME)
                     got_drive = False
@@ -1490,7 +1492,8 @@ def main() -> None:
                     break
 
                 got_drive = True
-                print("Back to monitoring for TeslaCam Drive to be inserted.")
+                print("Waiting for TeslaCam Drive to be ejected. Press "
+                      "CTRL-C to stop")
             except KeyboardInterrupt:
                 print("Monitoring stopped due to CTRL-C.")
                 break
