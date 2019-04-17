@@ -561,6 +561,7 @@ Release Notes
     - Will now check if a new update is available, additional arguments to just perform check (--check_for_update), include test releases (--include_test), or disable always checking for updates (--no-check_for_update)
     - Formatted output to easily show progress
     - Time it took to create the video files will now be provided upon completion of processing.
+    - Will now handle it much better if a video file from a camera is corrupt (i.e. zero-byte file).
 
 TODO
 ----
