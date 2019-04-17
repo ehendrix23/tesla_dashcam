@@ -17,7 +17,24 @@ import requests
 from psutil import disk_partitions
 from tzlocal import get_localzone
 
-VERSION = '0.1.9b0'
+VERSION = {
+    'major': 0,
+    'minor': 1,
+    'patch': 9,
+    'beta': 1,
+}
+VERSION_STR = 'v{major}.{minor}.{patch}'.format(
+        major=VERSION['major'],
+        minor=VERSION['minor'],
+        patch=VERSION['patch'],
+    )
+
+if VERSION['beta'] > -1:
+    VERSION_STR = VERSION_STR + 'b{beta}'.format(
+        beta=VERSION['beta']
+    )
+
+MONITOR_SLEEP_TIME = 30
 
 GITHUB = {
     'URL': 'https://api.github.com',
@@ -204,13 +221,9 @@ def get_tesladashcam_folder():
 
         teslacamfolder = os.path.join(partition.mountpoint, 'TeslaCam')
         if os.path.isdir(teslacamfolder):
-            # TeslaCam Folder found, returning it.
-            print("TeslaCam folder found on {partition}.".format(
-                partition=partition.mountpoint
-            ))
-            return teslacamfolder
+            return teslacamfolder, partition.mountpoint
 
-    return None
+    return None, None
 
 
 def get_movie_files(source_folder, exclude_subdirs, ffmpeg):
@@ -762,6 +775,9 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
 
             # Delete the source files if stated to delete.
             if delete_folder_files:
+                print("\t\tDeleting files and folder {folder_name}".format(
+                    folder_name=folder_name
+                ))
                 delete_intermediate(delete_file_list)
                 # And delete the folder.
                 delete_intermediate([folder_name])
@@ -827,8 +843,9 @@ def main() -> None:
                'https://ffmpeg.org/download.html',
         formatter_class=SmartFormatter)
 
+
     parser.add_argument('--version', action='version', version=' %(prog)s '
-                        + VERSION)
+                        + VERSION_STR)
     parser.add_argument('source',
                         type=str,
                         help="Folder containing the saved camera files.")
@@ -1148,19 +1165,57 @@ def main() -> None:
 
     if not args.no_check_for_updates or args.check_for_updates:
         release_info = check_latest_release(args.include_beta)
-        check_version = 'v' + VERSION
-        if release_info.get('tag_name') != check_version:
+
+        new_version = False
+        if release_info.get('tag_name') is not None:
+            github_version = release_info.get('tag_name').split('.')
+            if len(github_version) == 3:
+                # Release tags normally start with v. If that is the case
+                # then strip the v.
+                try:
+                    major_version = int(github_version[0])
+                except ValueError:
+                    major_version = int(github_version[0][1:])
+
+                minor_version = int(github_version[1])
+                if release_info.get('prerelease'):
+                    # Drafts will have b and then beta number.
+                    patch_version = int(github_version[2].split('b')[0])
+                    beta_version = int(github_version[2].split('b')[1])
+                else:
+                    patch_version = int(github_version[2])
+                    beta_version = -1
+
+                if major_version == VERSION['major']:
+                    if minor_version == VERSION['minor']:
+                        if patch_version == VERSION['patch']:
+                            if beta_version > VERSION['beta'] or \
+                                    beta_version == -1:
+                                new_version = True
+                        elif patch_version > VERSION['patch']:
+                            new_version = True
+                    elif minor_version > VERSION['minor']:
+                        new_version = True
+                elif major_version > VERSION['major']:
+                    new_version = True
+
+        if new_version:
             beta = ""
-            if release_info.get('draft'):
+            if release_info.get('prerelease'):
                 beta = "beta "
 
+            release_notes = ""
+            if not args.check_for_updates:
+                release_notes = "Use --check-for-update to get latest " \
+                                "release notes."
+
             print("New {beta}release {release} is available for download "
-                  "({url}). You are currently on {version}. Use "
-                  "--check-for-update to get latest release notes.".format(
+                  "({url}). You are currently on {version}. {rel_note}".format(
                       beta=beta,
                       release=release_info.get('tag_name'),
                       url=release_info.get('html_url'),
-                      version=check_version,
+                      version=VERSION_STR,
+                      rel_note=release_notes,
                   ))
 
             if args.check_for_updates:
@@ -1174,7 +1229,7 @@ def main() -> None:
         else:
             if args.check_for_updates:
                 print("{version} is the latest release available.".format(
-                    version=check_version,
+                    version=VERSION_STR,
                 ))
                 return
 
@@ -1389,22 +1444,26 @@ def main() -> None:
               " stop")
         while True:
             try:
-                source_folder = get_tesladashcam_folder()
+                source_folder, source_partition = get_tesladashcam_folder()
                 if source_folder is None:
                     # Nothing found, sleep for 1 minute and check again.
                     if got_drive:
                         print("TeslaCam drive has been ejected.")
 
-                    sleep(60)
+                    sleep(MONITOR_SLEEP_TIME)
                     got_drive = False
                     continue
 
                 # As long as TeslaCam drive is still attached we're going to
                 # keep on waiting.
                 if got_drive:
-                    sleep(60)
+                    sleep(MONITOR_SLEEP_TIME)
                     continue
 
+                # TeslaCam Folder found, returning it.
+                print("TeslaCam folder found on {partition}.".format(
+                    partition=source_partition
+                ))
                 # Got a folder, append what was provided as source unless
                 # . was provided in which case everything is done.
                 if args.source != '.':
