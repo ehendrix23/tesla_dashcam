@@ -544,7 +544,7 @@ def create_intermediate_movie(filename_timestamp,
                      video_settings['other_params']
 
     ffmpeg_command = ffmpeg_command + ['-y', temp_movie_name]
-    # print(ffmpeg_command)
+
     # Run the command.
     try:
         run(ffmpeg_command, capture_output=True, check=True)
@@ -794,6 +794,7 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
     # Reason to also do it with 1 is to put the name correctly for the
     # movie
     # especially if a filename was given.
+    movie_name is None
     if video_settings['merge_subdirs'] or len(folders) == 1:
         print("\tCreating movie {}, please be patient.".format(
             video_settings['movie_filename']))
@@ -804,9 +805,9 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
             video_settings,
         )
 
-        if movie_name is not None:
-            print("Movie {base_name} has been created, enjoy.".format(
-                base_name=movie_name))
+    if movie_name is not None:
+        print("Movie {base_name} has been created, enjoy.".format(
+            base_name=movie_name))
     else:
         print("All folders have been processed, resulting movie files are "
               "located in {target_folder}".format(
@@ -819,7 +820,22 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
     print("Total processing time: {real}".format(
         real=str(timedelta(seconds=real)),
     ))
-
+    if movie_name is not None:
+        notify("TeslaCam", "Completed",
+               "{total_folders} folders with {total_clips} clips have been "
+               "processed, movie {movie_name} has been created.".format(
+                   total_folders=len(folders),
+                   total_clips=total_clips,
+                   movie_name=video_settings['target_folder']
+               ))
+    else:
+        notify("TeslaCam", "Completed",
+               "{total_folders} folders with {total_clips} clips have been "
+               "processed, {target_folder} contains resulting files.".format(
+                   total_folders=len(folders),
+                   total_clips=total_clips,
+                   target_folder=video_settings['target_folder']
+               ))
     print()
 
 def resource_path(relative_path):
@@ -832,11 +848,69 @@ def resource_path(relative_path):
     base_path = getattr(sys, '_MEIPASS', Path(__file__).parent)
     return os.path.join(base_path, relative_path)
 
+def notify_macos(title, subtitle, message):
+    """ Notification on MacOS """
+    try:
+        run(['osascript',
+             '-e display notification "{message}" with title "{title}" '
+             'subtitle "{subtitle}"'
+             ''.format(
+                 message=message,
+                 title=title,
+                 subtitle=subtitle,
+             )])
+    except Exception as exc:
+        print("Failed in notifification: ", exc)
+
+def notify_windows(title, subtitle, message):
+    """ Notification on Windows """
+    try:
+        from win10toast import ToastNotifier
+        ToastNotifier().show_toast(
+            threaded=True,
+            title="{} {}".format(title, subtitle),
+            msg=message,
+            duration=5,
+            icon_path=resource_path("tesla_dashcam.ico")
+        )
+
+        run(['notify-send',
+             '"{title} {subtitle}"'.format(
+                 title=title,
+                 subtitle=subtitle),
+             '"{}"'.format(message),
+             ])
+    except Exception as exc:
+        pass
+        # print("Failed in notifification: ", exc)
+
+def notify_linux(title, subtitle, message):
+    """ Notification on Linux """
+    try:
+        run(['notify-send',
+             '"{title} {subtitle}"'.format(
+                 title=title,
+                 subtitle=subtitle),
+             '"{}"'.format(message),
+             ])
+    except Exception as exc:
+        print("Failed in notifification: ", exc)
+
+def notify(title, subtitle, message):
+    """ Call function to send notification based on OS """
+    if sys.platform == 'darwin':
+        notify_macos(title, subtitle, message)
+    elif sys.platform == 'win32':
+        notify_windows(title, subtitle, message)
+    elif sys.platform == 'linux':
+        notify_linux(title, subtitle, message)
+
 def main() -> None:
     """ Main function """
 
     internal_ffmpeg = getattr(sys, 'frozen', None) is not None
-    ffmpeg_default = resource_path(FFMPEG.get(sys.platform,'ffmpeg'))
+    ffmpeg_default = resource_path(FFMPEG.get(sys.platform, 'ffmpeg'))
+
     # Check if ffmpeg exist, if not then hope it is in default path or
     # provided.
     if not os.path.isfile(ffmpeg_default):
@@ -1251,7 +1325,9 @@ def main() -> None:
                 ))
                 return
 
-    ffmpeg = getattr(args, 'ffmpeg', ffmpeg_default)
+
+    ffmpeg = ffmpeg_default if getattr(args, 'ffmpeg', None) is None else \
+        args.ffmpeg
 
     mirror_sides = ''
     if args.rear:
@@ -1484,6 +1560,10 @@ def main() -> None:
                 print("TeslaCam folder found on {partition}.".format(
                     partition=source_partition
                 ))
+                notify("TeslaCam Started",
+                       "TeslaCam folder found on {partition}.".format(
+                           partition=source_partition
+                ))
                 # Got a folder, append what was provided as source unless
                 # . was provided in which case everything is done.
                 if args.source != '.':
@@ -1504,6 +1584,10 @@ def main() -> None:
                     process_folders(folders, video_settings, True,
                                     args.delete_source)
 
+                notify("TeslaCam Completed",
+                       "Processing of movies has completed.".format(
+                           partition=source_partition
+                ))
                 # Stop if we're only to monitor once and then exit.
                 if args.monitor_once:
                     print("Exiting monitoring as asked process once.")
@@ -1518,7 +1602,5 @@ def main() -> None:
     else:
         folders = get_movie_files(args.source, args.exclude_subdirs, ffmpeg)
         process_folders(folders, video_settings, False, False)
-
-
 
 sys.exit(main())
