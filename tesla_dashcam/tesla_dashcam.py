@@ -411,6 +411,7 @@ def create_intermediate_movie(filename_timestamp,
     video files into 1 video file. """
     # We first stack (combine the 3 different camera video files into 1
     # and then we concatenate.
+    camera_1 = None
     if video['video_info']['front_camera']['filename'] is not None:
         camera_1 = os.path.join(
             video['movie_folder'],
