@@ -562,6 +562,7 @@ Release Notes
     - Formatted output to easily show progress
     - Time it took to create the video files will now be provided upon completion of processing.
     - Will now handle it much better if a video file from a camera is corrupt (i.e. zero-byte file).
+    - ffmpeg executables are now merged into the tesla_dashcam executable itself and not added separately for Windows and MacOS bundles
 
 TODO
 ----

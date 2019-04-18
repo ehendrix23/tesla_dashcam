@@ -822,26 +822,36 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
 
     print()
 
+def resource_path(relative_path):
+    """ Return absolute path for provided relative item based on location
+
+    of program.
+    """
+    # If compiled with pyinstaller then sys._MEIPASS points to the location
+    # of the bundle. Otherwise path of python script is used.
+    base_path = getattr(sys, '_MEIPASS', Path(__file__).parent)
+    return os.path.join(base_path, relative_path)
+
 def main() -> None:
     """ Main function """
-    # If compiled then getting path of executable is different.
-    if getattr(sys, 'frozen', False):
-        ffmpeg_path = os.path.dirname(sys.executable)
-    else:
-        ffmpeg_path = Path(__file__).parent
 
-    ffmpeg_default = os.path.join(ffmpeg_path, FFMPEG.get(sys.platform,
-                                                          'ffmpeg'))
-
+    internal_ffmpeg = getattr(sys, 'frozen', None) is not None
+    ffmpeg_default = resource_path(FFMPEG.get(sys.platform,'ffmpeg'))
     # Check if ffmpeg exist, if not then hope it is in default path or
     # provided.
     if not os.path.isfile(ffmpeg_default):
+        internal_ffmpeg = False
         ffmpeg_default = FFMPEG.get(sys.platform, 'ffmpeg')
+
+    epilog = "This program leverages ffmpeg which is included. See " \
+             "https://ffmpeg.org/ for more information on ffmpeg" if \
+        internal_ffmpeg else 'This program requires ffmpeg which can be ' \
+                             'downloaded from: ' \
+                             'https://ffmpeg.org/download.html'
 
     parser = argparse.ArgumentParser(
         description='tesla_dashcam - Tesla DashCam & Sentry Video Creator',
-        epilog='This program requires ffmpeg which can be downloaded from: '
-               'https://ffmpeg.org/download.html',
+        epilog=epilog,
         formatter_class=SmartFormatter)
 
 
@@ -1099,12 +1109,19 @@ def main() -> None:
                                     "much time is used to compress it."
                                )
 
-    parser.add_argument('--ffmpeg',
-                        required=False,
-                        type=str,
-                        default=ffmpeg_default,
-                        help='Path and filename for ffmpeg. Specify if '
-                             'ffmpeg is not within path.')
+    if internal_ffmpeg:
+        parser.add_argument('--ffmpeg',
+                            required=False,
+                            type=str,
+                            help='Full path and filename for alternative '
+                                 'ffmpeg.')
+    else:
+        parser.add_argument('--ffmpeg',
+                            required=False,
+                            type=str,
+                            default=ffmpeg_default,
+                            help='Path and filename for ffmpeg. Specify if '
+                                 'ffmpeg is not within path.')
 
     monitor_group = parser.add_argument_group(
         title="Monitor for TeslaDash Cam drive",
@@ -1234,7 +1251,7 @@ def main() -> None:
                 ))
                 return
 
-    ffmpeg = args.ffmpeg
+    ffmpeg = getattr(args, 'ffmpeg', ffmpeg_default)
 
     mirror_sides = ''
     if args.rear:
