@@ -1469,7 +1469,7 @@ def main() -> None:
         if use_gpu:
             print("GPU acceleration is enabled")
             encoding = encoding + '_mac' if sys.platform == 'darwin' else \
-                encoding + '_nvenc'
+                encoding + '_nvidia'
 
             ffmpeg_params = ffmpeg_params + \
                             ['-b:v',
