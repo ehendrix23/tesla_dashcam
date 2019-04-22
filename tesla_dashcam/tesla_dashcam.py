@@ -820,22 +820,29 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
     print("Total processing time: {real}".format(
         real=str(timedelta(seconds=real)),
     ))
-    if movie_name is not None:
-        notify("TeslaCam", "Completed",
-               "{total_folders} folders with {total_clips} clips have been "
-               "processed, movie {movie_name} has been created.".format(
-                   total_folders=len(folders),
-                   total_clips=total_clips,
-                   movie_name=video_settings['target_folder']
-               ))
-    else:
-        notify("TeslaCam", "Completed",
-               "{total_folders} folders with {total_clips} clips have been "
-               "processed, {target_folder} contains resulting files.".format(
-                   total_folders=len(folders),
-                   total_clips=total_clips,
-                   target_folder=video_settings['target_folder']
-               ))
+    if video_settings['notification']:
+        if movie_name is not None:
+            notify("TeslaCam", "Completed",
+                   "{total_folders} folder{folders} with {total_clips} "
+                   "clip{clips} have been processed, movie {movie_name} has "
+                   "been created.".format(
+                       folders='' if len(folders) < 2 else 's',
+                       total_folders=len(folders),
+                       clips='' if total_clips < 2 else 's',
+                       total_clips=total_clips,
+                       movie_name=video_settings['target_folder']
+                   ))
+        else:
+            notify("TeslaCam", "Completed",
+                   "{total_folders} folder{folders} with {total_clips} "
+                   "clip{clips} have been processed, {target_folder} contains "
+                   "resulting files.".format(
+                       folders='' if len(folders) < 2 else 's',
+                       total_folders=len(folders),
+                       clips='' if total_clips < 2 else 's',
+                       total_clips=total_clips,
+                       target_folder=video_settings['target_folder']
+                   ))
     print()
 
 def resource_path(relative_path):
@@ -966,6 +973,12 @@ def main() -> None:
                         action='store_true',
                         help='Do not remove the intermediate video files that '
                              'are created')
+
+    parser.add_argument('--no-notification',
+                        dest='system_notification',
+                        action='store_false',
+                        help='Do not create a notification upon '
+                             'completion.')
 
     parser.add_argument('--layout',
                         required=False,
@@ -1298,6 +1311,14 @@ def main() -> None:
 
             release_notes = ""
             if not args.check_for_updates:
+                if args.system_notification:
+                    notify("TeslaCam", "Update available",
+                           "New {beta}release {release} is available. You are on "
+                           "version {version}".format(
+                               beta=beta,
+                               release=release_info.get('tag_name'),
+                               version=VERSION_STR,
+                           ))
                 release_notes = "Use --check-for-update to get latest " \
                                 "release notes."
 
@@ -1512,6 +1533,7 @@ def main() -> None:
         'merge_subdirs':     args.merge_subdirs,
         'movie_filename':    movie_filename,
         'keep_intermediate': args.keep_intermediate,
+        'notification':      args.system_notification,
         'swap_left_right':   swap_left_right,
         'movie_layout':      args.layout,
         'movie_speed':       speed,
@@ -1560,10 +1582,11 @@ def main() -> None:
                 print("TeslaCam folder found on {partition}.".format(
                     partition=source_partition
                 ))
-                notify("TeslaCam Started",
-                       "TeslaCam folder found on {partition}.".format(
-                           partition=source_partition
-                ))
+                if args.system_notification:
+                    notify("TeslaCam", "Started",
+                           "TeslaCam folder found on {partition}.".format(
+                               partition=source_partition
+                    ))
                 # Got a folder, append what was provided as source unless
                 # . was provided in which case everything is done.
                 if args.source != '.':
@@ -1584,10 +1607,11 @@ def main() -> None:
                     process_folders(folders, video_settings, True,
                                     args.delete_source)
 
-                notify("TeslaCam Completed",
-                       "Processing of movies has completed.".format(
-                           partition=source_partition
-                ))
+                if args.system_notification:
+                    notify("TeslaCam", "Completed",
+                           "Processing of movies has completed.".format(
+                               partition=source_partition
+                    ))
                 # Stop if we're only to monitor once and then exit.
                 if args.monitor_once:
                     print("Exiting monitoring as asked process once.")

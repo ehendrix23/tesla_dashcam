@@ -136,6 +136,8 @@ Usage
                             If not provided then resulting movie files will be created within same folder as source files. (default: None)
       --keep-intermediate   Do not remove the intermediate video files that are
                             created (default: False)
+      --no-notification     Do not create a notification upon completion.
+                            (default: False)
       --layout {WIDESCREEN,FULLSCREEN,DIAGONAL,PERSPECTIVE}
                             Layout of the created video.
                                 FULLSCREEN: Front camera center top, side cameras underneath it.
@@ -558,11 +560,12 @@ Release Notes
     - Added option to monitor if the USB drive (or SD card) is inserted in the PC and then automatically start processing the files. Use parameter --monitor to enable.
       Parameter --monitor_once will stop monitoring and exit after 1st time drive was inserted.
       Parameter --delete_source will delete the source files and folder once the movie file for that folder has been created.
-    - Will now check if a new update is available, additional arguments to just perform check (--check_for_update), include test releases (--include_test), or disable always checking for updates (--no-check_for_update)
+    - Added update checker to determine if there is a newer version, additional arguments to just perform check (--check_for_update), include test releases (--include_test), or disable always checking for updates (--no-check_for_update)
     - Formatted output to easily show progress
     - Time it took to create the video files will now be provided upon completion of processing.
     - Will now handle it much better if a video file from a camera is corrupt (i.e. zero-byte file).
-    - ffmpeg executables are now merged into the tesla_dashcam executable itself and not added separately for Windows and MacOS bundles
+    - ffmpeg executables are now merged into the tesla_dashcam executable and separately for Windows and MacOS bundles
+    - Desktop notification when processing starts (when using monitor) and when it completes.
 
 TODO
 ----
