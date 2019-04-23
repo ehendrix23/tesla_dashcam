@@ -935,7 +935,6 @@ def main() -> None:
         epilog=epilog,
         formatter_class=SmartFormatter)
 
-
     parser.add_argument('--version', action='version', version=' %(prog)s '
                         + VERSION_STR)
     parser.add_argument('source',
@@ -1264,7 +1263,6 @@ def main() -> None:
                                     help='Include test (beta) releases '
                                          'when checking for updates.'
                                     )
-
 
     args = parser.parse_args()
 
