@@ -26,6 +26,8 @@ VERSION = None
 # What packages are required for this module to be executed?
 REQUIRED = [  # type: ignore
     'tzlocal',
+    'requests',
+    'psutil',
 ]
 
 # The rest you shouldn't have to touch too much :)
