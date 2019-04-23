@@ -566,6 +566,7 @@ Release Notes
     - Will now handle it much better if a video file from a camera is corrupt (i.e. zero-byte file).
     - ffmpeg is part of the tesla_dashcam executable
     - Desktop notification when processing starts (when using monitor) and when it completes.
+    - DockerFile added making it easy to run tesla_dashcam within Docker (jeanfabrice)
 
 TODO
 ----
