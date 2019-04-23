@@ -564,7 +564,7 @@ Release Notes
     - Formatted output to easily show progress
     - Time it took to create the video files will now be provided upon completion of processing.
     - Will now handle it much better if a video file from a camera is corrupt (i.e. zero-byte file).
-    - ffmpeg executables are now merged into the tesla_dashcam executable and separately for Windows and MacOS bundles
+    - ffmpeg is part of the tesla_dashcam executable
     - Desktop notification when processing starts (when using monitor) and when it completes.
 
 TODO
@@ -572,7 +572,8 @@ TODO
 
 * Add object detection (i.e. people) and possible output when object was detected
 * Support drag&drop of video folder
-* Create GUI for options
+* GUI Front-end
+* Saving of options
 * Option to specify resolutions as an argument
 * Option for end-user layout
 * Use timestamp in video to determine order instead of file name
