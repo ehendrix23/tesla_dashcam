@@ -794,7 +794,7 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
     # Reason to also do it with 1 is to put the name correctly for the
     # movie
     # especially if a filename was given.
-    movie_name is None
+    movie_name = None
     if video_settings['merge_subdirs'] or len(folders) == 1:
         print("\tCreating movie {}, please be patient.".format(
             video_settings['movie_filename']))
