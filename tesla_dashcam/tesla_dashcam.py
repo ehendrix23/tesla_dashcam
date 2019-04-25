@@ -24,10 +24,10 @@ VERSION = {
     'beta': 2,
 }
 VERSION_STR = 'v{major}.{minor}.{patch}'.format(
-        major=VERSION['major'],
-        minor=VERSION['minor'],
-        patch=VERSION['patch'],
-    )
+    major=VERSION['major'],
+    minor=VERSION['minor'],
+    patch=VERSION['patch'],
+)
 
 if VERSION['beta'] > -1:
     VERSION_STR = VERSION_STR + 'b{beta}'.format(
@@ -44,125 +44,125 @@ GITHUB = {
 
 FFMPEG = {
     'darwin': 'ffmpeg',
-    'win32':  'ffmpeg.exe',
+    'win32': 'ffmpeg.exe',
     'cygwin': 'ffmpeg',
-    'linux':  'ffmpeg',
+    'linux': 'ffmpeg',
 }
 
 MOVIE_LAYOUT = {
     # Layout:
     #  [Left_Clip][Front_Clip][Right_Clip]
-    'WIDESCREEN':  {
-        'video_x':        1920,
-        'video_y':        480,
-        'clip_x':         640,  # 1/3 of video width
-        'clip_y':         480,  # Same as video height
-        'left_x':         0,  # Left of video
-        'left_y':         0,  # Top of video
-        'front_x':        640,  # Right of left clip
-        'front_y':        0,  # Top of video
-        'right_x':        1280,  # Right-most clip
-        'right_y':        0,  # Top of video
-        'left_options':   '',
-        'front_options':  '',
-        'right_options':  '',
+    'WIDESCREEN': {
+        'video_x': 1920,
+        'video_y': 480,
+        'clip_x': 640,  # 1/3 of video width
+        'clip_y': 480,  # Same as video height
+        'left_x': 0,  # Left of video
+        'left_y': 0,  # Top of video
+        'front_x': 640,  # Right of left clip
+        'front_y': 0,  # Top of video
+        'right_x': 1280,  # Right-most clip
+        'right_y': 0,  # Top of video
+        'left_options': '',
+        'front_options': '',
+        'right_options': '',
         'swap_left_rear': False,
     },
     # Layout:
     #       [Front_Clip]
     #  [Left_Clip][Right_Clip]
-    'FULLSCREEN':  {
-        'video_x':        1280,
-        'video_y':        960,
-        'clip_x':         640,  # 1/3 of video width
-        'clip_y':         480,  # Same as video height
-        'left_x':         0,  # Left of video
-        'left_y':         480,  # Bottom of video
-        'front_x':        320,  # Middle of video
-        'front_y':        0,  # Top of video
-        'right_x':        640,  # Right of left clip
-        'right_y':        480,  # Bottom of video
-        'left_options':   '',
-        'front_options':  '',
-        'right_options':  '',
+    'FULLSCREEN': {
+        'video_x': 1280,
+        'video_y': 960,
+        'clip_x': 640,  # 1/3 of video width
+        'clip_y': 480,  # Same as video height
+        'left_x': 0,  # Left of video
+        'left_y': 480,  # Bottom of video
+        'front_x': 320,  # Middle of video
+        'front_y': 0,  # Top of video
+        'right_x': 640,  # Right of left clip
+        'right_y': 480,  # Bottom of video
+        'left_options': '',
+        'front_options': '',
+        'right_options': '',
         'swap_left_rear': False,
     },
     'PERSPECTIVE': {
-        'video_x':        980,
-        'video_y':        380,
-        'clip_x':         320,  # 1/3 of video width
-        'clip_y':         240,  # Same as video height
-        'left_x':         5,  # Left of video
-        'left_y':         5,  # Bottom of video
-        'front_x':        330,  # Middle of video
-        'front_y':        5,  # Top of video
-        'right_x':        655,  # Right of left clip
-        'right_y':        5,  # Bottom of video
-        'left_options':   ', pad=iw+4:11/6*ih:-1:30:0x00000000,'
-                          'perspective=x0=0:y0=1*H/5:x1=W:y1=-3/44*H:'
-                          'x2=0:y2=6*H/5:x3=7/8*W:y3=5*H/6:sense=destination',
-        'front_options':  '',
-        'right_options':  ', pad=iw+4:11/6*ih:-1:30:0x00000000,'
-                          'perspective=x0=0:y1=1*H/5:x1=W:y0=-3/44*H:'
-                          'x2=1/8*W:y3=6*H/5:x3=W:y2=5*H/6:sense=destination',
+        'video_x': 980,
+        'video_y': 380,
+        'clip_x': 320,  # 1/3 of video width
+        'clip_y': 240,  # Same as video height
+        'left_x': 5,  # Left of video
+        'left_y': 5,  # Bottom of video
+        'front_x': 330,  # Middle of video
+        'front_y': 5,  # Top of video
+        'right_x': 655,  # Right of left clip
+        'right_y': 5,  # Bottom of video
+        'left_options': ', pad=iw+4:11/6*ih:-1:30:0x00000000,'
+                        'perspective=x0=0:y0=1*H/5:x1=W:y1=-3/44*H:'
+                        'x2=0:y2=6*H/5:x3=7/8*W:y3=5*H/6:sense=destination',
+        'front_options': '',
+        'right_options': ', pad=iw+4:11/6*ih:-1:30:0x00000000,'
+                         'perspective=x0=0:y1=1*H/5:x1=W:y0=-3/44*H:'
+                         'x2=1/8*W:y3=6*H/5:x3=W:y2=5*H/6:sense=destination',
         'swap_left_rear': False,
     },
-    'DIAGONAL':    {
-        'video_x':        980,
-        'video_y':        380,
-        'clip_x':         320,  # 1/3 of video width
-        'clip_y':         240,  # Same as video height
-        'left_x':         5,  # Left of video
-        'left_y':         5,  # Bottom of video
-        'front_x':        330,  # Middle of video
-        'front_y':        5,  # Top of video
-        'right_x':        655,  # Right of left clip
-        'right_y':        5,  # Bottom of video
-        'left_options':   ', pad=iw+4:11/6*ih:-1:30:0x00000000,'
-                          'perspective=x0=0:y0=1*H/5:x1=W:y1=-3/44*H:'
-                          'x2=0:y2=6*H/5:x3=W:y3=410:sense=destination',
-        'front_options':  '',
-        'right_options':  ', pad=iw+4:11/6*ih:-1:30:0x00000000,'
-                          'perspective=x0=0:y0=-3/44*H:x1=W:y1=1*H/5:'
-                          'x2=0:y2=410:x3=W:y3=6*H/5:sense=destination',
+    'DIAGONAL': {
+        'video_x': 980,
+        'video_y': 380,
+        'clip_x': 320,  # 1/3 of video width
+        'clip_y': 240,  # Same as video height
+        'left_x': 5,  # Left of video
+        'left_y': 5,  # Bottom of video
+        'front_x': 330,  # Middle of video
+        'front_y': 5,  # Top of video
+        'right_x': 655,  # Right of left clip
+        'right_y': 5,  # Bottom of video
+        'left_options': ', pad=iw+4:11/6*ih:-1:30:0x00000000,'
+                        'perspective=x0=0:y0=1*H/5:x1=W:y1=-3/44*H:'
+                        'x2=0:y2=6*H/5:x3=W:y3=410:sense=destination',
+        'front_options': '',
+        'right_options': ', pad=iw+4:11/6*ih:-1:30:0x00000000,'
+                         'perspective=x0=0:y0=-3/44*H:x1=W:y1=1*H/5:'
+                         'x2=0:y2=410:x3=W:y3=6*H/5:sense=destination',
         'swap_left_rear': False,
     },
 }
 
 MOVIE_QUALITY = {
-    'HIGH':   '18',
+    'HIGH': '18',
     'MEDIUM': '20',
-    'LOW':    '23',
-    'LOWER':  '28',
+    'LOW': '23',
+    'LOWER': '28',
     'LOWEST': '33',
 }
 
 MOVIE_ENCODING = {
-    'x264':        'libx264',
+    'x264': 'libx264',
     'x264_nvidia': 'h264_nvenc',
-    'x264_mac':    'h264_videotoolbox',
-    'x264_intel':  'h264_qsv',
-    'x265':        'libx265',
+    'x264_mac': 'h264_videotoolbox',
+    'x264_intel': 'h264_qsv',
+    'x265': 'libx265',
     'x265_nvidia': 'hevc_nvenc',
-    'x265_mac':    'hevc_videotoolbox',
-    'x265_intel':  'h265_qsv',
+    'x265_mac': 'hevc_videotoolbox',
+    'x265_intel': 'h265_qsv',
 }
 
 DEFAULT_FONT = {
     'darwin': '/Library/Fonts/Arial.ttf',
-    'win32':  'C\:\\Windows\\Fonts\\arial.ttf',
+    'win32': 'C\:\\Windows\\Fonts\\arial.ttf',
     'cygwin': '/cygdrive/c/Windows/Fonts/arial.ttf',
-    'linux':  '/usr/share/fonts/truetype/freefont/FreeSans.ttf',
+    'linux': '/usr/share/fonts/truetype/freefont/FreeSans.ttf',
 }
 
 HALIGN = {
-    'LEFT':   '10',
+    'LEFT': '10',
     'CENTER': '(w/2-text_w/2)',
-    'RIGHT':  '(w-text_w)',
+    'RIGHT': '(w-text_w)',
 }
 
 VALIGN = {
-    'TOP':    '10',
+    'TOP': '10',
     'MIDDLE': '(h/2-(text_h/2))',
     'BOTTOM': '(h-(text_h*2))',
 }
@@ -184,15 +184,6 @@ class SmartFormatter(argparse.HelpFormatter):
         return argparse.ArgumentDefaultsHelpFormatter._get_help_string(self,
                                                                        action)
 
-def log_entry(OUTPUT, message):
-    if output is None:
-        print(message)
-    else:
-        try:
-            with open(output) as file:
-                file.write(message)
-        except:
-            print(message)
 
 def check_latest_release(include_beta):
     """ Checks GitHub for latest release """
@@ -210,7 +201,7 @@ def check_latest_release(include_beta):
     except requests.exceptions.RequestException as exc:
         print("Unable to check for latest release: {exc}".format(
             exc=exc
-            ))
+        ))
         return None
 
     release_data = releases.json()
@@ -264,18 +255,18 @@ def get_movie_files(source_folder, exclude_subdirs, ffmpeg):
 
         video_info = {
             'front_camera': {
-                'filename':  None,
-                'duration':  None,
+                'filename': None,
+                'duration': None,
                 'timestamp': None,
             },
-            'left_camera':  {
-                'filename':  None,
-                'duration':  None,
+            'left_camera': {
+                'filename': None,
+                'duration': None,
                 'timestamp': None,
             },
             'right_camera': {
-                'filename':  None,
-                'duration':  None,
+                'filename': None,
+                'duration': None,
                 'timestamp': None,
             },
         }
@@ -341,9 +332,9 @@ def get_movie_files(source_folder, exclude_subdirs, ffmpeg):
 
         movie_info = {
             'movie_folder': movie_folder,
-            'timestamp':    video_timestamp,
-            'duration':     duration,
-            'video_info':   video_info,
+            'timestamp': video_timestamp,
+            'duration': duration,
+            'video_info': video_info,
         }
 
         movie_file_list.update({filename_timestamp: movie_info})
@@ -400,9 +391,9 @@ def get_metadata(ffmpeg, filenames):
 
             metadata.append(
                 {
-                    'filename':  file,
+                    'filename': file,
                     'timestamp': video_timestamp,
-                    'duration':  duration,
+                    'duration': duration,
                 }
             )
             continue
@@ -546,11 +537,11 @@ def create_intermediate_movie(filename_timestamp,
         video_settings['ffmpeg_speed']
 
     ffmpeg_command = [video_settings['ffmpeg_exec']] + \
-                     ffmpeg_command_0 + \
-                     ffmpeg_command_1 + \
-                     ffmpeg_command_2 + \
-                     ['-filter_complex', ffmpeg_filter] + \
-                     video_settings['other_params']
+        ffmpeg_command_0 + \
+        ffmpeg_command_1 + \
+        ffmpeg_command_2 + \
+        ['-filter_complex', ffmpeg_filter] + \
+        video_settings['other_params']
 
     ffmpeg_command = ffmpeg_command + ['-y', temp_movie_name]
 
@@ -594,9 +585,9 @@ def create_movie(clips_list, movie_filename, video_settings):
                 os.remove(movie_filename)
             except OSError as exc:
                 # Putting out error but going to try to copy/move anyway.
-                print("\t\tError trying to remove file %s: %s",
-                      movie_filename,
-                      exc)
+                print("\t\tError trying to remove file {}: {}".format(
+                    movie_filename,
+                    exc))
 
         if not video_settings['keep_intermediate']:
             try:
@@ -625,14 +616,14 @@ def create_movie(clips_list, movie_filename, video_settings):
     for clip_number, filename in enumerate(clips_list):
         ffmpeg_concat_input = ffmpeg_concat_input + ['-i', filename]
         concat_filter_complex = concat_filter_complex + \
-                                '[{clip}:v:0] '.format(
-                                    clip=clip_number
-                                )
+            '[{clip}:v:0] '.format(
+                clip=clip_number
+            )
 
     concat_filter_complex = concat_filter_complex + \
-                            "concat=n={total_clips}:v=1:a=0 [v]".format(
-                                total_clips=len(clips_list),
-                            )
+        "concat=n={total_clips}:v=1:a=0 [v]".format(
+            total_clips=len(clips_list),
+        )
 
     ffmpeg_params = ['-filter_complex',
                      concat_filter_complex,
@@ -647,9 +638,9 @@ def create_movie(clips_list, movie_filename, video_settings):
                      ]
 
     ffmpeg_command = [video_settings['ffmpeg_exec']] + \
-                     ffmpeg_concat_input + \
-                     ffmpeg_params + \
-                     ['-y', movie_filename]
+        ffmpeg_concat_input + \
+        ffmpeg_params + \
+        ['-y', movie_filename]
 
     try:
         run(ffmpeg_command, capture_output=True, check=True)
@@ -676,15 +667,18 @@ def delete_intermediate(movie_files):
 
                     os.remove(file)
                 except OSError as exc:
-                    print("\t\tError trying to remove file %s: %s", file, exc)
+                    print("\t\tError trying to remove file {}: {}".format(
+                        file,
+                        exc))
             elif os.path.isdir(file):
                 try:
 
                     os.rmdir(file)
                 except OSError as exc:
-                    print("\t\tError trying to remove folder %s: %s",
-                          file,
-                          exc)
+                    print("\t\tError trying to remove folder {}: {}".format(
+                        file,
+                        exc))
+
 
 def process_folders(folders, video_settings, skip_existing, delete_source):
     """ Process all clips found within folders. """
@@ -859,6 +853,7 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
                    ))
     print()
 
+
 def resource_path(relative_path):
     """ Return absolute path for provided relative item based on location
 
@@ -868,6 +863,7 @@ def resource_path(relative_path):
     # of the bundle. Otherwise path of python script is used.
     base_path = getattr(sys, '_MEIPASS', Path(__file__).parent)
     return os.path.join(base_path, relative_path)
+
 
 def notify_macos(title, subtitle, message):
     """ Notification on MacOS """
@@ -882,6 +878,7 @@ def notify_macos(title, subtitle, message):
              )])
     except Exception as exc:
         print("Failed in notifification: ", exc)
+
 
 def notify_windows(title, subtitle, message):
     """ Notification on Windows """
@@ -901,9 +898,9 @@ def notify_windows(title, subtitle, message):
                  subtitle=subtitle),
              '"{}"'.format(message),
              ])
-    except Exception as exc:
+    except Exception:
         pass
-        # print("Failed in notifification: ", exc)
+
 
 def notify_linux(title, subtitle, message):
     """ Notification on Linux """
@@ -917,6 +914,7 @@ def notify_linux(title, subtitle, message):
     except Exception as exc:
         print("Failed in notifification: ", exc)
 
+
 def notify(title, subtitle, message):
     """ Call function to send notification based on OS """
     if sys.platform == 'darwin':
@@ -925,6 +923,7 @@ def notify(title, subtitle, message):
         notify_windows(title, subtitle, message)
     elif sys.platform == 'linux':
         notify_linux(title, subtitle, message)
+
 
 def main() -> None:
     """ Main function """
@@ -949,8 +948,10 @@ def main() -> None:
         epilog=epilog,
         formatter_class=SmartFormatter)
 
-    parser.add_argument('--version', action='version', version=' %(prog)s '
-                        + VERSION_STR)
+    parser.add_argument('--version',
+                        action='version',
+                        version=' %(prog)s ' + VERSION_STR
+                        )
     parser.add_argument('source',
                         type=str,
                         help="Folder containing the saved camera files.")
@@ -961,14 +962,14 @@ def main() -> None:
                           action='store_true',
                           help="Do not search all sub folders for video files "
                                "to."
-                         )
+                          )
 
     sub_dirs.add_argument('--merge',
                           dest='merge_subdirs',
                           action='store_true',
                           help="Merge the video files from different "
                                "folders into 1 big video file."
-                         )
+                          )
 
     parser.add_argument('--output',
                         required=False,
@@ -1325,8 +1326,8 @@ def main() -> None:
             if not args.check_for_updates:
                 if args.system_notification:
                     notify("TeslaCam", "Update available",
-                           "New {beta}release {release} is available. You are on "
-                           "version {version}".format(
+                           "New {beta}release {release} is available. You are "
+                           "on version {version}".format(
                                beta=beta,
                                release=release_info.get('tag_name'),
                                version=VERSION_STR,
@@ -1357,7 +1358,6 @@ def main() -> None:
                     version=VERSION_STR,
                 ))
                 return
-
 
     ffmpeg = ffmpeg_default if getattr(args, 'ffmpeg', None) is None else \
         args.ffmpeg
@@ -1437,23 +1437,23 @@ def main() -> None:
 
         ffmpeg_timestamp = filter_label.format(
             filter_counter=filter_counter) + \
-                           'drawtext=fontfile={fontfile}:'.format(
-                               fontfile=font_file
-                           )
+            'drawtext=fontfile={fontfile}:'.format(
+                fontfile=font_file,
+        )
         filter_counter += 1
 
         ffmpeg_timestamp = ffmpeg_timestamp + \
-                           'fontcolor={fontcolor}:fontsize={fontsize}:' \
-                           'borderw=2:bordercolor=black@1.0:' \
-                           'x={halign}:y={valign}:'.format(
-                               fontcolor=args.fontcolor,
-                               fontsize=args.fontsize,
-                               valign=VALIGN[args.valign],
-                               halign=HALIGN[args.halign],
-                           )
+            'fontcolor={fontcolor}:fontsize={fontsize}:' \
+            'borderw=2:bordercolor=black@1.0:' \
+            'x={halign}:y={valign}:'.format(
+                fontcolor=args.fontcolor,
+                fontsize=args.fontsize,
+                valign=VALIGN[args.valign],
+                halign=HALIGN[args.halign],
+            )
 
         ffmpeg_timestamp = ffmpeg_timestamp + \
-                           "text='%{{pts\:localtime\:{epoch_time}\:%x %X}}'"
+            "text='%{{pts\:localtime\:{epoch_time}\:%x %X}}'"
 
     speed = args.slow_down if args.slow_down is not None else ''
     speed = 1 / args.speed_up if args.speed_up is not None else speed
@@ -1461,7 +1461,7 @@ def main() -> None:
     if speed != '':
         ffmpeg_speed = filter_label.format(
             filter_counter=filter_counter) + \
-                       " setpts={speed}*PTS".format(speed=speed)
+            " setpts={speed}*PTS".format(speed=speed)
         filter_counter += 1
 
     ffmpeg_params = [
@@ -1484,18 +1484,19 @@ def main() -> None:
                 encoding + '_nvidia'
 
             ffmpeg_params = ffmpeg_params + \
-                            ['-b:v',
-                             '2500K']
+                ['-b:v',
+                 '2500K'
+                 ]
 
         ffmpeg_params = ffmpeg_params + \
-                        ['-c:v',
-                         MOVIE_ENCODING[encoding]
-                         ]
+            ['-c:v',
+             MOVIE_ENCODING[encoding]
+             ]
     else:
         ffmpeg_params = ffmpeg_params + \
-                        ['-c:v',
-                         args.enc
-                         ]
+            ['-c:v',
+             args.enc
+             ]
 
     # Determine the target folder.
     target_folder = args.source if args.output is None else args.output
@@ -1541,27 +1542,27 @@ def main() -> None:
         swap_left_right = args.swap
 
     video_settings = {
-        'target_folder':     target_folder,
-        'merge_subdirs':     args.merge_subdirs,
-        'movie_filename':    movie_filename,
+        'target_folder': target_folder,
+        'merge_subdirs': args.merge_subdirs,
+        'movie_filename': movie_filename,
         'keep_intermediate': args.keep_intermediate,
-        'notification':      args.system_notification,
-        'swap_left_right':   swap_left_right,
-        'movie_layout':      args.layout,
-        'movie_speed':       speed,
-        'movie_encoding':    args.encoding,
+        'notification': args.system_notification,
+        'swap_left_right': swap_left_right,
+        'movie_layout': args.layout,
+        'movie_speed': speed,
+        'movie_encoding': args.encoding,
         'movie_compression': args.compression,
-        'movie_quality':     args.quality,
-        'background':        ffmpeg_black_video,
-        'ffmpeg_exec':       ffmpeg,
-        'base':              ffmpeg_base,
-        'clip_positions':    ffmpeg_video_position,
-        'timestamp_text':    ffmpeg_timestamp,
-        'ffmpeg_speed':      ffmpeg_speed,
-        'other_params':      ffmpeg_params,
-        'input_0':           ffmpeg_input_0,
-        'input_1':           ffmpeg_input_1,
-        'input_2':           ffmpeg_input_2,
+        'movie_quality': args.quality,
+        'background': ffmpeg_black_video,
+        'ffmpeg_exec': ffmpeg,
+        'base': ffmpeg_base,
+        'clip_positions': ffmpeg_video_position,
+        'timestamp_text': ffmpeg_timestamp,
+        'ffmpeg_speed': ffmpeg_speed,
+        'other_params': ffmpeg_params,
+        'input_0': ffmpeg_input_0,
+        'input_1': ffmpeg_input_1,
+        'input_2': ffmpeg_input_2,
     }
 
     # If we constantly run and monitor for drive added or not.
@@ -1598,21 +1599,23 @@ def main() -> None:
                     notify("TeslaCam", "Started",
                            "TeslaCam folder found on {partition}.".format(
                                partition=source_partition
-                    ))
+                           ))
                 # Got a folder, append what was provided as source unless
                 # . was provided in which case everything is done.
                 if args.source != '.':
                     source_folder = os.path.join(source_folder, args.source)
 
-                    folders = get_movie_files(source_folder, args.exclude_subdirs,
+                    folders = get_movie_files(source_folder,
+                                              args.exclude_subdirs,
                                               ffmpeg)
 
                     if not args.monitor_once:
-                        # We will continue to monitor hence we need to ensure we
+                        # We will continue to monitor hence we need to
+                        # ensure we
                         # always have a unique final movie name.
                         mv_filename = movie_filename + '_' + \
-                                      datetime.today().strftime(
-                                          '%Y-%m-%d_%H_%M')
+                            datetime.today().strftime(
+                                '%Y-%m-%d_%H_%M')
 
                         video_settings.update({movie_filename: mv_filename})
 
@@ -1623,7 +1626,7 @@ def main() -> None:
                     notify("TeslaCam", "Completed",
                            "Processing of movies has completed.".format(
                                partition=source_partition
-                    ))
+                           ))
                 # Stop if we're only to monitor once and then exit.
                 if args.monitor_once:
                     print("Exiting monitoring as asked process once.")
@@ -1638,5 +1641,6 @@ def main() -> None:
     else:
         folders = get_movie_files(args.source, args.exclude_subdirs, ffmpeg)
         process_folders(folders, video_settings, False, False)
+
 
 sys.exit(main())
