@@ -21,7 +21,7 @@ VERSION = {
     'major': 0,
     'minor': 1,
     'patch': 9,
-    'beta': 1,
+    'beta': 2,
 }
 VERSION_STR = 'v{major}.{minor}.{patch}'.format(
         major=VERSION['major'],
@@ -184,6 +184,15 @@ class SmartFormatter(argparse.HelpFormatter):
         return argparse.ArgumentDefaultsHelpFormatter._get_help_string(self,
                                                                        action)
 
+def log_entry(OUTPUT, message):
+    if output is None:
+        print(message)
+    else:
+        try:
+            with open(output) as file:
+                file.write(message)
+        except:
+            print(message)
 
 def check_latest_release(include_beta):
     """ Checks GitHub for latest release """
@@ -572,6 +581,11 @@ def create_movie(clips_list, movie_filename, video_settings):
     # If there is only 1 clip then we can just put it in place as there is
     # nothing to concatenate.
     if len(clips_list) == 1:
+        # If not output folder provided then these 2 are the same and thus
+        # nothing to be done.
+        if movie_filename == clips_list[0]:
+            return movie_filename
+
         # There really was only one, no need to create, just move
         # intermediate file.
         # Remove file 1st if it exist otherwise on Windows we can't rename.
@@ -588,19 +602,19 @@ def create_movie(clips_list, movie_filename, video_settings):
             try:
                 shutil.move(clips_list[0], movie_filename)
             except OSError as exc:
-                print("\t\tError trying to move file %s to %s: %s",
-                      clips_list[0],
-                      movie_filename,
-                      exc)
+                print("\t\tError trying to move file {} to {}: {}".format(
+                    clips_list[0],
+                    movie_filename,
+                    exc))
                 return None
         else:
             try:
                 shutil.copyfile(clips_list[0], movie_filename)
             except OSError as exc:
-                print("\t\tError trying to copy file %s to %s: %s",
-                      clips_list[0],
-                      movie_filename,
-                      exc)
+                print("\t\tError trying to copy file {} to {}: {}".format(
+                    clips_list[0],
+                    movie_filename,
+                    exc))
                 return None
 
         return movie_filename
