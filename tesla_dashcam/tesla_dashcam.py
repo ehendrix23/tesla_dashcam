@@ -21,7 +21,7 @@ VERSION = {
     'major': 0,
     'minor': 1,
     'patch': 9,
-    'beta': 3,
+    'beta': 2,
 }
 VERSION_STR = 'v{major}.{minor}.{patch}'.format(
     major=VERSION['major'],
