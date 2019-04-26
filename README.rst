@@ -567,6 +567,7 @@ Release Notes
     - ffmpeg is part of the tesla_dashcam executable
     - Desktop notification when processing starts (when using monitor) and when it completes.
     - DockerFile added making it easy to run tesla_dashcam within Docker (jeanfabrice)
+    - Fixed: combining clips to movie would not use GPU or provided encoding.
 
 TODO
 ----

@@ -21,7 +21,7 @@ VERSION = {
     'major': 0,
     'minor': 1,
     'patch': 9,
-    'beta': 2,
+    'beta': 3,
 }
 VERSION_STR = 'v{major}.{minor}.{patch}'.format(
     major=VERSION['major'],
@@ -629,13 +629,12 @@ def create_movie(clips_list, movie_filename, video_settings):
                      concat_filter_complex,
                      '-map',
                      '[v]',
-                     '-c:v',
-                     MOVIE_ENCODING[video_settings['movie_encoding']],
                      '-preset',
                      video_settings['movie_compression'],
                      '-crf',
                      MOVIE_QUALITY[video_settings['movie_quality']]
-                     ]
+                     ] + \
+        video_settings['video_encoding']
 
     ffmpeg_command = [video_settings['ffmpeg_exec']] + \
         ffmpeg_concat_input + \
@@ -1475,6 +1474,7 @@ def main() -> None:
     if sys.platform == 'darwin':
         use_gpu = not args.gpu
 
+    video_encoding = []
     if args.enc is None:
         encoding = args.encoding
         # GPU acceleration enabled
@@ -1483,20 +1483,23 @@ def main() -> None:
             encoding = encoding + '_mac' if sys.platform == 'darwin' else \
                 encoding + '_nvidia'
 
-            ffmpeg_params = ffmpeg_params + \
+            video_encoding = video_encoding + \
                 ['-b:v',
                  '2500K'
                  ]
 
-        ffmpeg_params = ffmpeg_params + \
+        video_encoding = video_encoding + \
             ['-c:v',
              MOVIE_ENCODING[encoding]
              ]
+
     else:
-        ffmpeg_params = ffmpeg_params + \
+        video_encoding = video_encoding + \
             ['-c:v',
              args.enc
              ]
+
+    ffmpeg_params = ffmpeg_params + video_encoding
 
     # Determine the target folder.
     target_folder = args.source if args.output is None else args.output
@@ -1550,6 +1553,7 @@ def main() -> None:
         'swap_left_right': swap_left_right,
         'movie_layout': args.layout,
         'movie_speed': speed,
+        'video_encoding': video_encoding,
         'movie_encoding': args.encoding,
         'movie_compression': args.compression,
         'movie_quality': args.quality,
