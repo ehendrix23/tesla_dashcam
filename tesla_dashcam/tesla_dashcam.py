@@ -21,7 +21,7 @@ VERSION = {
     'major': 0,
     'minor': 1,
     'patch': 9,
-    'beta': 2,
+    'beta': 3,
 }
 VERSION_STR = 'v{major}.{minor}.{patch}'.format(
     major=VERSION['major'],
@@ -388,6 +388,10 @@ def get_metadata(ffmpeg, filenames):
                 int(duration_list[1]) * 60 + \
                 int(duration_list[2].split('.')[0]) + \
                 (float(duration_list[2].split('.')[1]) / 100)
+
+            # Only add if duration is greater then 0; otherwise ignore.
+            if duration <= 0:
+                continue
 
             metadata.append(
                 {
