@@ -613,16 +613,28 @@ def create_movie(clips_list, movie_filename, video_settings):
     # Go through the list of clips to create the command.
     ffmpeg_concat_input = []
     concat_filter_complex = ''
-    for clip_number, filename in enumerate(clips_list):
+    total_clips = 0
+    for filename in clips_list:
+        if not os.path.isfile(filename):
+            print("\t\tFile {} does not exist anymore, skipping.".format(
+                filename
+            ))
+            continue
+
         ffmpeg_concat_input = ffmpeg_concat_input + ['-i', filename]
         concat_filter_complex = concat_filter_complex + \
             '[{clip}:v:0] '.format(
-                clip=clip_number
+                clip=total_clips
             )
+        total_clips = total_clips + 1
+
+    if total_clips == 0:
+        print("\t\tError: No valid clips to merge found.")
+        return None
 
     concat_filter_complex = concat_filter_complex + \
         "concat=n={total_clips}:v=1:a=0 [v]".format(
-            total_clips=len(clips_list),
+            total_clips=total_clips,
         )
 
     ffmpeg_params = ['-filter_complex',

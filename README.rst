@@ -568,6 +568,7 @@ Release Notes
     - Desktop notification when processing starts (when using monitor) and when it completes.
     - DockerFile added making it easy to run tesla_dashcam within Docker (jeanfabrice)
     - Fixed: combining clips to movie would not use GPU or provided encoding.
+    - Added additional check that video file exist before merging into movie.
 
 TODO
 ----
