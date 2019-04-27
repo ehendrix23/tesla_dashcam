@@ -3,8 +3,11 @@ tesla_dashcam
 
 Python program that provides an easy method to merge saved Tesla Dashcam footage into a single video.
 
-When saving Tesla Dashcam footage a folder is created on the USB drive and within it multiple MP4 video files are
-created. Currently the dashcam leverages three (3) cameras (front, left repeater, and right repeater) and will create a
+Tesla has been providing dashcam footage since `v9 of their software <https://www.tesla.com/support/software-v9#dashcam>`_.
+
+To save Tesla Dashcam footages create a folder, at the base-level of your USB drive, named `TeslaCam`. Once the USB drive inserted in your vehicle front USB ports, it will write in `TeslaCam/` multiple MP4 video files.
+
+Currently the dashcam leverages three (3) cameras (front, left repeater, and right repeater) and will create a
 file for each of them. Every minute is stored into a separate file as well. This means that when saving dashcam footage
 there is a total of 30 files video files for every 10 minutes. Each block of 10 minutes is put into a folder, thus often
 there will be multiple folders.
