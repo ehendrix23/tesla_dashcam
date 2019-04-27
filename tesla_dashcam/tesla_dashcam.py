@@ -433,6 +433,12 @@ def create_intermediate_movie(filename_timestamp,
             video['movie_folder'],
             video['video_info']['right_camera']['filename'])
 
+    if camera_1 is None and left_camera is None and right_camera is None:
+        print("\t\tNo valid video files for {timestamp}".format(
+            timestamp=filename_timestamp,
+        ))
+        return None
+
     if video_settings['swap_left_right']:
         camera_2 = left_camera
         camera_0 = right_camera
