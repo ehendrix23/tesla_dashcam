@@ -1668,4 +1668,5 @@ def main() -> None:
         folders = get_movie_files(args.source, args.exclude_subdirs, ffmpeg)
         process_folders(folders, video_settings, False, False)
 
+
 sys.exit(main())

@@ -20,7 +20,7 @@ DESCRIPTION = 'Python program to merge video files created by Tesla ' \
 URL = 'https://github.com/ehendrix23/tesla_dashcam'
 EMAIL = 'hendrix_erik@hotmail.com'
 AUTHOR = 'Erik Hendrix'
-REQUIRES_PYTHON = '>=3.5.3'
+REQUIRES_PYTHON = '>=3.7.0'
 VERSION = None
 
 # What packages are required for this module to be executed?
@@ -120,8 +120,6 @@ setup(
         'License :: OSI Approved :: Apache Software License',
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: Implementation :: CPython',
         'Programming Language :: Python :: Implementation :: PyPy',
