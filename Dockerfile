@@ -12,7 +12,7 @@ RUN sed -i -e 's/v[[:digit:]]\.[[:digit:]]/edge/g' /etc/apk/repositories && \
     python3 \
     python3-dev \
     ttf-freefont \
-    tzdata \ && \
+    tzdata && \
     mkdir -p /usr/share/fonts/truetype/freefont/ &&\
     ln -s /usr/share/fonts/TTF/FreeSans.ttf /usr/share/fonts/truetype/freefont/FreeSans.ttf
 
