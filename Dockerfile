@@ -1,13 +1,12 @@
-FROM python:3
+FROM jrottenberg/ffmpeg:4.1-alpine
 
 ENV PYTHONUNBUFFERED=true
 WORKDIR /usr/src/app/tesla_dashcam
 ENTRYPOINT [ "python", "/usr/src/app/tesla_dashcam/tesla_dashcam.py" ]
 
+RUN apk --no-cache add python3 tzdata ttf-freefont
 
-WORKDIR /usr/src/app/tesla_dashcam
-ADD . .
-RUN pip install -r requirements.txt
-ENV PYTHONUNBUFFERED=true
+# ADD requirements.txt  .
+# RUN pip install -r requirements.txt
 
-ADD .  .
+# ADD .  .
