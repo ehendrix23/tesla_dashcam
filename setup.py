@@ -20,12 +20,14 @@ DESCRIPTION = 'Python program to merge video files created by Tesla ' \
 URL = 'https://github.com/ehendrix23/tesla_dashcam'
 EMAIL = 'hendrix_erik@hotmail.com'
 AUTHOR = 'Erik Hendrix'
-REQUIRES_PYTHON = '>=3.5.3'
+REQUIRES_PYTHON = '>=3.7.0'
 VERSION = None
 
 # What packages are required for this module to be executed?
 REQUIRED = [  # type: ignore
     'tzlocal',
+    'requests',
+    'psutil',
 ]
 
 # The rest you shouldn't have to touch too much :)

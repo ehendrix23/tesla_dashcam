@@ -24,6 +24,7 @@ wheels/
 .installed.cfg
 *.egg
 MANIFEST
+bundles/
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -105,3 +106,4 @@ venv.bak/
 # mypy
 .mypy_cache/
 .DS_Store
+tesla_dashcam/ffmpeg
