@@ -1329,7 +1329,8 @@ def main() -> None:
                     if minor_version == VERSION['minor']:
                         if patch_version == VERSION['patch']:
                             if beta_version > VERSION['beta'] or \
-                                    beta_version == -1:
+                                    (beta_version == -1 and
+                                     VERSION['beta'] != -1):
                                 new_version = True
                         elif patch_version > VERSION['patch']:
                             new_version = True
@@ -1668,6 +1669,5 @@ def main() -> None:
         folders = get_movie_files(args.source, args.exclude_subdirs, ffmpeg)
         process_folders(folders, video_settings, False, False)
 
-    print()
 
 sys.exit(main())
