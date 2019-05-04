@@ -569,15 +569,26 @@ Release Notes
     - DockerFile added making it easy to run tesla_dashcam within Docker (jeanfabrice)
     - Fixed: combining clips to movie would not use GPU or provided encoding.
     - Added additional check that video file exist before merging into movie.
+0.1.10:
+    - Fixed issue where sometimes encoding with GPU would fail by also allowing software based encoding
+    - Fixed traceback when unable to retrieve latest release from GitHub
+    - Added scale option to set the scale of the clips and thus resulting video.
+
 
 TODO
 ----
 
 * Add object detection (i.e. people) and possible output when object was detected
-* Support drag&drop of video folder
+* Support drag&drop of video folder (supported in Windows now, MacOS not yet)
 * GUI Front-end
 * Saving of options
 * Option to specify resolutions as an argument
 * Option for end-user layout
 * Use timestamp in video to determine order instead of file name
 * Use timestamp in video to ensure full synchronization between the 3 cameras
+* Develop method to run as a service with --monitor option
+* Allow for scanning if there are new folders and process if there are
+* Provide option to copy or move from source to output folder before starting to process
+* Add option for source/output to be S3 bucket (with temp folder for creating temporary files)
+* Develop Web Front-End
+* Develop method to have run in AWS, allowing user to upload video files and interact using Web Front-End
