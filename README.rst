@@ -572,6 +572,7 @@ Release Notes
 0.1.10:
     - Fixed issue where sometimes encoding with GPU would fail by also allowing software based encoding
     - Fixed traceback when unable to retrieve latest release from GitHub
+    - Fixed running tesla_dashcam when installed using pip.
     - Added scale option to set the scale of the clips and thus resulting video.
 
 

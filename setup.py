@@ -108,7 +108,7 @@ setup(
     # py_modules=['tesla_dashcam'],
 
     entry_points={
-        'console_scripts': ['tesla_dashcam=tesla_dashcam.__main__:main'],
+        'console_scripts': ['tesla_dashcam=tesla_dashcam.tesla_dashcam:main'],
     },
     install_requires=REQUIRED,
     include_package_data=True,
