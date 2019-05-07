@@ -574,6 +574,10 @@ Release Notes
     - Fixed traceback when unable to retrieve latest release from GitHub
     - Fixed running tesla_dashcam when installed using pip.
     - Added scale option to set the scale of the clips and thus resulting video.
+    - Added option to specify a parameter file using @<filename> where parameters can be located in.
+    - Timestamp within video will now be used for concatenation of the clips at folder level and all (--merge option) instead of filename. This will ensure that even when crossing timezones the order of the video is still accurate.
+    - One can now specify multiple sources instead of just 1.
+    - Individual file(s) can now be provided as a source as well
 
 
 TODO
@@ -585,7 +589,6 @@ TODO
 * Saving of options
 * Option to specify resolutions as an argument
 * Option for end-user layout
-* Use timestamp in video to determine order instead of file name
 * Use timestamp in video to ensure full synchronization between the 3 cameras
 * Develop method to run as a service with --monitor option
 * Allow for scanning if there are new folders and process if there are
