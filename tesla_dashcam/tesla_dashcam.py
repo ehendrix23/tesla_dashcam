@@ -809,6 +809,10 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
                         if item['timestamp'] < video_timestamp else \
                         video_timestamp
 
+
+            video_timestamp = filename_timestamp if video_timestamp is None \
+                else video_timestamp
+
             movie_info = {
                 'movie_folder': movie_folder,
                 'timestamp': video_timestamp,
@@ -1243,9 +1247,9 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
         folder_timestamp = None
 
         for clip_number, filename_timestamp in enumerate(sorted(files)):
-            folder_timestamp = filename_timestamp if folder_timestamp is \
-                                                     None else folder_timestamp
             video_timestamp_info = files[filename_timestamp]
+            folder_timestamp = video_timestamp_info['timestamp'] \
+                if folder_timestamp is None else folder_timestamp
             clip_name = create_intermediate_movie(
                 filename_timestamp,
                 video_timestamp_info,
@@ -1259,13 +1263,13 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
                     # When file only there is no concatenation at the folder
                     # level, will only happen at the higher level if requested.
                     dashcam_clips.append({
-                        'video_timestamp': filename_timestamp,
+                        'video_timestamp': video_timestamp_info['timestamp'],
                         'video_filename': clip_name
                     })
                 else:
                     # Movie was created, store name for concatenation.
                     folder_clips.append({
-                        'video_timestamp': filename_timestamp,
+                        'video_timestamp': video_timestamp_info['timestamp'],
                         'video_filename': clip_name
                     })
                     delete_folder_clips.append(clip_name)
