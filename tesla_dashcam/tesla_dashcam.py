@@ -1076,7 +1076,7 @@ def create_movie(clips_list, movie_filename, video_settings):
     if len(clips_list) == 1:
         # If not output folder provided then these 2 are the same and thus
         # nothing to be done.
-        if movie_filename == clips_list[0]:
+        if movie_filename == clips_list[0]['video_filename']:
             return movie_filename
 
         # There really was only one, no need to create, just move
@@ -1093,19 +1093,21 @@ def create_movie(clips_list, movie_filename, video_settings):
 
         if not video_settings['keep_intermediate']:
             try:
-                shutil.move(clips_list[0], movie_filename)
+                shutil.move(clips_list[0]['video_filename'],
+                            movie_filename)
             except OSError as exc:
                 print("\t\tError trying to move file {} to {}: {}".format(
-                    clips_list[0],
+                    clips_list[0]['video_filename'],
                     movie_filename,
                     exc))
                 return None
         else:
             try:
-                shutil.copyfile(clips_list[0], movie_filename)
+                shutil.copyfile(clips_list[0]['video_filename'],
+                                movie_filename)
             except OSError as exc:
                 print("\t\tError trying to copy file {} to {}: {}".format(
-                    clips_list[0],
+                    clips_list[0]['video_filename'],
                     movie_filename,
                     exc))
                 return None
@@ -1335,19 +1337,41 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
                   ))
 
     # Now that we have gone through all the folders merge.
-    # We only do this if merge is enabled OR if we only have 1 clip.
-    # Reason to also do it with 1 is to put the name correctly for the
-    # movie
-    # especially if a filename was given.
+    # We only do this if merge is enabled OR if we only have 1 clip and for
+    # output a specific filename was provided.
     movie_name = None
     if dashcam_clips:
-        if (video_settings['merge_subdirs'] or len(folders) == 1):
+        if video_settings['merge_subdirs'] or \
+           (len(folders) == 1 and
+            video_settings['target_filename'] is not None):
+
+            if video_settings['movie_filename'] is not None:
+                movie_filename = video_settings['movie_filename']
+            elif video_settings['target_filename'] is not None:
+                movie_filename = video_settings['target_filename']
+            else:
+                folder, movie_filename = os.path.split(
+                    video_settings['target_folder'])
+                # If there was a trailing separator provided then it will be
+                # empty, redo split then.
+                if movie_filename == '':
+                    movie_filename = os.path.split(folder)[1]
+
+            movie_filename = os.path.join(
+                video_settings['target_folder'],
+                movie_filename
+            )
+
+            # Make sure it ends in .mp4
+            if os.path.splitext(movie_filename)[1] != '.mp4':
+                movie_filename = movie_filename + '.mp4'
+
             print("\tCreating movie {}, please be patient.".format(
-                video_settings['movie_filename']))
+                movie_filename))
 
             movie_name = create_movie(
                 dashcam_clips,
-                video_settings['movie_filename'],
+                movie_filename,
                 video_settings,
             )
 
@@ -2093,9 +2117,10 @@ def main() -> None:
             else:
                 encoding = encoding + '_nvidia'
 
+            bit_rate = str(int(10000 * layout_settings.scale)) + 'K'
             video_encoding = video_encoding + \
                ['-b:v',
-                '2500K'
+                bit_rate,
                 ]
 
         video_encoding = video_encoding + \
@@ -2111,35 +2136,17 @@ def main() -> None:
 
     ffmpeg_params = ffmpeg_params + video_encoding
 
-    # Determine the target folder.
-    target_folder = args.source[0] if args.output is None else args.output
-    if not os.path.isdir(target_folder):
-        target_folder = os.path.split(str(args.output))[0]
-
-    # Determine final movie name.
-    movie_filename = args.output
-    if movie_filename is None or os.path.isdir(str(movie_filename)):
-        if movie_filename is None:
-            movie_filename = args.source[0]
-
-        # Get the actual folder name as we're using that to create the movie
-        # name
-        folder, filename = os.path.split(movie_filename)
-
-        # If there was a trailing seperator provided then it will be empty,
-        # redo split then.
-        if filename == '':
-            filename = os.path.split(folder)[1]
-
-        # Now add full path to it.
-        movie_filename = os.path.join(movie_filename, filename)
+    # Determine the target folder and filename.
+    target_filename = None
+    if args.output is None:
+        target_folder = args.source[0] if os.path.isdir(args.source[0]) else\
+            os.path.split(args.source[0])[0]
     else:
-        # Got complete with filename.
-        movie_filename = args.output
-
-    # Make sure it ends in .mp4
-    if os.path.splitext(movie_filename)[1] != '.mp4':
-        movie_filename = movie_filename + '.mp4'
+        if os.path.isdir(args.output):
+            target_folder = args.output
+        else:
+            target_folder, target_filename = os.path.split(args.output)
+            target_filename = os.path.splitext(target_filename)[0]
 
     # Determine if left and right cameras should be swapped or not.
     if args.swap is None:
@@ -2153,9 +2160,11 @@ def main() -> None:
         layout_settings.swap_left_right = args.swap
 
     video_settings = {
+        'source_folder': args.source,
         'target_folder': target_folder,
+        'target_filename': target_filename,
         'merge_subdirs': args.merge_subdirs,
-        'movie_filename': movie_filename,
+        'movie_filename': None,
         'keep_intermediate': args.keep_intermediate,
         'notification': args.system_notification,
         'movie_layout': args.layout,
@@ -2179,7 +2188,6 @@ def main() -> None:
 
     # If we constantly run and monitor for drive added or not.
     if args.monitor or args.monitor_once:
-        movie_filename, _ = os.path.splitext(video_settings['movie_filename'])
         got_drive = False
         print("Monitoring for TeslaCam Drive to be inserted. Press CTRL-C to"
               " stop")
@@ -2214,11 +2222,13 @@ def main() -> None:
                            ))
                 # Got a folder, append what was provided as source unless
                 # . was provided in which case everything is done.
-                if args.source[0] != '.':
-                    source_folder = (os.path.join(source_folder,
-                                                  args.source[0]))
+                if video_settings['source_folder'][0] != '.':
 
-                    folders = get_movie_files(source_folder,
+                    source_folder = (os.path.join(
+                        source_folder,
+                        video_settings['source_folder'][0]))
+
+                    folders = get_movie_files([source_folder],
                                               args.exclude_subdirs,
                                               video_settings)
 
@@ -2226,11 +2236,14 @@ def main() -> None:
                         # We will continue to monitor hence we need to
                         # ensure we
                         # always have a unique final movie name.
-                        mv_filename = movie_filename + '_' + \
-                            datetime.today().strftime(
-                                '%Y-%m-%d_%H_%M')
+                        movie_filename = video_settings['target_filename']
+                        movie_filename = movie_filename + '_' if \
+                            movie_filename is not None else ''
+                        movie_filename = movie_filename + \
+                                         datetime.today().strftime(
+                                             '%Y-%m-%d_%H_%M')
 
-                        video_settings.update({movie_filename: mv_filename})
+                        video_settings.update({movie_filename: movie_filename})
 
                     process_folders(folders, video_settings, True,
                                     args.delete_source)
