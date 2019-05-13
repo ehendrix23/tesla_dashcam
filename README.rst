@@ -596,3 +596,4 @@ TODO
 * Add option for source/output to be S3 bucket (with temp folder for creating temporary files)
 * Develop Web Front-End
 * Develop method to have run in AWS, allowing user to upload video files and interact using Web Front-End
+* Add chapter markers
