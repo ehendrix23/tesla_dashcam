@@ -570,14 +570,16 @@ Release Notes
     - Fixed: combining clips to movie would not use GPU or provided encoding.
     - Added additional check that video file exist before merging into movie.
 0.1.10:
-    - Fixed issue where sometimes encoding with GPU would fail by also allowing software based encoding
-    - Fixed traceback when unable to retrieve latest release from GitHub
-    - Fixed running tesla_dashcam when installed using pip.
-    - Added scale option to set the scale of the clips and thus resulting video.
-    - Added option to specify a parameter file using @<filename> where parameters can be located in.
-    - Timestamp within video will now be used for concatenation of the clips at folder level and all (--merge option) instead of filename. This will ensure that even when crossing timezones the order of the video is still accurate.
-    - One can now specify multiple sources instead of just 1.
-    - Individual file(s) can now be provided as a source as well
+    - New: Added scale option to set the scale of the clips and thus resulting video.
+    - New: Added option to specify a parameter file using @<filename> where parameters can be located in.
+    - New: One can now specify multiple sources instead of just 1.
+    - New: Individual file(s) can now be provided as a source as well
+    - Changed: Timestamp within video will now be used for concatenation of the clips at folder level and all (--merge option) instead of filename. This will ensure that even when crossing timezones the order of the video is still accurate.
+    - Changed: --delete_source will delete source files when specified even when --monitor or --monitor_once is not specified
+    - Fixed: issue where sometimes encoding with GPU would fail by also allowing software based encoding
+    - Fixed: traceback when unable to retrieve latest release from GitHub
+    - Fixed: running tesla_dashcam when installed using pip.
+
 
 
 TODO
