@@ -1555,6 +1555,13 @@ def main() -> None:
                         help='Do not remove the intermediate video files that '
                              'are created')
 
+    parser.add_argument('--delete_source',
+                        dest='delete_source',
+                        action='store_true',
+                        help='Delete the processed files on the '
+                        'TeslaCam drive.'
+                        )
+
     parser.add_argument('--no-notification',
                         dest='system_notification',
                         action='store_false',
@@ -1842,13 +1849,6 @@ def main() -> None:
                                help='Enable monitoring and exit once drive '
                                     'with TeslaCam folder has been attached '
                                     'and files processed.'
-                               )
-
-    monitor_group.add_argument('--delete_source',
-                               dest='delete_source',
-                               action='store_true',
-                               help='Delete the processed files on the '
-                                    'TeslaCam drive.'
                                )
 
     update_check_group = parser.add_argument_group(
@@ -2267,7 +2267,7 @@ def main() -> None:
     else:
         folders = get_movie_files(args.source, args.exclude_subdirs,
                                   video_settings)
-        process_folders(folders, video_settings, False, False)
+        process_folders(folders, video_settings, False, args.delete_source)
 
 
 sys.exit(main())
