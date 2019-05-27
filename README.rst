@@ -579,6 +579,7 @@ Release Notes
     - Fixed: issue where sometimes encoding with GPU would fail by also allowing software based encoding
     - Fixed: traceback when unable to retrieve latest release from GitHub
     - Fixed: running tesla_dashcam when installed using pip.
+    - Fixed: Folder clip would be removed if only 1 set in folder with same name as folder name if keep_intermediate not specified
 
 
 

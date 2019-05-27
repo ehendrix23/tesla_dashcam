@@ -1274,7 +1274,11 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
                         'video_timestamp': video_timestamp_info['timestamp'],
                         'video_filename': clip_name
                     })
-                    delete_folder_clips.append(clip_name)
+
+                    # Add clip for deletion only if it's name is not the
+                    # same as the resulting movie filename
+                    if clip_name != movie_filename:
+                        delete_folder_clips.append(clip_name)
 
                     # Add the files to our list for removal.
                     video_info = video_timestamp_info['video_info']
@@ -1327,7 +1331,7 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
                     folder_name=folder_name
                 ))
                 delete_intermediate(delete_file_list)
-                # And delete the folder.
+                # And delete the folder
                 delete_intermediate([folder_name])
 
             print("\tMovie {base_name} for folder {folder_name} is "
@@ -2161,6 +2165,7 @@ def main() -> None:
 
     video_settings = {
         'source_folder': args.source,
+        'output': args.output,
         'target_folder': target_folder,
         'target_filename': target_filename,
         'merge_subdirs': args.merge_subdirs,
