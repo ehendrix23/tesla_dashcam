@@ -781,6 +781,10 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
                 right_path,
             ])
 
+            # Move on to next one if nothing received.
+            if not metadata:
+                continue
+
             # Get the longest duration:
             duration = 0
             video_timestamp = None
@@ -816,9 +820,18 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
                         if item['timestamp'] < video_timestamp else \
                         video_timestamp
 
-
-            video_timestamp = filename_timestamp if video_timestamp is None \
-                else video_timestamp
+            if video_timestamp is None:
+                # Firmware version 2019.16 changed filename timestamp format.
+                if len(filename_timestamp) == 16:
+                    # This is for before version 2019.16
+                    video_timestamp = datetime.strptime(
+                        filename_timestamp,
+                        "%Y-%m-%d_%H-%M")
+                else:
+                    # This is for version 2019.16 and later
+                    video_timestamp = datetime.strptime(
+                        filename_timestamp,
+                        "%Y-%m-%d_%H-%M-%S")
 
             movie_info = {
                 'movie_folder': movie_folder,
