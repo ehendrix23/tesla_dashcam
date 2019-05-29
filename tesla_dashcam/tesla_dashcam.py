@@ -68,105 +68,6 @@ MOVIE_HOMEDIR = {
 DEFAULT_CLIP_HEIGHT = 960
 DEFAULT_CLIP_WIDTH = 1280
 
-MOVIE_LAYOUT = {
-    # Layout:
-    #  [Left_Clip][Front_Clip][Right_Clip]
-    'WIDESCREEN': {
-        'scale': 1/2,
-        'video_x': lambda front, left, right: left + front + right,
-        'video_y': lambda front, left, right: max(left, front, right),
-        # 'video_x': 1920,
-        # 'video_y': 480,
-        'clip_x': lambda scale: int(DEFAULT_CLIP_WIDTH * scale), # 640
-        'clip_y': lambda scale: int(DEFAULT_CLIP_HEIGHT * scale), # 480
-        'left_x': lambda scale: 0,
-        'left_y': lambda scale: 0,
-         'front_x': lambda scale: MOVIE_LAYOUT['WIDESCREEN']['clip_x'](scale),
-         # 640
-        'front_y': lambda scale: 0,
-        'right_x': lambda scale: MOVIE_LAYOUT['WIDESCREEN']['clip_x'](scale)
-                                 * 2, # 1280,
-        'right_y': lambda scale: 0,
-        'left_options': '',
-        'front_options': '',
-        'right_options': '',
-        'swap_left_rear': False,
-    },
-    # Layout:
-    #       [Front_Clip]
-    #  [Left_Clip][Right_Clip]
-    'FULLSCREEN': {
-        'scale': 1/2,
-        'video_x': lambda front, left, right: max(front, left+right),
-        'video_y': lambda front, left, right: front+max(left, right),
-        # 'video_x': 1280,
-        # 'video_y': 960,
-        'clip_x': lambda scale: int(DEFAULT_CLIP_WIDTH * scale),  # 640
-        'clip_y': lambda scale: int(DEFAULT_CLIP_HEIGHT * scale),  # 480
-        'left_x': lambda scale: 0,
-        'left_y': lambda scale: MOVIE_LAYOUT['FULLSCREEN']['clip_y'](scale),
-        # 480
-        'front_x': lambda scale:
-        int(MOVIE_LAYOUT['FULLSCREEN']['clip_x'](scale)/2), # 320
-        'front_y': lambda scale: 0,
-        'right_x': lambda scale: MOVIE_LAYOUT['FULLSCREEN']['clip_x'](scale), # 480
-        'right_y': lambda scale: MOVIE_LAYOUT['FULLSCREEN']['clip_y'](scale), # 480
-        'left_options': '',
-        'front_options': '',
-        'right_options': '',
-        'swap_left_rear': False,
-    },
-    'PERSPECTIVE': {
-        'scale': 1/4,
-        'video_x': lambda front, left, right: front + min(5, front*100) +
-                                              left + min(5, left*100) +
-                                              right + min(5,left*100) + 5,
-        'video_y': lambda front, left, right: int(
-            max((6*left/5 + 1*left/5), front, (right/5+6*right/5))) + 5,
-        # 'video_x': 980,
-        # 'video_y': 380,
-        'clip_x': lambda scale: int(DEFAULT_CLIP_WIDTH * scale), # 320
-        'clip_y': lambda scale: int(DEFAULT_CLIP_HEIGHT * scale), # 240
-        'left_x': lambda scale: 5,
-        'left_y': lambda scale: 5,
-        'front_x': lambda scale: MOVIE_LAYOUT['FULLSCREEN']['clip_x'](scale)
-                                 + 10, # 330
-        'front_y': lambda scale: 5,
-        'right_x': lambda scale: MOVIE_LAYOUT['FULLSCREEN']['clip_x'](scale)*2
-                                 + 15, # 655
-        'right_y': lambda scale: 5,
-        'left_options': ', pad=iw+4:11/6*ih:-1:30:0x00000000,'
-                        'perspective=x0=0:y0=1*H/5:x1=W:y1=-3/44*H:'
-                        'x2=0:y2=6*H/5:x3=7/8*W:y3=5*H/6:sense=destination',
-        'front_options': '',
-        'right_options': ', pad=iw+4:11/6*ih:-1:30:0x00000000,'
-                         'perspective=x0=0:y1=1*H/5:x1=W:y0=-3/44*H:'
-                         'x2=1/8*W:y3=6*H/5:x3=W:y2=5*H/6:sense=destination',
-        'swap_left_rear': False,
-    },
-    'DIAGONAL': {
-        'scale': 1/4,
-        'video_x': 980,
-        'video_y': 380,
-        'clip_x': lambda scale: int(DEFAULT_CLIP_WIDTH * scale), # 320
-        'clip_y': lambda scale: int(DEFAULT_CLIP_HEIGHT * scale), # 240
-        'left_x': 5,  # Left of video
-        'left_y': 5,  # Bottom of video
-        'front_x': 330,  # Middle of video
-        'front_y': 5,  # Top of video
-        'right_x': 655,  # Right of left clip
-        'right_y': 5,  # Bottom of video
-        'left_options': ', pad=iw+4:11/6*ih:-1:30:0x00000000,'
-                        'perspective=x0=0:y0=1*H/5:x1=W:y1=-3/44*H:'
-                        'x2=0:y2=6*H/5:x3=W:y3=410:sense=destination',
-        'front_options': '',
-        'right_options': ', pad=iw+4:11/6*ih:-1:30:0x00000000,'
-                         'perspective=x0=0:y0=-3/44*H:x1=W:y1=1*H/5:'
-                         'x2=0:y2=410:x3=W:y3=6*H/5:sense=destination',
-        'swap_left_rear': False,
-    },
-}
-
 MOVIE_QUALITY = {
     'HIGH':   '18',
     'MEDIUM': '20',
@@ -189,7 +90,6 @@ MOVIE_ENCODING = {
 DEFAULT_FONT = {
     'darwin': '/Library/Fonts/Arial.ttf',
     'win32': '/Windows/Fonts/arial.ttf',
-    # 'win32': 'C\:\\Windows\\Fonts\\arial.ttf',
     'cygwin': '/cygdrive/c/Windows/Fonts/arial.ttf',
     'linux': '/usr/share/fonts/truetype/freefont/FreeSans.ttf',
 }
@@ -945,18 +845,18 @@ def create_intermediate_movie(filename_timestamp,
 
     if video_settings['video_layout'].swap_left_right:
         camera_2 = left_camera
-        clip_2 = (video_settings['video_layout'].left_x, video_settings[
-            'video_layout'].left_y)
+        clip_2 = (video_settings['video_layout'].left_width, video_settings[
+            'video_layout'].left_height)
         camera_0 = right_camera
-        clip_0 = (video_settings['video_layout'].right_x, video_settings[
-            'video_layout'].right_y)
+        clip_0 = (video_settings['video_layout'].right_width, video_settings[
+            'video_layout'].right_height)
     else:
         camera_0 = left_camera
-        clip_0 = (video_settings['video_layout'].left_x, video_settings[
-            'video_layout'].left_y)
+        clip_0 = (video_settings['video_layout'].left_width, video_settings[
+            'video_layout'].left_height)
         camera_2 = right_camera
-        clip_2 = (video_settings['video_layout'].right_x, video_settings[
-            'video_layout'].right_y)
+        clip_2 = (video_settings['video_layout'].right_width, video_settings[
+            'video_layout'].right_height)
 
     temp_movie_name = os.path.join(video_settings['target_folder'],
                                    filename_timestamp) + '.mp4'
@@ -994,8 +894,8 @@ def create_intermediate_movie(filename_timestamp,
         ffmpeg_camera_1 = video_settings['background'].format(
             duration=video['duration'],
             speed=speed,
-            width=video_settings['video_layout'].front_x,
-            height=video_settings['video_layout'].front_y,
+            width=video_settings['video_layout'].front_width,
+            height=video_settings['video_layout'].front_height,
         ) + '[front];'
 
     if camera_2 is not None and os.path.isfile(camera_2):
