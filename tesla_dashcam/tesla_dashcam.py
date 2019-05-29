@@ -29,8 +29,8 @@ from tzlocal import get_localzone
 VERSION = {
     'major': 0,
     'minor': 1,
-    'patch': 9,
-    'beta': -1,
+    'patch': 10,
+    'beta': 0,
 }
 VERSION_STR = 'v{major}.{minor}.{patch}'.format(
     major=VERSION['major'],
@@ -56,6 +56,13 @@ FFMPEG = {
     'win32': 'ffmpeg.exe',
     'cygwin': 'ffmpeg',
     'linux': 'ffmpeg',
+}
+
+MOVIE_HOMEDIR = {
+    'darwin': 'Movies/Tesla_Dashcam',
+    'win32': 'Videos\Tesla_Dashcam',
+    'cygwin': 'Videos/Tesla_Dashcam',
+    'linux': 'Videos/Tesla_Dashcam',
 }
 
 DEFAULT_CLIP_HEIGHT = 960
@@ -1046,7 +1053,7 @@ def create_intermediate_movie(filename_timestamp,
         video_settings['other_params']
 
     ffmpeg_command = ffmpeg_command + ['-y', temp_movie_name]
-    print(ffmpeg_command)
+    # print(ffmpeg_command)
     # Run the command.
     try:
         run(ffmpeg_command, capture_output=True, check=True)
@@ -1216,7 +1223,28 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
     for folder_number, folder_name in enumerate(sorted(folders)):
         files = folders[folder_name]
 
-        movie_filename = os.path.split(folder_name)[1]
+        # Ensure the clips are sorted based on video timestamp.
+        sorted_video_clips = sorted(
+            files,
+            key=lambda video: files[video]['timestamp'])
+
+        # Get the start and ending timestamps, we add duration to
+        # last timestamp to get true ending.
+        first_clip_tmstp = files[sorted_video_clips[0]]['timestamp']
+
+        last_clip_tmstp  = files[sorted_video_clips[-1]]['timestamp'] + \
+                                 timedelta(
+                                     seconds=
+                                     files[sorted_video_clips[-1]]['duration'])
+
+        # Convert timestamp to local timezone.
+        first_clip_tmstp = first_clip_tmstp.astimezone(get_localzone())
+        last_clip_tmstp = last_clip_tmstp.astimezone(get_localzone())
+
+        # Put them together to create the filename for the folder.
+        movie_filename = first_clip_tmstp.strftime("%Y-%m-%dT%H-%M-%S") + \
+            "_" + last_clip_tmstp.strftime("%Y-%m-%dT%H-%M-%S")
+
         # Now add full path to it.
         movie_filename = os.path.join(video_settings['target_folder'],
                                       movie_filename) + '.mp4'
@@ -1248,7 +1276,7 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
         delete_file_list = []
         folder_timestamp = None
 
-        for clip_number, filename_timestamp in enumerate(sorted(files)):
+        for clip_number, filename_timestamp in enumerate(sorted_video_clips):
             video_timestamp_info = files[filename_timestamp]
             folder_timestamp = video_timestamp_info['timestamp'] \
                 if folder_timestamp is None else folder_timestamp
@@ -1499,6 +1527,10 @@ def main() -> None:
     internal_ffmpeg = getattr(sys, 'frozen', None) is not None
     ffmpeg_default = resource_path(FFMPEG.get(sys.platform, 'ffmpeg'))
 
+    movie_folder = os.path.join(str(Path.home()),
+                                MOVIE_HOMEDIR.get(sys.platform),'')
+
+
     # Check if ffmpeg exist, if not then hope it is in default path or
     # provided.
     if not os.path.isfile(ffmpeg_default):
@@ -1524,8 +1556,11 @@ def main() -> None:
                         )
     parser.add_argument('source',
                         type=str,
-                        nargs='+',
-                        help="Folder containing the saved camera files.")
+                        nargs='*',
+                        help="Folder(s) containing the saved camera "
+                             "files. Filenames can be provided as well to "
+                             "manage individual clips."
+                        )
 
     sub_dirs = parser.add_mutually_exclusive_group()
     sub_dirs.add_argument('--exclude_subdirs',
@@ -1544,13 +1579,11 @@ def main() -> None:
 
     parser.add_argument('--output',
                         required=False,
+                        default = movie_folder,
                         type=str,
                         help="R|Path/Filename for the new movie file. "
                              "Intermediate files will be stored in same "
                              "folder.\n"
-                             "If not provided then resulting movie files "
-                             "will be created within same folder as source "
-                             "files."
                         )
 
     parser.add_argument('--keep-intermediate',
@@ -1638,23 +1671,23 @@ def main() -> None:
                                    "default with all other options."
                               )
 
-    camera_group = parser.add_argument_group(title='Camera Exclusion',
-                                             description="Exclude "
-                                                         "one or "
-                                                         "more "
-                                                         "cameras:")
-    camera_group.add_argument('--no-front',
-                              dest='no_front',
-                              action='store_true',
-                              help="Exclude front camera from video.")
-    camera_group.add_argument('--no-left',
-                              dest='no_left',
-                              action='store_true',
-                              help="Exclude left camera from video.")
-    camera_group.add_argument('--no-right',
-                              dest='no_right',
-                              action='store_true',
-                              help="Exclude right camera from video.")
+    # camera_group = parser.add_argument_group(title='Camera Exclusion',
+    #                                          description="Exclude "
+    #                                                      "one or "
+    #                                                      "more "
+    #                                                      "cameras:")
+    # camera_group.add_argument('--no-front',
+    #                           dest='no_front',
+    #                           action='store_true',
+    #                           help="Exclude front camera from video.")
+    # camera_group.add_argument('--no-left',
+    #                           dest='no_left',
+    #                           action='store_true',
+    #                           help="Exclude left camera from video.")
+    # camera_group.add_argument('--no-right',
+    #                           dest='no_right',
+    #                           action='store_true',
+    #                           help="Exclude right camera from video.")
 
     speed_group = parser.add_mutually_exclusive_group()
     speed_group.add_argument('--slowdown',
@@ -1992,10 +2025,13 @@ def main() -> None:
     if args.clip_scale is not None and args.clip_scale > 0:
         layout_settings.scale = args.clip_scale
 
-    layout_settings.front = not args.no_front
-    layout_settings.left = not args.no_left
-    layout_settings.right = not args.no_right
-
+    # This portion is not ready yet, hence is temporary set to true for now.
+    # layout_settings.front = not args.no_front
+    # layout_settings.left = not args.no_left
+    # layout_settings.right = not args.no_right
+    layout_settings.front = True
+    layout_settings.left = True
+    layout_settings.right = True
 
     ffmpeg_base = black_base + black_size.format(
         width=layout_settings.video_width,
@@ -2141,16 +2177,23 @@ def main() -> None:
     ffmpeg_params = ffmpeg_params + video_encoding
 
     # Determine the target folder and filename.
-    target_filename = None
-    if args.output is None:
-        target_folder = args.source[0] if os.path.isdir(args.source[0]) else\
-            os.path.split(args.source[0])[0]
+    # If no extension then assume it is a folder.
+    if len(os.path.splitext(args.output)) > 1:
+        target_folder, target_filename = os.path.split(args.output)
+        if target_filename is None:
+            # If nothing in target_filename then no folder was given,
+            # setting default movie folder
+            target_folder = movie_folder
+            target_filename = arggs.output
+
     else:
-        if os.path.isdir(args.output):
-            target_folder = args.output
-        else:
-            target_folder, target_filename = os.path.split(args.output)
-            target_filename = os.path.splitext(target_filename)[0]
+        # Folder only provided.
+        target_folder = args.output
+        target_filename = None
+
+    # Create folder if not already existing.
+    if not os.path.isdir(target_folder):
+        os.mkdir(target_folder)
 
     # Determine if left and right cameras should be swapped or not.
     if args.swap is None:
@@ -2163,11 +2206,27 @@ def main() -> None:
     else:
         layout_settings.swap_left_right = args.swap
 
+    # Set the run type based on arguments.
+    runtype = 'RUN'
+    if args.monitor:
+        runtype = 'MONITOR'
+    elif args.monitor_once:
+        runtype = 'MONITOR_ONCE'
+
+    # If no source provided then set to MONITOR_ONCE and we're only going to
+    # take SavedClips
+    source_list = args.source
+    if not source_list:
+        source_list = ['SavedClips']
+        if runtype == 'RUN':
+            runtype = 'MONITOR_ONCE'
+
     video_settings = {
-        'source_folder': args.source,
+        'source_folder': source_list,
         'output': args.output,
         'target_folder': target_folder,
         'target_filename': target_filename,
+        'run_type': runtype,
         'merge_subdirs': args.merge_subdirs,
         'movie_filename': None,
         'keep_intermediate': args.keep_intermediate,
@@ -2192,7 +2251,7 @@ def main() -> None:
     }
 
     # If we constantly run and monitor for drive added or not.
-    if args.monitor or args.monitor_once:
+    if video_settings['run_type'] in ['MONITOR', 'MONITOR_ONCE']:
         got_drive = False
         print("Monitoring for TeslaCam Drive to be inserted. Press CTRL-C to"
               " stop")
@@ -2237,7 +2296,7 @@ def main() -> None:
                                               args.exclude_subdirs,
                                               video_settings)
 
-                    if not args.monitor_once:
+                    if video_settings['run_type'] == 'MONITOR':
                         # We will continue to monitor hence we need to
                         # ensure we
                         # always have a unique final movie name.
@@ -2259,7 +2318,7 @@ def main() -> None:
                                partition=source_partition
                            ))
                 # Stop if we're only to monitor once and then exit.
-                if args.monitor_once:
+                if video_settings['run_type'] == 'MONITOR_ONCE':
                     print("Exiting monitoring as asked process once.")
                     break
 
@@ -2270,7 +2329,8 @@ def main() -> None:
                 print("Monitoring stopped due to CTRL-C.")
                 break
     else:
-        folders = get_movie_files(args.source, args.exclude_subdirs,
+        folders = get_movie_files(video_settings['source_folder'],
+                                  args.exclude_subdirs,
                                   video_settings)
         process_folders(folders, video_settings, False, args.delete_source)
 
