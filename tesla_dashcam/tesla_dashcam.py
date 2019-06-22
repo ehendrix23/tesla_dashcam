@@ -2091,14 +2091,13 @@ def main() -> None:
 
     # Determine the target folder and filename.
     # If no extension then assume it is a folder.
-    if len(os.path.splitext(args.output)) > 1:
+    if os.path.splitext(args.output)[1] is None:
         target_folder, target_filename = os.path.split(args.output)
         if target_filename is None:
             # If nothing in target_filename then no folder was given,
             # setting default movie folder
             target_folder = movie_folder
-            target_filename = arggs.output
-
+            target_filename = args.output
     else:
         # Folder only provided.
         target_folder = args.output
