@@ -657,13 +657,16 @@ Release Notes
     - Fixed: Folder clip would be removed if only 1 set in folder with same name as folder name if keep_intermediate not specified
     - Fixed: Font issue in Windows (hopefully final fix) `Issue #29 <https://github.com/ehendrix23/tesla_dashcam/issues/29>`_
     - Fixed: Python version has to be 3.7 or higher due to use of capture_output `Issue #19 <https://github.com/ehendrix23/tesla_dashcam/issues/19>`_
-
+0.1.11:
+    - Fixed: Traceback when getting ffmpeg path in Linux `Issue #39 <https://github.com/ehendrix23/tesla_dashcam/issues/39>`_
+    - Fixed: running tesla_dashcam when installed using pip. `Issue #38 <https://github.com/ehendrix23/tesla_dashcam/issues/38>`_
 
 
 TODO
 ----
 
 * Allow exclusion of camera(s) in output (i.e. don't include right, or don't include front, ...).
+* Implement option to crop individual camera output
 * Provide option to copy or move from source to output folder before starting to process
 * Add chapter markers
 * Allow for scanning if there are new folders and process if there are
