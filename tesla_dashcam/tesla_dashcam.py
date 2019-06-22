@@ -29,7 +29,7 @@ from tzlocal import get_localzone
 VERSION = {
     'major': 0,
     'minor': 1,
-    'patch': 10,
+    'patch': 11,
     'beta': -1,
 }
 VERSION_STR = 'v{major}.{minor}.{patch}'.format(
@@ -1370,7 +1370,7 @@ def resource_path(relative_path):
     """
     # If compiled with pyinstaller then sys._MEIPASS points to the location
     # of the bundle. Otherwise path of python script is used.
-    base_path = getattr(sys, '_MEIPASS', Path(__file__).parent)
+    base_path = getattr(sys, '_MEIPASS', str(Path(__file__).parent))
     return os.path.join(base_path, relative_path)
 
 
