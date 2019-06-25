@@ -152,7 +152,7 @@ Usage
                             (default: False)
       --no-notification     Do not create a notification upon completion.
                             (default: True)
-      --layout {WIDESCREEN,FULLSCREEN,DIAGONAL,PERSPECTIVE}
+      --layout {WIDESCREEN,FULLSCREEN,PERSPECTIVE}
                             Layout of the created video.
                                 FULLSCREEN: Front camera center top, side cameras underneath it.
                                 WIDESCREEN: Output from all 3 cameras are next to each other.

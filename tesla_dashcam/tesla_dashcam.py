@@ -1522,7 +1522,6 @@ def main() -> None:
                         required=False,
                         choices=['WIDESCREEN',
                                  'FULLSCREEN',
-                                 'DIAGONAL',
                                  'PERSPECTIVE', ],
                         default='FULLSCREEN',
                         help="R|Layout of the created video.\n"
@@ -1542,8 +1541,7 @@ def main() -> None:
                              "    WIDESCREEN: 1/2 (640x480, video is "
                              "1920x480)\n"
                              "    FULLSCREEN: 1/2 (640x480, video is "
-                             "1280x960)\n"
-                             "    DIAGONAL: 1/4 (320x240, video is 980x380)\n"
+                             "1280x960)\n"                             
                              "    PERSPECTIVE: 1/4 (320x240, video is "
                              "980x380)\n"
                         )
