@@ -51,8 +51,8 @@ Binaries
 
 Stand-alone binaries can be retrieved:
 
-- Windows: https://github.com/ehendrix23/tesla_dashcam/releases/download/v0.1.9/tesla_dashcam.zip
-- MacOS (OSX): https://github.com/ehendrix23/tesla_dashcam/releases/download/v0.1.9/tesla_dashcam.dmg
+- Windows: https://github.com/ehendrix23/tesla_dashcam/releases/download/v0.1.11/tesla_dashcam.zip
+- MacOS (OSX): https://github.com/ehendrix23/tesla_dashcam/releases/download/v0.1.11/tesla_dashcam.dmg
 
 `ffmpeg <https://www.ffmpeg.org/legal.html>`_ is included within the respective package.
 ffmpeg is a separately licensed product under the `GNU Lesser General Public License (LGPL) version 2.1 or later <http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html>`_.
@@ -152,7 +152,7 @@ Usage
                             (default: False)
       --no-notification     Do not create a notification upon completion.
                             (default: True)
-      --layout {WIDESCREEN,FULLSCREEN,DIAGONAL,PERSPECTIVE}
+      --layout {WIDESCREEN,FULLSCREEN,PERSPECTIVE}
                             Layout of the created video.
                                 FULLSCREEN: Front camera center top, side cameras underneath it.
                                 WIDESCREEN: Output from all 3 cameras are next to each other.
@@ -657,13 +657,18 @@ Release Notes
     - Fixed: Folder clip would be removed if only 1 set in folder with same name as folder name if keep_intermediate not specified
     - Fixed: Font issue in Windows (hopefully final fix) `Issue #29 <https://github.com/ehendrix23/tesla_dashcam/issues/29>`_
     - Fixed: Python version has to be 3.7 or higher due to use of capture_output `Issue #19 <https://github.com/ehendrix23/tesla_dashcam/issues/19>`_
-
+0.1.11:
+    - Fixed: Traceback when getting ffmpeg path in Linux `Issue #39 <https://github.com/ehendrix23/tesla_dashcam/issues/39>`_
+    - Fixed: running tesla_dashcam when installed using pip. `Issue #38 <https://github.com/ehendrix23/tesla_dashcam/issues/38>`_
+    - Fixed: Just providing a filename for output would result in traceback.
+    - Fixed: When providing a folder as output it would be possible that the last folder name was stripped potentially resulting in error.
 
 
 TODO
 ----
 
 * Allow exclusion of camera(s) in output (i.e. don't include right, or don't include front, ...).
+* Implement option to crop individual camera output
 * Provide option to copy or move from source to output folder before starting to process
 * Add chapter markers
 * Allow for scanning if there are new folders and process if there are

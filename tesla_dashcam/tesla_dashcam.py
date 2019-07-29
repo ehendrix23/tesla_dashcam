@@ -29,7 +29,7 @@ from tzlocal import get_localzone
 VERSION = {
     'major': 0,
     'minor': 1,
-    'patch': 10,
+    'patch': 11,
     'beta': -1,
 }
 VERSION_STR = 'v{major}.{minor}.{patch}'.format(
@@ -1370,7 +1370,7 @@ def resource_path(relative_path):
     """
     # If compiled with pyinstaller then sys._MEIPASS points to the location
     # of the bundle. Otherwise path of python script is used.
-    base_path = getattr(sys, '_MEIPASS', Path(__file__).parent)
+    base_path = getattr(sys, '_MEIPASS', str(Path(__file__).parent))
     return os.path.join(base_path, relative_path)
 
 
@@ -1522,7 +1522,6 @@ def main() -> None:
                         required=False,
                         choices=['WIDESCREEN',
                                  'FULLSCREEN',
-                                 'DIAGONAL',
                                  'PERSPECTIVE', ],
                         default='FULLSCREEN',
                         help="R|Layout of the created video.\n"
@@ -1542,8 +1541,7 @@ def main() -> None:
                              "    WIDESCREEN: 1/2 (640x480, video is "
                              "1920x480)\n"
                              "    FULLSCREEN: 1/2 (640x480, video is "
-                             "1280x960)\n"
-                             "    DIAGONAL: 1/4 (320x240, video is 980x380)\n"
+                             "1280x960)\n"                             
                              "    PERSPECTIVE: 1/4 (320x240, video is "
                              "980x380)\n"
                         )
@@ -2091,14 +2089,13 @@ def main() -> None:
 
     # Determine the target folder and filename.
     # If no extension then assume it is a folder.
-    if len(os.path.splitext(args.output)) > 1:
+    if os.path.splitext(args.output)[1] is None:
         target_folder, target_filename = os.path.split(args.output)
         if target_filename is None:
             # If nothing in target_filename then no folder was given,
             # setting default movie folder
             target_folder = movie_folder
-            target_filename = arggs.output
-
+            target_filename = args.output
     else:
         # Folder only provided.
         target_folder = args.output
