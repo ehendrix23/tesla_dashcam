@@ -628,9 +628,24 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
                 continue
 
             video_info = {
-                "front_camera": {"filename": None, "duration": None, "timestamp": None},
-                "left_camera": {"filename": None, "duration": None, "timestamp": None},
-                "right_camera": {"filename": None, "duration": None, "timestamp": None},
+                "front_camera": {
+                    "filename": None,
+                    "duration": None,
+                    "timestamp": None,
+                    "include": False,
+                },
+                "left_camera": {
+                    "filename": None,
+                    "duration": None,
+                    "timestamp": None,
+                    "include": False,
+                },
+                "right_camera": {
+                    "filename": None,
+                    "duration": None,
+                    "timestamp": None,
+                    "include": False,
+                },
             }
 
             if video_settings["video_layout"].front:
@@ -693,6 +708,7 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
                     filename=video_filename,
                     duration=item["duration"],
                     timestamp=item["timestamp"],
+                    include=item["include"],
                 )
 
                 # Figure out which one has the longest duration
@@ -753,12 +769,25 @@ def get_metadata(ffmpeg, filenames):
     metadata = []
     video_timestamp = None
     wait_for_input_line = True
+    filename_appended = True
     for line in command_result.stderr.splitlines():
         if search("^Input #", line) is not None:
+            # If filename was not yet appended then it means it is a corrupt file, in that case just add to list for
+            # but identify not to include for processing
+            if not filename_appended:
+                metadata.append(
+                    {
+                        "filename": file,
+                        "timestamp": None,
+                        "duration": 0,
+                        "include": False,
+                    }
+                )
             file = filenames[input_counter]
             input_counter += 1
             video_timestamp = None
             wait_for_input_line = False
+            filename_appended = False
             continue
 
         if wait_for_input_line:
@@ -782,13 +811,18 @@ def get_metadata(ffmpeg, filenames):
                 + (float(duration_list[2].split(".")[1]) / 100)
             )
 
-            # Only add if duration is greater then 0; otherwise ignore.
-            if duration <= 0:
-                continue
+            # File will only be processed if duration is greater then 0
+            include = duration > 0
 
             metadata.append(
-                {"filename": file, "timestamp": video_timestamp, "duration": duration}
+                {
+                    "filename": file,
+                    "timestamp": video_timestamp,
+                    "duration": duration,
+                    "include": include,
+                }
             )
+            filename_appended = True
             continue
 
     return metadata
@@ -803,19 +837,28 @@ def create_intermediate_movie(
     # We first stack (combine the 3 different camera video files into 1
     # and then we concatenate.
     camera_1 = None
-    if video["video_info"]["front_camera"]["filename"] is not None:
+    if (
+        video["video_info"]["front_camera"]["filename"] is not None
+        and video["video_info"]["front_camera"]["include"]
+    ):
         camera_1 = os.path.join(
             video["movie_folder"], video["video_info"]["front_camera"]["filename"]
         )
 
     left_camera = None
-    if video["video_info"]["left_camera"]["filename"] is not None:
+    if (
+        video["video_info"]["left_camera"]["filename"] is not None
+        and video["video_info"]["left_camera"]["include"]
+    ):
         left_camera = os.path.join(
             video["movie_folder"], video["video_info"]["left_camera"]["filename"]
         )
 
     right_camera = None
-    if video["video_info"]["right_camera"]["filename"] is not None:
+    if (
+        video["video_info"]["right_camera"]["filename"] is not None
+        and video["video_info"]["right_camera"]["include"]
+    ):
         right_camera = os.path.join(
             video["movie_folder"], video["video_info"]["right_camera"]["filename"]
         )
@@ -826,7 +869,7 @@ def create_intermediate_movie(
                 timestamp=filename_timestamp
             )
         )
-        return None
+        return None, True
 
     if video_settings["video_layout"].swap_left_right:
         camera_2 = left_camera
@@ -973,9 +1016,9 @@ def create_intermediate_movie(
                 stderr=exc.stderr,
             )
         )
-        return None
+        return None, False
 
-    return temp_movie_name
+    return temp_movie_name, True
 
 
 def create_movie(clips_list, movie_filename, video_settings):
@@ -1075,7 +1118,17 @@ def create_movie(clips_list, movie_filename, video_settings):
     )
 
     try:
+        print(ffmpeg_command)
+        temp_start_time = timestamp()
         run(ffmpeg_command, capture_output=True, check=True)
+        temp_end_time = timestamp()
+        temp_real = int((temp_end_time - temp_start_time))
+
+        print(
+            "Total processing time: {real}".format(
+                real=str(timedelta(seconds=temp_real))
+            )
+        )
     except CalledProcessError as exc:
         print(
             "\t\tError trying to create movie {base_name}. RC: {rc}\n"
@@ -1192,7 +1245,7 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
                 if folder_timestamp is None
                 else folder_timestamp
             )
-            clip_name = create_intermediate_movie(
+            clip_name, files_processed = create_intermediate_movie(
                 filename_timestamp,
                 video_timestamp_info,
                 video_settings,
@@ -1223,34 +1276,35 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
                     # same as the resulting movie filename
                     if clip_name != movie_filename:
                         delete_folder_clips.append(clip_name)
-
-                    # Add the files to our list for removal.
-                    video_info = video_timestamp_info["video_info"]
-                    if video_info["front_camera"]["filename"] is not None:
-                        delete_file_list.append(
-                            os.path.join(
-                                video_timestamp_info["movie_folder"],
-                                video_info["front_camera"]["filename"],
-                            )
-                        )
-
-                    if video_info["left_camera"]["filename"] is not None:
-                        delete_file_list.append(
-                            os.path.join(
-                                video_timestamp_info["movie_folder"],
-                                video_info["left_camera"]["filename"],
-                            )
-                        )
-
-                    if video_info["right_camera"]["filename"] is not None:
-                        delete_file_list.append(
-                            os.path.join(
-                                video_timestamp_info["movie_folder"],
-                                video_info["right_camera"]["filename"],
-                            )
-                        )
-            else:
+            elif not files_processed:
                 delete_folder_files = False
+
+            if files_processed:
+                # Add the files to our list for removal.
+                video_info = video_timestamp_info["video_info"]
+                if video_info["front_camera"]["filename"] is not None:
+                    delete_file_list.append(
+                        os.path.join(
+                            video_timestamp_info["movie_folder"],
+                            video_info["front_camera"]["filename"],
+                        )
+                    )
+
+                if video_info["left_camera"]["filename"] is not None:
+                    delete_file_list.append(
+                        os.path.join(
+                            video_timestamp_info["movie_folder"],
+                            video_info["left_camera"]["filename"],
+                        )
+                    )
+
+                if video_info["right_camera"]["filename"] is not None:
+                    delete_file_list.append(
+                        os.path.join(
+                            video_timestamp_info["movie_folder"],
+                            video_info["right_camera"]["filename"],
+                        )
+                    )
 
         # All clips in folder have been processed, merge those clips
         # together now.
@@ -2113,7 +2167,7 @@ def main() -> None:
 
     # Determine the target folder and filename.
     # If no extension then assume it is a folder.
-    if os.path.splitext(args.output)[1] is None:
+    if os.path.splitext(args.output)[1] is not None:
         target_folder, target_filename = os.path.split(args.output)
         if target_filename is None:
             # If nothing in target_filename then no folder was given,

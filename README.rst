@@ -662,7 +662,8 @@ Release Notes
     - Fixed: running tesla_dashcam when installed using pip. `Issue #38 <https://github.com/ehendrix23/tesla_dashcam/issues/38>`_
     - Fixed: Just providing a filename for output would result in traceback.
     - Fixed: When providing a folder as output it would be possible that the last folder name was stripped potentially resulting in error.
-
+0.1.12:
+    - Fixed: Folders will now be deleted if there are 0-byte or corrupt video files within the folder `Issue #40 <https://github.com/ehendrix23/tesla_dashcam/issues/40>`_
 
 TODO
 ----
