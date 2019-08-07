@@ -859,7 +859,7 @@ def create_intermediate_movie(filename_timestamp,
             'video_layout'].right_height)
 
     temp_movie_name = os.path.join(video_settings['target_folder'],
-                                   filename_timestamp) + '.mp4'
+                                   filename_timestamp) + '.ts'
 
     movie_layout = video_settings['movie_layout']
     speed = video_settings['movie_speed']
@@ -1034,10 +1034,17 @@ def create_movie(clips_list, movie_filename, video_settings):
 
         return movie_filename
 
-    # Go through the list of clips to create the command.
-    ffmpeg_concat_input = []
-    concat_filter_complex = ''
+    # Concatenate intermediate transport streams
     total_clips = 0
+
+    # Use 1MiB block sizes to avoid disk thrashing
+    # TODO: Maybe have this configurable?
+    block_size = 1048576
+
+    # Ensure binary read/write mode if available
+    o_binary = getattr(os, 'O_BINARY') if hasattr(os, 'O_BINARY') else 0
+    ts_file = os.open(movie_filename + '.ts', os.O_CREAT | os.O_WRONLY | \
+        o_binary)
     # Loop through the list sorted by video timestamp.
     for video_clip in sorted(clips_list, key=lambda video: video[
         'video_timestamp']):
@@ -1047,38 +1054,26 @@ def create_movie(clips_list, movie_filename, video_settings):
             ))
             continue
 
-        ffmpeg_concat_input = ffmpeg_concat_input + ['-i',
-            video_clip['video_filename']]
-        concat_filter_complex = concat_filter_complex + \
-            '[{clip}:v:0] '.format(
-                clip=total_clips
-            )
+        # Concatenate transport streams 1MiB block at a time
+        video_concat = os.open(video_clip['video_filename'], os.O_RDONLY | \
+            o_binary)
+        while True:
+            concat_block = os.read(video_concat, block_size)
+            if not concat_block:
+                break
+            os.write(ts_file, concat_block)
+        os.close(video_concat)
         total_clips = total_clips + 1
+    os.close(ts_file)
 
     if total_clips == 0:
         print("\t\tError: No valid clips to merge found.")
         return None
 
-    concat_filter_complex = concat_filter_complex + \
-        "concat=n={total_clips}:v=1:a=0 [v]".format(
-            total_clips=total_clips,
-        )
-
-    ffmpeg_params = ['-filter_complex',
-                     concat_filter_complex,
-                     '-map',
-                     '[v]',
-                     '-preset',
-                     video_settings['movie_compression'],
-                     '-crf',
-                     MOVIE_QUALITY[video_settings['movie_quality']]
-                     ] + \
-        video_settings['video_encoding']
-
-    ffmpeg_command = [video_settings['ffmpeg_exec']] + \
-        ffmpeg_concat_input + \
-        ffmpeg_params + \
-        ['-y', movie_filename]
+    # Remux from transport stream to mp4
+    ffmpeg_command = [video_settings['ffmpeg_exec'], '-i'] + \
+        [movie_filename + '.ts', '-c:v', 'copy', '-y'] + \
+        [movie_filename]
 
     try:
         run(ffmpeg_command, capture_output=True, check=True)
@@ -1264,6 +1259,7 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
             })
             # Delete the intermediate files we created.
             if not video_settings['keep_intermediate']:
+                delete_folder_clips.append(movie_name + '.ts')
                 delete_intermediate(delete_folder_clips)
 
             # Delete the source files if stated to delete.
