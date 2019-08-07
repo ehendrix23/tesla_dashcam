@@ -11,6 +11,7 @@ from glob import glob
 from pathlib import Path
 from re import search
 from subprocess import CalledProcessError, run
+from tempfile import mkstemp
 from time import sleep, time as timestamp
 
 import requests
@@ -1071,64 +1072,46 @@ def create_movie(clips_list, movie_filename, video_settings):
         return movie_filename
 
     # Go through the list of clips to create the command.
-    ffmpeg_concat_input = []
-    concat_filter_complex = ""
+    ffmpeg_join_filehandle, ffmpeg_join_filename = mkstemp(suffix=".txt", text=True)
     total_clips = 0
-    # Loop through the list sorted by video timestamp.
-    for video_clip in sorted(clips_list, key=lambda video: video["video_timestamp"]):
-        if not os.path.isfile(video_clip["video_filename"]):
-            print(
-                "\t\tFile {} does not exist anymore, skipping.".format(
-                    video_clip["video_filename"]
+    with os.fdopen(ffmpeg_join_filehandle, "w") as fp:
+        # Loop through the list sorted by video timestamp.
+        for video_clip in sorted(
+            clips_list, key=lambda video: video["video_timestamp"]
+        ):
+            if not os.path.isfile(video_clip["video_filename"]):
+                print(
+                    "\t\tFile {} does not exist anymore, skipping.".format(
+                        video_clip["video_filename"]
+                    )
                 )
-            )
-            continue
+                continue
 
-        ffmpeg_concat_input = ffmpeg_concat_input + ["-i", video_clip["video_filename"]]
-        concat_filter_complex = concat_filter_complex + "[{clip}:v:0] ".format(
-            clip=total_clips
-        )
-        total_clips = total_clips + 1
+            # Add this file in our temp list.
+            fp.write("file '" + video_clip["video_filename"] + "'\n")
+            total_clips = total_clips + 1
 
     if total_clips == 0:
         print("\t\tError: No valid clips to merge found.")
         return None
 
-    concat_filter_complex = (
-        concat_filter_complex
-        + "concat=n={total_clips}:v=1:a=0 [v]".format(total_clips=total_clips)
-    )
-
     ffmpeg_params = [
-        "-filter_complex",
-        concat_filter_complex,
-        "-map",
-        "[v]",
-        "-preset",
-        video_settings["movie_compression"],
-        "-crf",
-        MOVIE_QUALITY[video_settings["movie_quality"]],
-    ] + video_settings["video_encoding"]
+        "-f",
+        "concat",
+        "-safe",
+        "0",
+        "-i",
+        ffmpeg_join_filename,
+        "-c",
+        "copy",
+    ]
 
     ffmpeg_command = (
-        [video_settings["ffmpeg_exec"]]
-        + ffmpeg_concat_input
-        + ffmpeg_params
-        + ["-y", movie_filename]
+        [video_settings["ffmpeg_exec"]] + ffmpeg_params + ["-y", movie_filename]
     )
 
     try:
-        print(ffmpeg_command)
-        temp_start_time = timestamp()
         run(ffmpeg_command, capture_output=True, check=True)
-        temp_end_time = timestamp()
-        temp_real = int((temp_end_time - temp_start_time))
-
-        print(
-            "Total processing time: {real}".format(
-                real=str(timedelta(seconds=temp_real))
-            )
-        )
     except CalledProcessError as exc:
         print(
             "\t\tError trying to create movie {base_name}. RC: {rc}\n"
@@ -1140,7 +1123,14 @@ def create_movie(clips_list, movie_filename, video_settings):
                 stderr=exc.stderr,
             )
         )
-        return None
+
+        movie_filename = None
+
+    # Remove temp text file.
+    try:
+        os.remove(ffmpeg_join_filename)
+    except:
+        pass
 
     return movie_filename
 
@@ -1310,7 +1300,7 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
         # together now.
         movie_name = None
         if folder_clips:
-            print("\t\tCreating movie {}, please be patient.".format(movie_filename))
+            print("\t\tCreating movie {}.".format(movie_filename))
 
             movie_name = create_movie(folder_clips, movie_filename, video_settings)
 
@@ -1367,7 +1357,7 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
             if os.path.splitext(movie_filename)[1] != ".mp4":
                 movie_filename = movie_filename + ".mp4"
 
-            print("\tCreating movie {}, please be patient.".format(movie_filename))
+            print("\tCreating movie {}.".format(movie_filename))
 
             movie_name = create_movie(dashcam_clips, movie_filename, video_settings)
 
