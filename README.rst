@@ -664,6 +664,7 @@ Release Notes
     - Fixed: When providing a folder as output it would be possible that the last folder name was stripped potentially resulting in error.
 0.1.12:
     - Fixed: Folders will now be deleted if there are 0-byte or corrupt video files within the folder `Issue #40 <https://github.com/ehendrix23/tesla_dashcam/issues/40>`_
+    - Fixed: Providing a filename for --output would create a folder instead and not setting resulting file to filename provided `Issue #52 <https://github.com/ehendrix23/tesla_dashcam/issues/52>`_
 
 TODO
 ----

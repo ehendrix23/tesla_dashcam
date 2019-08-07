@@ -2169,7 +2169,7 @@ def main() -> None:
     # If no extension then assume it is a folder.
     if os.path.splitext(args.output)[1] is not None:
         target_folder, target_filename = os.path.split(args.output)
-        if target_filename is None:
+        if target_folder is None or target_folder == "":
             # If nothing in target_filename then no folder was given,
             # setting default movie folder
             target_folder = movie_folder
