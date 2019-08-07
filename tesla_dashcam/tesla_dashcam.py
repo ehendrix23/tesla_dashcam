@@ -2158,7 +2158,10 @@ def main() -> None:
 
     # Determine the target folder and filename.
     # If no extension then assume it is a folder.
-    if os.path.splitext(args.output)[1] is not None:
+    if (
+        os.path.splitext(args.output)[1] is not None
+        and os.path.splitext(args.output)[1] != ""
+    ):
         target_folder, target_filename = os.path.split(args.output)
         if target_folder is None or target_folder == "":
             # If nothing in target_filename then no folder was given,
