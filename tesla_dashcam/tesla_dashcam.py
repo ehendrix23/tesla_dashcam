@@ -1027,49 +1027,6 @@ def create_movie(clips_list, movie_filename, video_settings):
     if not clips_list:
         return None
 
-    # If there is only 1 clip then we can just put it in place as there is
-    # nothing to concatenate.
-    if len(clips_list) == 1:
-        # If not output folder provided then these 2 are the same and thus
-        # nothing to be done.
-        if movie_filename == clips_list[0]["video_filename"]:
-            return movie_filename
-
-        # There really was only one, no need to create, just move
-        # intermediate file.
-        # Remove file 1st if it exist otherwise on Windows we can't rename.
-        if os.path.isfile(movie_filename):
-            try:
-                os.remove(movie_filename)
-            except OSError as exc:
-                # Putting out error but going to try to copy/move anyway.
-                print(
-                    "\t\tError trying to remove file {}: {}".format(movie_filename, exc)
-                )
-
-        if not video_settings["keep_intermediate"]:
-            try:
-                shutil.move(clips_list[0]["video_filename"], movie_filename)
-            except OSError as exc:
-                print(
-                    "\t\tError trying to move file {} to {}: {}".format(
-                        clips_list[0]["video_filename"], movie_filename, exc
-                    )
-                )
-                return None
-        else:
-            try:
-                shutil.copyfile(clips_list[0]["video_filename"], movie_filename)
-            except OSError as exc:
-                print(
-                    "\t\tError trying to copy file {} to {}: {}".format(
-                        clips_list[0]["video_filename"], movie_filename, exc
-                    )
-                )
-                return None
-
-        return movie_filename
-
     # Go through the list of clips to create the command.
     ffmpeg_join_filehandle, ffmpeg_join_filename = mkstemp(suffix=".txt", text=True)
     total_clips = 0
