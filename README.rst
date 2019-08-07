@@ -659,12 +659,13 @@ Release Notes
     - Fixed: Python version has to be 3.7 or higher due to use of capture_output `Issue #19 <https://github.com/ehendrix23/tesla_dashcam/issues/19>`_
 0.1.11:
     - Fixed: Traceback when getting ffmpeg path in Linux `Issue #39 <https://github.com/ehendrix23/tesla_dashcam/issues/39>`_
-    - Fixed: running tesla_dashcam when installed using pip. `Issue #38 <https://github.com/ehendrix23/tesla_dashcam/issues/38>`_
+    - Fixed: Running tesla_dashcam when installed using pip. `Issue #38 <https://github.com/ehendrix23/tesla_dashcam/issues/38>`_
     - Fixed: Just providing a filename for output would result in traceback.
     - Fixed: When providing a folder as output it would be possible that the last folder name was stripped potentially resulting in error.
 0.1.12:
     - New: Added chapter markers in the concatenated movies. Folder ones will have a chapter marker for each intermediate clip, merged one has a chapter marker for each folder.
-    - Changed: Method for concatenating the clips together has been changed resulting in massive performance improvement (less then 1 second to do concatenation)
+    - New: Added flags -movstart and +faststart for video files better suited with browsers etc. (i.e. YouTube). Thanks to sf302 for suggestion.
+    - Changed: Method for concatenating the clips together has been changed resulting in massive performance improvement (less then 1 second to do concatenation). Big thanks to sf302!
     - Fixed: Folders will now be deleted if there are 0-byte or corrupt video files within the folder `Issue #40 <https://github.com/ehendrix23/tesla_dashcam/issues/40>`_
     - Fixed: Providing a filename for --output would create a folder instead and not setting resulting file to filename provided `Issue #52 <https://github.com/ehendrix23/tesla_dashcam/issues/52>`_
 
