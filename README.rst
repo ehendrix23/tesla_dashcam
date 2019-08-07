@@ -663,6 +663,7 @@ Release Notes
     - Fixed: Just providing a filename for output would result in traceback.
     - Fixed: When providing a folder as output it would be possible that the last folder name was stripped potentially resulting in error.
 0.1.12:
+    - New: Added chapter markers in the concatenated movies. Folder ones will have a chapter marker for each intermediate clip, merged one has a chapter marker for each folder.
     - Changed: Method for concatenating the clips together has been changed resulting in massive performance improvement (less then 1 second to do concatenation)
     - Fixed: Folders will now be deleted if there are 0-byte or corrupt video files within the folder `Issue #40 <https://github.com/ehendrix23/tesla_dashcam/issues/40>`_
     - Fixed: Providing a filename for --output would create a folder instead and not setting resulting file to filename provided `Issue #52 <https://github.com/ehendrix23/tesla_dashcam/issues/52>`_
@@ -673,7 +674,6 @@ TODO
 * Allow exclusion of camera(s) in output (i.e. don't include right, or don't include front, ...).
 * Implement option to crop individual camera output
 * Provide option to copy or move from source to output folder before starting to process
-* Add chapter markers
 * Allow for scanning if there are new folders and process if there are
 * Develop method to run as a service with --monitor option
 * GUI Front-end

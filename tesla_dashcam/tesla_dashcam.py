@@ -899,7 +899,6 @@ def create_intermediate_movie(
         os.path.join(video_settings["target_folder"], filename_timestamp) + ".mp4"
     )
 
-    movie_layout = video_settings["movie_layout"]
     speed = video_settings["movie_speed"]
     # Confirm if files exist, if not replace with nullsrc
     input_count = 0
@@ -1074,6 +1073,8 @@ def create_movie(clips_list, movie_filename, video_settings):
     # Go through the list of clips to create the command.
     ffmpeg_join_filehandle, ffmpeg_join_filename = mkstemp(suffix=".txt", text=True)
     total_clips = 0
+    meta_content = ""
+    meta_start = 0
     with os.fdopen(ffmpeg_join_filehandle, "w") as fp:
         # Loop through the list sorted by video timestamp.
         for video_clip in sorted(
@@ -1087,13 +1088,37 @@ def create_movie(clips_list, movie_filename, video_settings):
                 )
                 continue
 
-            # Add this file in our temp list.
-            fp.write("file '" + video_clip["video_filename"] + "'\n")
+            # Add this file in our join list.
+            fp.write(
+                "file '"
+                + video_clip["video_filename"]
+                + "'{linesep}".format(linesep=os.linesep)
+            )
             total_clips = total_clips + 1
+            title = video_clip["video_timestamp"].astimezone(get_localzone())
+            meta_content = (
+                meta_content + "[CHAPTER]{linesep}"
+                "TIMEBASE=1/1000{linesep}"
+                "START={start}{linesep}"
+                "END={end}{linesep}"
+                "title={title}{linesep}".format(
+                    linesep=os.linesep,
+                    start=meta_start,
+                    end=meta_start + int(video_clip["video_duration"] * 1000),
+                    title=title.strftime("%x %X"),
+                )
+            )
+            meta_start = meta_start + 1 + int(video_clip["video_duration"] * 1000)
 
     if total_clips == 0:
         print("\t\tError: No valid clips to merge found.")
         return None
+
+    # Write out the meta data file.
+    meta_content = ";FFMETADATA1" + os.linesep + meta_content
+    ffmpeg_meta_filehandle, ffmpeg_meta_filename = mkstemp(suffix=".txt", text=True)
+    with os.fdopen(ffmpeg_meta_filehandle, "w") as fp:
+        fp.write(meta_content)
 
     ffmpeg_params = [
         "-f",
@@ -1102,6 +1127,12 @@ def create_movie(clips_list, movie_filename, video_settings):
         "0",
         "-i",
         ffmpeg_join_filename,
+        "-i",
+        ffmpeg_meta_filename,
+        "-map_metadata",
+        "1",
+        "-map_chapters",
+        "1",
         "-c",
         "copy",
     ]
@@ -1126,9 +1157,15 @@ def create_movie(clips_list, movie_filename, video_settings):
 
         movie_filename = None
 
-    # Remove temp text file.
+    # Remove temp join file.
     try:
         os.remove(ffmpeg_join_filename)
+    except:
+        pass
+
+    # Remove temp join file.
+    try:
+        os.remove(ffmpeg_meta_filename)
     except:
         pass
 
@@ -1227,7 +1264,7 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
         delete_folder_files = delete_source
         delete_file_list = []
         folder_timestamp = None
-
+        total_clip_duration = 0
         for clip_number, filename_timestamp in enumerate(sorted_video_clips):
             video_timestamp_info = files[filename_timestamp]
             folder_timestamp = (
@@ -1251,6 +1288,7 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
                         {
                             "video_timestamp": video_timestamp_info["timestamp"],
                             "video_filename": clip_name,
+                            "video_duration": video_timestamp_info["duration"],
                         }
                     )
                 else:
@@ -1259,9 +1297,10 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
                         {
                             "video_timestamp": video_timestamp_info["timestamp"],
                             "video_filename": clip_name,
+                            "video_duration": video_timestamp_info["duration"],
                         }
                     )
-
+                    total_clip_duration += video_timestamp_info["duration"]
                     # Add clip for deletion only if it's name is not the
                     # same as the resulting movie filename
                     if clip_name != movie_filename:
@@ -1300,14 +1339,18 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
         # together now.
         movie_name = None
         if folder_clips:
-            print("\t\tCreating movie {}.".format(movie_filename))
+            print("\t\tCreating movie {}, please be patient.".format(movie_filename))
 
             movie_name = create_movie(folder_clips, movie_filename, video_settings)
 
         # Add this one to our list for final concatenation
         if movie_name is not None:
             dashcam_clips.append(
-                {"video_timestamp": folder_timestamp, "video_filename": movie_name}
+                {
+                    "video_timestamp": folder_timestamp,
+                    "video_filename": movie_name,
+                    "video_duration": total_clip_duration,
+                }
             )
             # Delete the intermediate files we created.
             if not video_settings["keep_intermediate"]:
@@ -1357,7 +1400,7 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
             if os.path.splitext(movie_filename)[1] != ".mp4":
                 movie_filename = movie_filename + ".mp4"
 
-            print("\tCreating movie {}.".format(movie_filename))
+            print("\tCreating movie {}, please be patient.".format(movie_filename))
 
             movie_name = create_movie(dashcam_clips, movie_filename, video_settings)
 
@@ -1551,7 +1594,7 @@ def main() -> None:
         type=str,
         help="R|Path/Filename for the new movie file. "
         "Intermediate files will be stored in same "
-        "folder.\n",
+        "folder." + os.linesep,
     )
 
     parser.add_argument(
