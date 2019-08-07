@@ -1090,6 +1090,8 @@ def create_movie(clips_list, movie_filename, video_settings):
         "1",
         "-map_chapters",
         "1",
+        "-movflags",
+        "+faststart",
         "-c",
         "copy",
     ]
