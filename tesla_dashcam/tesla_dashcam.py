@@ -869,7 +869,7 @@ def create_intermediate_movie(
                 timestamp=filename_timestamp
             )
         )
-        return None, True
+        return None, 0, True
 
     if video_settings["video_layout"].swap_left_right:
         camera_2 = left_camera
@@ -1003,7 +1003,7 @@ def create_intermediate_movie(
     # print(ffmpeg_command)
     # Run the command.
     try:
-        run(ffmpeg_command, capture_output=True, check=True)
+        output = run(ffmpeg_command, capture_output=True, check=True)
     except CalledProcessError as exc:
         print(
             "\t\t\tError trying to create clip for {base_name}. RC: {rc}\n"
@@ -1015,9 +1015,13 @@ def create_intermediate_movie(
                 stderr=exc.stderr,
             )
         )
-        return None, False
+        return None, 0, False
 
-    return temp_movie_name, True
+    # Get actual duration of our new video, required for chapters when concatenating.
+    metadata = get_metadata(video_settings["ffmpeg_exec"], [temp_movie_name])
+    duration = metadata[0]["duration"] if metadata else video["duration"]
+
+    return temp_movie_name, duration, True
 
 
 def create_movie(clips_list, movie_filename, video_settings):
@@ -1052,19 +1056,21 @@ def create_movie(clips_list, movie_filename, video_settings):
             )
             total_clips = total_clips + 1
             title = video_clip["video_timestamp"].astimezone(get_localzone())
+            # For duration need to also calculate if video was sped-up or slowed down.
+            video_duration = int(video_clip["video_duration"] * 1000000000)
             meta_content = (
                 meta_content + "[CHAPTER]{linesep}"
-                "TIMEBASE=1/1000{linesep}"
+                "TIMEBASE=1/1000000000{linesep}"
                 "START={start}{linesep}"
                 "END={end}{linesep}"
                 "title={title}{linesep}".format(
                     linesep=os.linesep,
                     start=meta_start,
-                    end=meta_start + int(video_clip["video_duration"] * 1000),
+                    end=meta_start + video_duration,
                     title=title.strftime("%x %X"),
                 )
             )
-            meta_start = meta_start + 1 + int(video_clip["video_duration"] * 1000)
+            meta_start = meta_start + 1 + video_duration
 
     if total_clips == 0:
         print("\t\tError: No valid clips to merge found.")
@@ -1112,8 +1118,12 @@ def create_movie(clips_list, movie_filename, video_settings):
                 stderr=exc.stderr,
             )
         )
-
         movie_filename = None
+        duration = 0
+    else:
+        # Get actual duration of our new video, required for chapters when concatenating.
+        metadata = get_metadata(video_settings["ffmpeg_exec"], [movie_filename])
+        duration = metadata[0]["duration"] if metadata else video["duration"]
 
     # Remove temp join file.
     try:
@@ -1127,7 +1137,7 @@ def create_movie(clips_list, movie_filename, video_settings):
     except:
         pass
 
-    return movie_filename
+    return movie_filename, duration
 
 
 def delete_intermediate(movie_files):
@@ -1222,7 +1232,7 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
         delete_folder_files = delete_source
         delete_file_list = []
         folder_timestamp = None
-        total_clip_duration = 0
+
         for clip_number, filename_timestamp in enumerate(sorted_video_clips):
             video_timestamp_info = files[filename_timestamp]
             folder_timestamp = (
@@ -1230,7 +1240,7 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
                 if folder_timestamp is None
                 else folder_timestamp
             )
-            clip_name, files_processed = create_intermediate_movie(
+            clip_name, clip_duration, files_processed = create_intermediate_movie(
                 filename_timestamp,
                 video_timestamp_info,
                 video_settings,
@@ -1246,7 +1256,7 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
                         {
                             "video_timestamp": video_timestamp_info["timestamp"],
                             "video_filename": clip_name,
-                            "video_duration": video_timestamp_info["duration"],
+                            "video_duration": clip_duration,
                         }
                     )
                 else:
@@ -1255,10 +1265,10 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
                         {
                             "video_timestamp": video_timestamp_info["timestamp"],
                             "video_filename": clip_name,
-                            "video_duration": video_timestamp_info["duration"],
+                            "video_duration": clip_duration,
                         }
                     )
-                    total_clip_duration += video_timestamp_info["duration"]
+
                     # Add clip for deletion only if it's name is not the
                     # same as the resulting movie filename
                     if clip_name != movie_filename:
@@ -1299,7 +1309,9 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
         if folder_clips:
             print("\t\tCreating movie {}, please be patient.".format(movie_filename))
 
-            movie_name = create_movie(folder_clips, movie_filename, video_settings)
+            movie_name, movie_duration = create_movie(
+                folder_clips, movie_filename, video_settings
+            )
 
         # Add this one to our list for final concatenation
         if movie_name is not None:
@@ -1307,7 +1319,7 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
                 {
                     "video_timestamp": folder_timestamp,
                     "video_filename": movie_name,
-                    "video_duration": total_clip_duration,
+                    "video_duration": movie_duration,
                 }
             )
             # Delete the intermediate files we created.
@@ -1360,12 +1372,15 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
 
             print("\tCreating movie {}, please be patient.".format(movie_filename))
 
-            movie_name = create_movie(dashcam_clips, movie_filename, video_settings)
+            movie_name, movie_duration = create_movie(
+                dashcam_clips, movie_filename, video_settings
+            )
 
         if movie_name is not None:
             print(
-                "Movie {base_name} has been created, enjoy.".format(
-                    base_name=movie_name
+                "Movie {base_name} with duration {duration} has been created, enjoy.".format(
+                    base_name=movie_name,
+                    duration=str(timedelta(seconds=int(movie_duration))),
                 )
             )
         else:
