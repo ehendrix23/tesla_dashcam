@@ -1459,11 +1459,18 @@ def notify_macos(title, subtitle, message):
 
 def notify_windows(title, subtitle, message):
     """ Notification on Windows """
+
+    # Section commented out, waiting to see if it really does not work on Windows 7
+    # This works only on Windows 10 9r Windows Server 2016/2019. Skipping for everything else
+    #    from platform import win32_ver
+    #    if win32_ver()[0] != 10:
+    #        return
+
     try:
         from win10toast import ToastNotifier
 
         if TOASTER_INSTANCE is None:
-            TOASTER_INSTANCE = ToastNotifier
+            TOASTER_INSTANCE = ToastNotifier()
 
         TOASTER_INSTANCE.show_toast(
             threaded=True,
