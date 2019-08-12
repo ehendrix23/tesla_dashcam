@@ -668,6 +668,7 @@ Release Notes
     - Changed: Method for concatenating the clips together has been changed resulting in massive performance improvement (less then 1 second to do concatenation). Big thanks to sf302!
     - Fixed: Folders will now be deleted if there are 0-byte or corrupt video files within the folder `Issue #40 <https://github.com/ehendrix23/tesla_dashcam/issues/40>`_
     - Fixed: Providing a filename for --output would create a folder instead and not setting resulting file to filename provided `Issue #52 <https://github.com/ehendrix23/tesla_dashcam/issues/52>`_
+    - Fixed: Thread exception in Windows that ToastNotifier does not have an attribute classAtom (potential fix). `Issue #54 <https://github.com/ehendrix23/tesla_dashcam/issues/54>`_
 
 TODO
 ----
