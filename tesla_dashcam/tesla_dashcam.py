@@ -2202,7 +2202,25 @@ def main() -> None:
 
     # Create folder if not already existing.
     if not os.path.isdir(target_folder):
-        os.mkdir(target_folder)
+        current_path, add_folder = os.path.split(args.output)
+        # If path does not exist in which to create folder then exit.
+        if not os.path.isdir(target_folder):
+            print(
+                "Path {} does not exist, please provide a valid path.".format(
+                    current_path
+                )
+            )
+            return
+
+        try:
+            os.mkdir(target_folder)
+        except OSError as exc:
+            print(
+                "Error creating folder {} at location {}".format(
+                    add_folder, current_path
+                )
+            )
+            return
 
     # Determine if left and right cameras should be swapped or not.
     if args.swap is None:
