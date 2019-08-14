@@ -6,6 +6,7 @@ import argparse
 import os
 import sys
 from datetime import datetime, timedelta
+from fnmatch import fnmatch
 from glob import glob
 from pathlib import Path
 from re import search
@@ -601,15 +602,18 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
     folder_list = {}
     for pathname in source_folder:
         if os.path.isdir(pathname):
-            # Retrieve all the video files in current path:
-            search_path = os.path.join(pathname, "*.mp4")
-            files = glob(search_path)
-
-            if not exclude_subdirs:
-                # Search through all sub folders as well.
-                search_path = os.path.join(pathname, "*", "*.mp4")
-                files = files + (glob(search_path))
             isfile = False
+            if exclude_subdirs:
+                # Retrieve all the video files in current path:
+                search_path = os.path.join(pathname, "*.mp4")
+                files = glob(search_path)
+            else:
+                # Search all sub folder.
+                files = []
+                for folder, _, filenames in os.walk(pathname, followlinks=True):
+                    for filename in filenames:
+                        if fnmatch(filename, "*.mp4"):
+                            files.append(os.path.join(folder, filename))
         else:
             files = [pathname]
             isfile = True
@@ -1880,7 +1884,7 @@ def main() -> None:
         "--monitor",
         dest="monitor",
         action="store_true",
-        help="Enable monitoring for drive to be " "attached with TeslaCam folder.",
+        help="Enable monitoring for drive to be attached with TeslaCam folder.",
     )
 
     monitor_group.add_argument(
@@ -1890,6 +1894,15 @@ def main() -> None:
         help="Enable monitoring and exit once drive "
         "with TeslaCam folder has been attached "
         "and files processed.",
+    )
+
+    monitor_group.add_argument(
+        "--monitor_trigger_file",
+        required=False,
+        type=str,
+        help="Trigger file to look for instead of waiting for drive to be attached. Once file is discovered then "
+        "processing will start, file will be deleted when processing has been completed. If source is not "
+        "provided then folder where file is located will be used as source.",
     )
 
     update_check_group = parser.add_argument_group(
@@ -2202,9 +2215,12 @@ def main() -> None:
 
     # Create folder if not already existing.
     if not os.path.isdir(target_folder):
-        current_path, add_folder = os.path.split(args.output)
+        current_path, add_folder = os.path.split(target_folder)
+        if add_folder == "":
+            current_path, add_folder = os.path.split(current_path)
+
         # If path does not exist in which to create folder then exit.
-        if not os.path.isdir(target_folder):
+        if not os.path.isdir(current_path):
             print(
                 "Path {} does not exist, please provide a valid path.".format(
                     current_path
@@ -2239,6 +2255,7 @@ def main() -> None:
         runtype = "MONITOR"
     elif args.monitor_once:
         runtype = "MONITOR_ONCE"
+    monitor_file = args.monitor_trigger_file
 
     # If no source provided then set to MONITOR_ONCE and we're only going to
     # take SavedClips
@@ -2279,89 +2296,154 @@ def main() -> None:
 
     # If we constantly run and monitor for drive added or not.
     if video_settings["run_type"] in ["MONITOR", "MONITOR_ONCE"]:
-        got_drive = False
-        print("Monitoring for TeslaCam Drive to be inserted. Press CTRL-C to" " stop")
+        trigger_exist = False
+        if monitor_file is None:
+            print("Monitoring for TeslaCam Drive to be inserted. Press CTRL-C to stop")
+        else:
+            print(
+                "Monitoring for trigger file {}. Press CTRL-C to stop".format(
+                    monitor_file
+                )
+            )
         while True:
             try:
-                source_folder, source_partition = get_tesladashcam_folder()
-                if source_folder is None:
-                    # Nothing found, sleep for 1 minute and check again.
-                    if got_drive:
-                        print("TeslaCam drive has been ejected.")
-                        print(
-                            "Monitoring for TeslaCam Drive to be inserted. "
-                            "Press CTRL-C to stop"
+                # Monitoring for disk to be inserted and not for a file.
+                if monitor_file is None:
+                    source_folder, source_partition = get_tesladashcam_folder(
+                        monitor_file
+                    )
+                    if source_folder is None:
+                        # Nothing found, sleep for 1 minute and check again.
+                        if trigger_exist:
+                            print("TeslaCam drive has been ejected.")
+                            print(
+                                "Monitoring for TeslaCam Drive to be inserted. "
+                                "Press CTRL-C to stop"
+                            )
+
+                        sleep(MONITOR_SLEEP_TIME)
+                        trigger_exist = False
+                        continue
+
+                    # As long as TeslaCam drive is still attached we're going to
+                    # keep on waiting.
+                    if trigger_exist:
+                        sleep(MONITOR_SLEEP_TIME)
+                        continue
+
+                    # Got a folder, append what was provided as source unless
+                    # . was provided in which case everything is done.
+                    if video_settings["source_folder"][0] != ".":
+                        source_folder = os.path.join(
+                            source_folder, video_settings["source_folder"][0]
                         )
 
-                    sleep(MONITOR_SLEEP_TIME)
-                    got_drive = False
-                    continue
-
-                # As long as TeslaCam drive is still attached we're going to
-                # keep on waiting.
-                if got_drive:
-                    sleep(MONITOR_SLEEP_TIME)
-                    continue
-
-                # TeslaCam Folder found, returning it.
-                print(
-                    "TeslaCam folder found on {partition}.".format(
+                    message = "TeslaCam folder found on {partition}.".format(
                         partition=source_partition
                     )
+                else:
+                    # Wait till trigger file exist (can also be folder).
+                    if not os.path.exists(monitor_file):
+                        sleep(MONITOR_SLEEP_TIME)
+                        trigger_exist = False
+                        continue
+
+                    if trigger_exist:
+                        sleep(MONITOR_SLEEP_TIME)
+                        continue
+
+                    message = "Trigger file {} exist.".format(monitor_file)
+                    trigger_exist = True
+
+                    # Set monitor path, make sure what was provided is a file first otherwise get path.
+                    monitor_path = monitor_file
+                    if os.path.isfile(monitor_file):
+                        monitor_path, _ = os.path.split(monitor_file)
+
+                    # If . is provided then source folder is path where monitor file exist.
+                    if video_settings["source_folder"][0] == ".":
+                        source_folder = monitor_path
+                    else:
+                        # If source path provided is absolute then use that for source path
+                        if os.path.isabs(video_settings["source_folder"][0]):
+                            source_folder = video_settings["source_folder"][0]
+                        else:
+                            # Path provided is relative, hence based on path of trigger file.
+                            source_folder = os.path.join(
+                                monitor_path, video_settings["source_folder"][0]
+                            )
+
+                print(message)
+                if args.system_notification:
+                    notify("TeslaCam", "Started", message)
+
+                print("Retrieving all files from {}".format(source_folder))
+                folders = get_movie_files(
+                    [source_folder], args.exclude_subdirs, video_settings
                 )
-                if args.system_notification:
-                    notify(
-                        "TeslaCam",
-                        "Started",
-                        "TeslaCam folder found on {partition}.".format(
-                            partition=source_partition
-                        ),
-                    )
-                # Got a folder, append what was provided as source unless
-                # . was provided in which case everything is done.
-                if video_settings["source_folder"][0] != ".":
 
-                    source_folder = os.path.join(
-                        source_folder, video_settings["source_folder"][0]
+                if video_settings["run_type"] == "MONITOR":
+                    # We will continue to monitor hence we need to
+                    # ensure we
+                    # always have a unique final movie name.
+                    movie_filename = video_settings["target_filename"]
+                    movie_filename = (
+                        movie_filename + "_" if movie_filename is not None else ""
+                    )
+                    movie_filename = movie_filename + datetime.today().strftime(
+                        "%Y-%m-%d_%H_%M"
                     )
 
-                    folders = get_movie_files(
-                        [source_folder], args.exclude_subdirs, video_settings
-                    )
+                    video_settings.update({movie_filename: movie_filename})
 
-                    if video_settings["run_type"] == "MONITOR":
-                        # We will continue to monitor hence we need to
-                        # ensure we
-                        # always have a unique final movie name.
-                        movie_filename = video_settings["target_filename"]
-                        movie_filename = (
-                            movie_filename + "_" if movie_filename is not None else ""
-                        )
-                        movie_filename = movie_filename + datetime.today().strftime(
-                            "%Y-%m-%d_%H_%M"
-                        )
-
-                        video_settings.update({movie_filename: movie_filename})
-
-                    process_folders(folders, video_settings, True, args.delete_source)
+                process_folders(folders, video_settings, True, args.delete_source)
 
                 if args.system_notification:
                     notify(
-                        "TeslaCam",
-                        "Completed",
-                        "Processing of movies has completed.".format(
-                            partition=source_partition
-                        ),
+                        "TeslaCam", "Completed", "Processing of movies has completed."
                     )
                 # Stop if we're only to monitor once and then exit.
                 if video_settings["run_type"] == "MONITOR_ONCE":
+                    if monitor_file is not None:
+                        if os.path.isfile(monitor_file):
+                            try:
+                                os.remove(monitor_file)
+                            except OSError as exc:
+                                print(
+                                    "Error trying to remove trigger file {}: {}".format(
+                                        monitor_file, exc
+                                    )
+                                )
+                            trigger_exist = False
+
                     print("Exiting monitoring as asked process once.")
                     break
 
-                got_drive = True
-                print(
-                    "Waiting for TeslaCam Drive to be ejected. Press " "CTRL-C to stop"
-                )
+                if monitor_file is None:
+                    trigger_exist = True
+                    print(
+                        "Waiting for TeslaCam Drive to be ejected. Press "
+                        "CTRL-C to stop"
+                    )
+                else:
+                    if os.path.isfile(monitor_file):
+                        try:
+                            os.remove(monitor_file)
+                        except OSError as exc:
+                            print(
+                                "Error trying to remove trigger file {}: {}".format(
+                                    monitor_file, exc
+                                )
+                            )
+                            break
+                        trigger_exist = False
+
+                    print(
+                        "Monitoring for trigger file {}. Press CTRL-C to stop".format(
+                            monitor_file
+                        )
+                    )
+
             except KeyboardInterrupt:
                 print("Monitoring stopped due to CTRL-C.")
                 break

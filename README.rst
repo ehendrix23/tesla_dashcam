@@ -30,6 +30,16 @@ file for that folder already exist.
 It is still possible for --monitor_once to provide a output filename instead of just a folder. For --monitor the filename
 will be ignored and the files will be created within the path specified using a unique name instead.
 
+Using the option --monitor_trigger_file one can have it check for existence of a certain file or folder for starting
+processing instead of waiting for the disk with the TeslaCam folder to become available. Once available processing will
+start, if a trigger file was provided then upon completion of processing the file will then be deleted. If it was a folder
+then it will wait for the folder to be removed by something else (or for example link removed) and then wait again for it
+to appear again.
+If no source folder is provided then folder SavedClips will be processed with assumption it is in the same location as
+the trigger file. If source folder is an absolute path (i.e. /Videos/Tesla) then that will be used as source location.
+If it is a relative path (i.e. Tesla/MyVideos) then the path will be considered to be relative based on the location
+provided for the trigger file.
+
 When using --merge, the name of the resulting video file will be appended with the current timestamp of processing when
 --monitor parameter is used, this to ensure that the resulting video file is always unique.
 
@@ -665,12 +675,14 @@ Release Notes
 0.1.12:
     - New: Added chapter markers in the concatenated movies. Folder ones will have a chapter marker for each intermediate clip, merged one has a chapter marker for each folder.
     - New: Added flags -movstart and +faststart for video files better suited with browsers etc. (i.e. YouTube). Thanks to sf302 for suggestion.
+    - New: Option to add trigger file (--monitor_trigger_file) to use existence of a file for starting processing instead of USB/SD being inserted.
     - Changed: Method for concatenating the clips together has been changed resulting in massive performance improvement (less then 1 second to do concatenation). Big thanks to sf302!
     - Fixed: Folders will now be deleted if there are 0-byte or corrupt video files within the folder `Issue #40 <https://github.com/ehendrix23/tesla_dashcam/issues/40>`_
     - Fixed: Providing a filename for --output would create a folder instead and not setting resulting file to filename provided `Issue #52 <https://github.com/ehendrix23/tesla_dashcam/issues/52>`_
     - Fixed: Thread exception in Windows that ToastNotifier does not have an attribute classAtom (potential fix). `Issue #54 <https://github.com/ehendrix23/tesla_dashcam/issues/54>`_
     - Fixed: Traceback when invalid output path (none-existing) is provided or when unable to create target folder in given path.
-
+    - Fixed: Including sub dirs did not work correctly, it would only grab the 1st folder.
+    - Fixed: When using monitor, if . was provided as source then nothing would be processed. Now it will process everything as intended.
 TODO
 ----
 
