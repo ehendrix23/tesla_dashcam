@@ -1990,7 +1990,7 @@ def main() -> None:
                             ),
                         )
                     release_notes = (
-                        "Use --check-for-update to get latest " "release notes."
+                        "Use --check_for_update to get latest " "release notes."
                     )
 
                 print(
