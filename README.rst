@@ -691,6 +691,7 @@ Release Notes
     - Fixed: Including sub dirs did not work correctly, it would only grab the 1st folder.
     - Fixed: When using monitor, if . was provided as source then nothing would be processed. Now it will process everything as intended.
     - Fixed: File created when providing a filename with --output and --monitor option did not put timestamp in filename to ensure unique filenames
+    - Fixed: Argument to get release notes was provided incorrectly when checking for updates. Thank you to demonbane for fixing.
 
 TODO
 ----
