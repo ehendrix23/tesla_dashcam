@@ -1030,17 +1030,18 @@ def create_intermediate_movie(
     return temp_movie_name, duration, True
 
 
-def create_movie(clips_list, movie_filename, video_settings):
+def create_movie(clips_list, movie_filename, video_settings, chapter_offset):
     """ Concatenate provided movie files into 1."""
     # Just return if there are no clips.
     if not clips_list:
         return None
 
-    # Go through the list of clips to create the command.
+    # Go through the list of clips to create the command and content for chapter meta file.
     ffmpeg_join_filehandle, ffmpeg_join_filename = mkstemp(suffix=".txt", text=True)
     total_clips = 0
     meta_content = ""
     meta_start = 0
+    chapter_offset = chapter_offset * 1000000000
     with os.fdopen(ffmpeg_join_filehandle, "w") as fp:
         # Loop through the list sorted by video timestamp.
         for video_clip in sorted(
@@ -1064,6 +1065,13 @@ def create_movie(clips_list, movie_filename, video_settings):
             title = video_clip["video_timestamp"].astimezone(get_localzone())
             # For duration need to also calculate if video was sped-up or slowed down.
             video_duration = int(video_clip["video_duration"] * 1000000000)
+            chapter_start = meta_start
+            if video_duration > abs(chapter_offset):
+                if chapter_offset < 0:
+                    chapter_start = meta_start + video_duration + chapter_offset
+                elif chapter_offset > 0:
+                    chapter_start = chapter_start + chapter_offset
+
             meta_content = (
                 meta_content + "[CHAPTER]{linesep}"
                 "TIMEBASE=1/1000000000{linesep}"
@@ -1071,7 +1079,7 @@ def create_movie(clips_list, movie_filename, video_settings):
                 "END={end}{linesep}"
                 "title={title}{linesep}".format(
                     linesep=os.linesep,
-                    start=meta_start,
+                    start=chapter_start,
                     end=meta_start + video_duration,
                     title=title.strftime("%x %X"),
                 )
@@ -1316,7 +1324,7 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
             print("\t\tCreating movie {}, please be patient.".format(movie_filename))
 
             movie_name, movie_duration = create_movie(
-                folder_clips, movie_filename, video_settings
+                folder_clips, movie_filename, video_settings, 0
             )
 
         # Add this one to our list for final concatenation
@@ -1379,7 +1387,10 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
             print("\tCreating movie {}, please be patient.".format(movie_filename))
 
             movie_name, movie_duration = create_movie(
-                dashcam_clips, movie_filename, video_settings
+                dashcam_clips,
+                movie_filename,
+                video_settings,
+                video_settings["chapter_offset"],
             )
 
         if movie_name is not None:
@@ -1574,6 +1585,15 @@ def main() -> None:
         dest="merge_subdirs",
         action="store_true",
         help="Merge the video files from different " "folders into 1 big video file.",
+    )
+
+    parser.add_argument(
+        "--chapter_offset",
+        dest="chapter_offset",
+        type=int,
+        default=0,
+        help="Offset in seconds for chapters in merged video. Negative offset is # of seconds before the end of the "
+        "subdir video, positive offset if # of seconds after the start of the subdir video.",
     )
 
     parser.add_argument(
@@ -1897,7 +1917,7 @@ def main() -> None:
     )
 
     monitor_group.add_argument(
-        "--monitor_trigger_file",
+        "--monitor_trigger",
         required=False,
         type=str,
         help="Trigger file to look for instead of waiting for drive to be attached. Once file is discovered then "
@@ -2255,7 +2275,7 @@ def main() -> None:
         runtype = "MONITOR"
     elif args.monitor_once:
         runtype = "MONITOR_ONCE"
-    monitor_file = args.monitor_trigger_file
+    monitor_file = args.monitor_trigger
 
     # If no source provided then set to MONITOR_ONCE and we're only going to
     # take SavedClips
@@ -2272,6 +2292,7 @@ def main() -> None:
         "target_filename": target_filename,
         "run_type": runtype,
         "merge_subdirs": args.merge_subdirs,
+        "chapter_offset": args.chapter_offset,
         "movie_filename": None,
         "keep_intermediate": args.keep_intermediate,
         "notification": args.system_notification,
@@ -2384,17 +2405,17 @@ def main() -> None:
 
                 if video_settings["run_type"] == "MONITOR":
                     # We will continue to monitor hence we need to
-                    # ensure we
-                    # always have a unique final movie name.
-                    movie_filename = video_settings["target_filename"]
+                    # ensure we always have a unique final movie name.
                     movie_filename = (
-                        movie_filename + "_" if movie_filename is not None else ""
-                    )
-                    movie_filename = movie_filename + datetime.today().strftime(
-                        "%Y-%m-%d_%H_%M"
+                        datetime.today().strftime("%Y-%m-%d_%H_%M")
+                        if video_settings["target_filename"] is None
+                        else os.path.splitext(video_settings["target_filename"])[0]
+                        + "_"
+                        + datetime.today().strftime("%Y-%m-%d_%H_%M")
+                        + os.path.splitext(video_settings["target_filename"])[1]
                     )
 
-                    video_settings.update({movie_filename: movie_filename})
+                    video_settings.update({"movie_filename": movie_filename})
 
                 process_folders(folders, video_settings, True, args.delete_source)
 

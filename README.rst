@@ -42,6 +42,12 @@ provided for the trigger file.
 
 When using --merge, the name of the resulting video file will be appended with the current timestamp of processing when
 --monitor parameter is used, this to ensure that the resulting video file is always unique.
+Option --chapter_offset can be provided to offset the chapter markers within the merged video. A negative number would
+result in the chapter marker being set not at the start for the folder video but instead be set provided number of
+seconds before the end of that video. For example, with 10 minute video for a folder a value of -120 would result
+in the chapter markers being set 2 minutes before the end of that video. A positive number will result in chapter marker
+being set to provided number of seconds after the start of the video. Value of 600 would result in chapter markers being
+set 5 minutes into that folder's video.
 
 If --merge is not provided as an option and there are multiple sub-folders then the filename (if provided in output)
 will be ignored. Instead the files will all be placed in the folder identified by the output parameter, one movie file
@@ -674,8 +680,9 @@ Release Notes
     - Fixed: When providing a folder as output it would be possible that the last folder name was stripped potentially resulting in error.
 0.1.12:
     - New: Added chapter markers in the concatenated movies. Folder ones will have a chapter marker for each intermediate clip, merged one has a chapter marker for each folder.
+    - New: Option --chapter_offset for use with --merge to offset the chapter marker in relation to the folder clip.
     - New: Added flags -movstart and +faststart for video files better suited with browsers etc. (i.e. YouTube). Thanks to sf302 for suggestion.
-    - New: Option to add trigger file (--monitor_trigger_file) to use existence of a file for starting processing instead of USB/SD being inserted.
+    - New: Option to add trigger (--monitor_trigger_file) to use existence of a file/folder/link for starting processing instead of USB/SD being inserted.
     - Changed: Method for concatenating the clips together has been changed resulting in massive performance improvement (less then 1 second to do concatenation). Big thanks to sf302!
     - Fixed: Folders will now be deleted if there are 0-byte or corrupt video files within the folder `Issue #40 <https://github.com/ehendrix23/tesla_dashcam/issues/40>`_
     - Fixed: Providing a filename for --output would create a folder instead and not setting resulting file to filename provided `Issue #52 <https://github.com/ehendrix23/tesla_dashcam/issues/52>`_
@@ -683,13 +690,13 @@ Release Notes
     - Fixed: Traceback when invalid output path (none-existing) is provided or when unable to create target folder in given path.
     - Fixed: Including sub dirs did not work correctly, it would only grab the 1st folder.
     - Fixed: When using monitor, if . was provided as source then nothing would be processed. Now it will process everything as intended.
+
 TODO
 ----
 
 * Allow exclusion of camera(s) in output (i.e. don't include right, or don't include front, ...).
 * Implement option to crop individual camera output
 * Provide option to copy or move from source to output folder before starting to process
-* Allow for scanning if there are new folders and process if there are
 * Develop method to run as a service with --monitor option
 * GUI Front-end
 * Support drag&drop of video folder (supported in Windows now, MacOS not yet)
