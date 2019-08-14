@@ -1880,7 +1880,7 @@ def main() -> None:
                                    release=release_info.get('tag_name'),
                                    version=VERSION_STR,
                                ))
-                    release_notes = "Use --check-for-update to get latest " \
+                    release_notes = "Use --check_for_update to get latest " \
                                     "release notes."
 
                 print("New {beta}release {release} is available for download "
