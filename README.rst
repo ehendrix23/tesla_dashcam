@@ -690,6 +690,7 @@ Release Notes
     - Fixed: Traceback when invalid output path (none-existing) is provided or when unable to create target folder in given path.
     - Fixed: Including sub dirs did not work correctly, it would only grab the 1st folder.
     - Fixed: When using monitor, if . was provided as source then nothing would be processed. Now it will process everything as intended.
+    - Fixed: File created when providing a filename with --output and --monitor option did not put timestamp in filename to ensure unique filenames
 
 TODO
 ----
