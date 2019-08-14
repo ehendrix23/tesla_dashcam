@@ -2301,7 +2301,7 @@ def main() -> None:
             print("Monitoring for TeslaCam Drive to be inserted. Press CTRL-C to stop")
         else:
             print(
-                "Monitoring for trigger file {}. Press CTRL-C to stop".format(
+                "Monitoring for trigger {} to exist. Press CTRL-C to stop".format(
                     monitor_file
                 )
             )
@@ -2352,7 +2352,7 @@ def main() -> None:
                         sleep(MONITOR_SLEEP_TIME)
                         continue
 
-                    message = "Trigger file {} exist.".format(monitor_file)
+                    message = "Trigger {} exist.".format(monitor_file)
                     trigger_exist = True
 
                     # Set monitor path, make sure what was provided is a file first otherwise get path.
@@ -2398,10 +2398,12 @@ def main() -> None:
 
                 process_folders(folders, video_settings, True, args.delete_source)
 
+                print("Processing of movies has completed.")
                 if args.system_notification:
                     notify(
                         "TeslaCam", "Completed", "Processing of movies has completed."
                     )
+
                 # Stop if we're only to monitor once and then exit.
                 if video_settings["run_type"] == "MONITOR_ONCE":
                     if monitor_file is not None:
@@ -2438,11 +2440,17 @@ def main() -> None:
                             break
                         trigger_exist = False
 
-                    print(
-                        "Monitoring for trigger file {}. Press CTRL-C to stop".format(
-                            monitor_file
+                        print(
+                            "Monitoring for trigger {}. Press CTRL-C to stop".format(
+                                monitor_file
+                            )
                         )
-                    )
+                    else:
+                        print(
+                            "Waiting for trigger {} to be removed. Press CTRL-C to stop".format(
+                                monitor_file
+                            )
+                        )
 
             except KeyboardInterrupt:
                 print("Monitoring stopped due to CTRL-C.")
