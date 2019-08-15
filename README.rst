@@ -13,7 +13,7 @@ Using this program, one can combine all of these into 1 video file. The video of
 into one picture, with the video for all the minutes further put together into one.
 
 By default sub-folders are included when retrieving the video clips. One can, for example, just provide the path to the
-respective SavedClips folder (i.e. e:\TeslaCam\SavedClips for Windows if drive has letter E,
+respective SavedClips folder (i.e. e:\\TeslaCam\\SavedClips for Windows if drive has letter E,
 /Volumes/Tesla/TeslaCam/SavedClips on MacOS if drive is mounted on /Volumes/Tesla) and then all folders that were created
 within the SavedClips folder will be processed. There will be a movie file for each folder.
 When using the option --merge there will also be a movie file created combining the movies from all the folders into 1.
@@ -129,9 +129,10 @@ Usage
 .. code:: bash
 
     usage: tesla_dashcam.py [-h] [--version] [--exclude_subdirs | --merge]
-                            [--output OUTPUT] [--keep-intermediate]
-                            [--delete_source] [--no-notification]
-                            [--layout {WIDESCREEN,FULLSCREEN,DIAGONAL,PERSPECTIVE}]
+                            [--chapter_offset CHAPTER_OFFSET] [--output OUTPUT]
+                            [--keep-intermediate] [--delete_source]
+                            [--no-notification]
+                            [--layout {WIDESCREEN,FULLSCREEN,PERSPECTIVE}]
                             [--scale CLIP_SCALE] [--mirror | --rear] [--swap]
                             [--no-swap] [--slowdown SLOW_DOWN]
                             [--speedup SPEED_UP]
@@ -142,6 +143,7 @@ Usage
                             [--quality {LOWEST,LOWER,LOW,MEDIUM,HIGH}]
                             [--compression {ultrafast,superfast,veryfast,faster,fast,medium,slow,slower,veryslow}]
                             [--ffmpeg FFMPEG] [--monitor] [--monitor_once]
+                            [--monitor_trigger MONITOR_TRIGGER]
                             [--check_for_update] [--no-check_for_update]
                             [--include_test]
                             [source [source ...]]
@@ -155,11 +157,16 @@ Usage
 
     optional arguments:
       -h, --help            show this help message and exit
-      --version             show program's version number and exit
+      --version             show program''s version number and exit
       --exclude_subdirs     Do not search all sub folders for video files to.
                             (default: False)
       --merge               Merge the video files from different folders into 1
                             big video file. (default: False)
+      --chapter_offset CHAPTER_OFFSET
+                            Offset in seconds for chapters in merged video.
+                            Negative offset is # of seconds before the end of the
+                            subdir video, positive offset if # of seconds after
+                            the start of the subdir video. (default: 0)
       --output OUTPUT       Path/Filename for the new movie file. Intermediate files will be stored in same folder.
                              (default: /Users/ehendrix/Movies/Tesla_Dashcam/)
       --keep-intermediate   Do not remove the intermediate video files that are
@@ -177,7 +184,6 @@ Usage
       --scale CLIP_SCALE    Set camera clip scale, scale of 1 is 1280x960 camera clip. Defaults:
                                 WIDESCREEN: 1/2 (640x480, video is 1920x480)
                                 FULLSCREEN: 1/2 (640x480, video is 1280x960)
-                                DIAGONAL: 1/4 (320x240, video is 980x380)
                                 PERSPECTIVE: 1/4 (320x240, video is 980x380)
                              (default: None)
       --mirror              Video from side cameras as if being viewed through the
@@ -212,8 +218,7 @@ Usage
                                                 For more information on supported cards see:
                                      https://developer.nvidia.com/video-encode-decode-gpu-support-matrix (default: False)
       --ffmpeg FFMPEG       Path and filename for ffmpeg. Specify if ffmpeg is not
-                            within path. (default: /Users/ehendrix/Documents/GitHu
-                            b/tesla_dashcam/tesla_dashcam/ffmpeg)
+                            within path. (default: tesla_dashcam/ffmpeg)
 
     Timestamp:
       Options for timestamp:
@@ -260,6 +265,13 @@ Usage
       --monitor_once        Enable monitoring and exit once drive with TeslaCam
                             folder has been attached and files processed.
                             (default: False)
+      --monitor_trigger MONITOR_TRIGGER
+                            Trigger file to look for instead of waiting for drive
+                            to be attached. Once file is discovered then
+                            processing will start, file will be deleted when
+                            processing has been completed. If source is not
+                            provided then folder where file is located will be
+                            used as source. (default: None)
 
     Update Check:
       Check for updates
@@ -271,7 +283,6 @@ Usage
                             this parameter that can be disabled (default: False)
       --include_test        Include test (beta) releases when checking for
                             updates. (default: False)
-
 
 
 
@@ -542,6 +553,30 @@ Also create a movie file that has them all merged together.
 .. code:: bash
 
     python3 tesla_dashcam.py --slowdown 2 --rear --merge --output /home/me/Tesla --monitor_once SavedClips
+
+Enable monitoring using a trigger file (or folder) to start processing all the files from SavedClips.
+Note that for source we provide the folder name (SavedClips), the complete path will be created by the program using the
+path of the trigger file (if it is a file) or folder. Videos are stored in folder specified by --output. Videos from all
+the folders are then merged into 1 folder with name TeslaDashcam followed by timestamp of processing (timestamp is
+added automatically). Chapter offset is set to be 2 minutes (120 seconds) before the end of the respective folder clips.
+
+* Windows:
+
+.. code:: bash
+
+    tesla_dashcam.exe --merge --chapter_offset -120 --output c:\Tesla\TeslaDashcam.mp4 --monitor --monitor_trigger x:\TeslaCam\start_processing.txt SavedClips
+
+* Mac:
+
+.. code:: bash
+
+    tesla_dashcam --merge --chapter_offset -120 --output /Users/me/Desktop/Tesla --monitor --monitor_trigger /Users/me/TeslaCam/start_processing.txt SavedClips
+
+* Linux:
+
+.. code:: bash
+
+    python3 tesla_dashcam.py --merge --chapter_offset -120 --output /home/me/Tesla --monitor --monitor_trigger /home/me/TeslaCam/start_processing.txt SavedClips
 
 
 Argument (Parameter) file
