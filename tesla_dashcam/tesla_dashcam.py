@@ -1577,7 +1577,7 @@ def main() -> None:
         "--exclude_subdirs",
         dest="exclude_subdirs",
         action="store_true",
-        help="Do not search all sub folders for video files " "to.",
+        help="Do not search sub folders for video files to process.",
     )
 
     sub_dirs.add_argument(

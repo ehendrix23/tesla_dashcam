@@ -158,14 +158,14 @@ Usage
     optional arguments:
       -h, --help            show this help message and exit
       --version             show program''s version number and exit
-      --exclude_subdirs     Do not search all sub folders for video files to.
+      --exclude_subdirs     Do not search sub folders for video files to process.
                             (default: False)
       --merge               Merge the video files from different folders into 1
                             big video file. (default: False)
       --chapter_offset CHAPTER_OFFSET
                             Offset in seconds for chapters in merged video.
-                            Negative offset is # of seconds before the end of the
-                            subdir video, positive offset if # of seconds after
+                            Negative offset is \# of seconds before the end of the
+                            subdir video, positive offset if \# of seconds after
                             the start of the subdir video. (default: 0)
       --output OUTPUT       Path/Filename for the new movie file. Intermediate files will be stored in same folder.
                              (default: /Users/ehendrix/Movies/Tesla_Dashcam/)
