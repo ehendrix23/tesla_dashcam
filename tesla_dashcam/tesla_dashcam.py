@@ -600,6 +600,7 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
     """ Find all the clip files within folder (and subfolder if requested) """
 
     folder_list = {}
+    total_folders = 0
     for pathname in source_folder:
         if os.path.isdir(pathname):
             isfile = False
@@ -607,13 +608,21 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
                 # Retrieve all the video files in current path:
                 search_path = os.path.join(pathname, "*.mp4")
                 files = glob(search_path)
+                print("Discovered {} files, retrieving clip data.".format(len(files)))
             else:
                 # Search all sub folder.
                 files = []
                 for folder, _, filenames in os.walk(pathname, followlinks=True):
+                    total_folders = total_folders + 1
                     for filename in filenames:
                         if fnmatch(filename, "*.mp4"):
                             files.append(os.path.join(folder, filename))
+
+                print(
+                    "Discovered {} folders containing total of {} files, retrieving clip data.".format(
+                        total_folders, len(files)
+                    )
+                )
         else:
             files = [pathname]
             isfile = True
@@ -1199,7 +1208,7 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
     for folder_number, folder_name in enumerate(sorted(folders)):
         total_clips = total_clips + len(folders[folder_name])
     print(
-        "Discovered {total_folders} folders with {total_clips} clips to "
+        "There are {total_folders} folders with {total_clips} clips to "
         "process.".format(total_folders=len(folders), total_clips=total_clips)
     )
 
@@ -1373,8 +1382,12 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
                 delete_intermediate(delete_folder_clips)
 
             print(
-                "\tMovie {base_name} for folder {folder_name} is "
-                "ready.".format(base_name=movie_name, folder_name=folder_name)
+                "\tMovie {base_name} for folder {folder_name} with duration {duration} is "
+                "ready.".format(
+                    base_name=movie_name,
+                    folder_name=folder_name,
+                    duration=str(timedelta(seconds=int(movie_duration))),
+                )
             )
 
     # Now that we have gone through all the folders merge.
