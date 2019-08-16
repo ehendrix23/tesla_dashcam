@@ -2349,9 +2349,7 @@ def main() -> None:
             try:
                 # Monitoring for disk to be inserted and not for a file.
                 if monitor_file is None:
-                    source_folder, source_partition = get_tesladashcam_folder(
-                        monitor_file
-                    )
+                    source_folder, source_partition = get_tesladashcam_folder()
                     if source_folder is None:
                         # Nothing found, sleep for 1 minute and check again.
                         if trigger_exist:
