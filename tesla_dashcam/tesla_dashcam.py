@@ -717,18 +717,22 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
                     include=item["include"],
                 )
 
-                # Figure out which one has the longest duration
-                duration = item["duration"] if item["duration"] > duration else duration
-
-                # Figure out starting timestamp
-                if video_timestamp is None:
-                    video_timestamp = item["timestamp"]
-                else:
-                    video_timestamp = (
-                        item["timestamp"]
-                        if item["timestamp"] < video_timestamp
-                        else video_timestamp
+                # Only check duration and timestamp if this file is not corrupt.
+                if item["include"]:
+                    # Figure out which one has the longest duration
+                    duration = (
+                        item["duration"] if item["duration"] > duration else duration
                     )
+
+                    # Figure out starting timestamp
+                    if video_timestamp is None:
+                        video_timestamp = item["timestamp"]
+                    else:
+                        video_timestamp = (
+                            item["timestamp"]
+                            if item["timestamp"] < video_timestamp
+                            else video_timestamp
+                        )
 
             if video_timestamp is None:
                 # Firmware version 2019.16 changed filename timestamp format.
@@ -762,38 +766,32 @@ def get_metadata(ffmpeg, filenames):
     # Get meta data for each video to determine creation time and duration.
     ffmpeg_command = [ffmpeg]
 
+    metadata = []
     for file in filenames:
         if os.path.isfile(file):
             ffmpeg_command.append("-i")
             ffmpeg_command.append(file)
+
+            metadata.append(
+                {"filename": file, "timestamp": None, "duration": 0, "include": False}
+            )
 
     ffmpeg_command.append("-hide_banner")
 
     command_result = run(ffmpeg_command, capture_output=True, text=True)
     input_counter = 0
     file = ""
-    metadata = []
+
     video_timestamp = None
     wait_for_input_line = True
-    filename_appended = True
     for line in command_result.stderr.splitlines():
         if search("^Input #", line) is not None:
             # If filename was not yet appended then it means it is a corrupt file, in that case just add to list for
             # but identify not to include for processing
-            if not filename_appended:
-                metadata.append(
-                    {
-                        "filename": file,
-                        "timestamp": None,
-                        "duration": 0,
-                        "include": False,
-                    }
-                )
             file = filenames[input_counter]
             input_counter += 1
             video_timestamp = None
             wait_for_input_line = False
-            filename_appended = False
             continue
 
         if wait_for_input_line:
@@ -820,17 +818,19 @@ def get_metadata(ffmpeg, filenames):
             # File will only be processed if duration is greater then 0
             include = duration > 0
 
-            metadata.append(
-                {
-                    "filename": file,
-                    "timestamp": video_timestamp,
-                    "duration": duration,
-                    "include": include,
-                }
+            # Update our metadata list.
+            element = next(
+                (item for item in metadata if item["filename"] == file), None
             )
-            filename_appended = True
-            continue
-
+            # Should never be None but just in case. :-)
+            if element != None:
+                element.update(
+                    {
+                        "timestamp": video_timestamp,
+                        "duration": duration,
+                        "include": include,
+                    }
+                )
     return metadata
 
 
@@ -870,11 +870,6 @@ def create_intermediate_movie(
         )
 
     if camera_1 is None and left_camera is None and right_camera is None:
-        print(
-            "\t\tNo valid video files for {timestamp}".format(
-                timestamp=filename_timestamp
-            )
-        )
         return None, 0, True
 
     if video_settings["video_layout"].swap_left_right:
@@ -1009,7 +1004,7 @@ def create_intermediate_movie(
     # print(ffmpeg_command)
     # Run the command.
     try:
-        output = run(ffmpeg_command, capture_output=True, check=True)
+        run(ffmpeg_command, capture_output=True, check=True)
     except CalledProcessError as exc:
         print(
             "\t\t\tError trying to create clip for {base_name}. RC: {rc}\n"
@@ -1072,6 +1067,21 @@ def create_movie(clips_list, movie_filename, video_settings, chapter_offset):
                 elif chapter_offset > 0:
                     chapter_start = chapter_start + chapter_offset
 
+            # We need to add an initial chapter if our "1st" chapter is not at the beginning of the movie.
+            if total_clips == 1 and chapter_start > 0:
+                meta_content = (
+                    "[CHAPTER]{linesep}"
+                    "TIMEBASE=1/1000000000{linesep}"
+                    "START={start}{linesep}"
+                    "END={end}{linesep}"
+                    "title={title}{linesep}".format(
+                        linesep=os.linesep,
+                        start=0,
+                        end=chapter_start - 1,
+                        title="Start",
+                    )
+                )
+
             meta_content = (
                 meta_content + "[CHAPTER]{linesep}"
                 "TIMEBASE=1/1000000000{linesep}"
@@ -1092,6 +1102,7 @@ def create_movie(clips_list, movie_filename, video_settings, chapter_offset):
 
     # Write out the meta data file.
     meta_content = ";FFMETADATA1" + os.linesep + meta_content
+
     ffmpeg_meta_filehandle, ffmpeg_meta_filename = mkstemp(suffix=".txt", text=True)
     with os.fdopen(ffmpeg_meta_filehandle, "w") as fp:
         fp.write(meta_content)
@@ -1160,11 +1171,17 @@ def delete_intermediate(movie_files):
         if file is not None:
             if os.path.isfile(file):
                 try:
-
                     os.remove(file)
                 except OSError as exc:
                     print("\t\tError trying to remove file {}: {}".format(file, exc))
             elif os.path.isdir(file):
+                # This is more specific for Mac but won't hurt on other platforms.
+                if os.path.exists(os.path.join(file, ".DS_Store")):
+                    try:
+                        os.remove(os.path.join(file, ".DS_Store"))
+                    except:
+                        pass
+
                 try:
 
                     os.rmdir(file)
@@ -1261,7 +1278,6 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
                 clip_number,
                 len(files),
             )
-
             if clip_name is not None:
                 if video_timestamp_info["file_only"]:
                     # When file only there is no concatenation at the folder
@@ -1327,6 +1343,20 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
                 folder_clips, movie_filename, video_settings, 0
             )
 
+        # Delete the source files if stated to delete.
+        # We only do so if there were no issues in processing the clips
+        if delete_folder_files and (
+            (folder_clips and movie_name is not None) or not folder_clips
+        ):
+            print(
+                "\t\tDeleting files and folder {folder_name}".format(
+                    folder_name=folder_name
+                )
+            )
+            delete_intermediate(delete_file_list)
+            # And delete the folder
+            delete_intermediate([folder_name])
+
         # Add this one to our list for final concatenation
         if movie_name is not None:
             dashcam_clips.append(
@@ -1339,17 +1369,6 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
             # Delete the intermediate files we created.
             if not video_settings["keep_intermediate"]:
                 delete_intermediate(delete_folder_clips)
-
-            # Delete the source files if stated to delete.
-            if delete_folder_files:
-                print(
-                    "\t\tDeleting files and folder {folder_name}".format(
-                        folder_name=folder_name
-                    )
-                )
-                delete_intermediate(delete_file_list)
-                # And delete the folder
-                delete_intermediate([folder_name])
 
             print(
                 "\tMovie {base_name} for folder {folder_name} is "
