@@ -5,7 +5,7 @@ then further concatenates the files together to make 1 movie.
 import argparse
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fnmatch import fnmatch
 from glob import glob
 from pathlib import Path
@@ -741,11 +741,13 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
                     video_timestamp = datetime.strptime(
                         filename_timestamp, "%Y-%m-%d_%H-%M"
                     )
+                    video_timestamp = video_timestamp.astimezone(get_localzone())
                 else:
                     # This is for version 2019.16 and later
                     video_timestamp = datetime.strptime(
                         filename_timestamp, "%Y-%m-%d_%H-%M-%S"
                     )
+                    video_timestamp = video_timestamp.astimezone(timezone.utc)
 
             movie_info = {
                 "movie_folder": movie_folder,
