@@ -132,6 +132,46 @@ class TestUploadCommand(Command):
 
         sys.exit()
 
+class TestUploadCommand(Command):
+    """Support setup.py upload."""
+
+    description = 'Build and publish the package to TestPyPi.'
+    user_options = []  # type: ignore
+
+    @staticmethod
+    def status(string):
+        """Prints things in bold."""
+        print('\033[1m{0}\033[0m'.format(string))
+
+    def initialize_options(self):
+        """Add options for initialization."""
+        pass
+
+    def finalize_options(self):
+        """Add options for finalization."""
+        pass
+
+    def run(self):
+        """Run."""
+        try:
+            self.status('Removing previous builds…')
+            rmtree(os.path.join(HERE, 'dist'))
+        except OSError:
+            pass
+
+        self.status('Building Source and Wheel (universal) distribution…')
+        os.system('{0} setup.py sdist bdist_wheel --universal'.format(
+            sys.executable))
+
+        self.status('Uploading the package to TestPyPi via Twine…')
+        os.system('twine upload --repository-url '
+                  'https://test.pypi.org/legacy/ dist/*')
+
+        self.status('Pushing git tags…')
+        os.system('git tag v{0}'.format(ABOUT['__version__']))
+        os.system('git push --tags')
+
+        sys.exit()
 
 # Where the magic happens:
 setup(
