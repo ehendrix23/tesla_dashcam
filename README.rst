@@ -13,7 +13,7 @@ Using this program, one can combine all of these into 1 video file. The video of
 into one picture, with the video for all the minutes further put together into one.
 
 By default sub-folders are included when retrieving the video clips. One can, for example, just provide the path to the
-respective SavedClips folder (i.e. e:\TeslaCam\SavedClips for Windows if drive has letter E,
+respective SavedClips folder (i.e. e:\\TeslaCam\\SavedClips for Windows if drive has letter E,
 /Volumes/Tesla/TeslaCam/SavedClips on MacOS if drive is mounted on /Volumes/Tesla) and then all folders that were created
 within the SavedClips folder will be processed. There will be a movie file for each folder.
 When using the option --merge there will also be a movie file created combining the movies from all the folders into 1.
@@ -30,8 +30,24 @@ file for that folder already exist.
 It is still possible for --monitor_once to provide a output filename instead of just a folder. For --monitor the filename
 will be ignored and the files will be created within the path specified using a unique name instead.
 
+Using the option --monitor_trigger_file one can have it check for existence of a certain file or folder for starting
+processing instead of waiting for the disk with the TeslaCam folder to become available. Once available processing will
+start, if a trigger file was provided then upon completion of processing the file will then be deleted. If it was a folder
+then it will wait for the folder to be removed by something else (or for example link removed) and then wait again for it
+to appear again.
+If no source folder is provided then folder SavedClips will be processed with assumption it is in the same location as
+the trigger file. If source folder is an absolute path (i.e. /Videos/Tesla) then that will be used as source location.
+If it is a relative path (i.e. Tesla/MyVideos) then the path will be considered to be relative based on the location
+provided for the trigger file.
+
 When using --merge, the name of the resulting video file will be appended with the current timestamp of processing when
 --monitor parameter is used, this to ensure that the resulting video file is always unique.
+Option --chapter_offset can be provided to offset the chapter markers within the merged video. A negative number would
+result in the chapter marker being set not at the start for the folder video but instead be set provided number of
+seconds before the end of that video. For example, with 10 minute video for a folder a value of -120 would result
+in the chapter markers being set 2 minutes before the end of that video. A positive number will result in chapter marker
+being set to provided number of seconds after the start of the video. Value of 600 would result in chapter markers being
+set 5 minutes into that folder's video.
 
 If --merge is not provided as an option and there are multiple sub-folders then the filename (if provided in output)
 will be ignored. Instead the files will all be placed in the folder identified by the output parameter, one movie file
@@ -51,8 +67,8 @@ Binaries
 
 Stand-alone binaries can be retrieved:
 
-- Windows: https://github.com/ehendrix23/tesla_dashcam/releases/download/v0.1.11/tesla_dashcam.zip
-- MacOS (OSX): https://github.com/ehendrix23/tesla_dashcam/releases/download/v0.1.11/tesla_dashcam.dmg
+- Windows: https://github.com/ehendrix23/tesla_dashcam/releases/download/v0.1.12/tesla_dashcam.zip
+- MacOS (OSX): https://github.com/ehendrix23/tesla_dashcam/releases/download/v0.1.12/tesla_dashcam.dmg
 
 `ffmpeg <https://www.ffmpeg.org/legal.html>`_ is included within the respective package.
 ffmpeg is a separately licensed product under the `GNU Lesser General Public License (LGPL) version 2.1 or later <http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html>`_.
@@ -113,9 +129,10 @@ Usage
 .. code:: bash
 
     usage: tesla_dashcam.py [-h] [--version] [--exclude_subdirs | --merge]
-                            [--output OUTPUT] [--keep-intermediate]
-                            [--delete_source] [--no-notification]
-                            [--layout {WIDESCREEN,FULLSCREEN,DIAGONAL,PERSPECTIVE}]
+                            [--chapter_offset CHAPTER_OFFSET] [--output OUTPUT]
+                            [--keep-intermediate] [--delete_source]
+                            [--no-notification]
+                            [--layout {WIDESCREEN,FULLSCREEN,PERSPECTIVE}]
                             [--scale CLIP_SCALE] [--mirror | --rear] [--swap]
                             [--no-swap] [--slowdown SLOW_DOWN]
                             [--speedup SPEED_UP]
@@ -126,6 +143,7 @@ Usage
                             [--quality {LOWEST,LOWER,LOW,MEDIUM,HIGH}]
                             [--compression {ultrafast,superfast,veryfast,faster,fast,medium,slow,slower,veryslow}]
                             [--ffmpeg FFMPEG] [--monitor] [--monitor_once]
+                            [--monitor_trigger MONITOR_TRIGGER]
                             [--check_for_update] [--no-check_for_update]
                             [--include_test]
                             [source [source ...]]
@@ -139,11 +157,16 @@ Usage
 
     optional arguments:
       -h, --help            show this help message and exit
-      --version             show program's version number and exit
-      --exclude_subdirs     Do not search all sub folders for video files to.
+      --version             show program''s version number and exit
+      --exclude_subdirs     Do not search sub folders for video files to process.
                             (default: False)
       --merge               Merge the video files from different folders into 1
                             big video file. (default: False)
+      --chapter_offset CHAPTER_OFFSET
+                            Offset in seconds for chapters in merged video.
+                            Negative offset is \# of seconds before the end of the
+                            subdir video, positive offset if \# of seconds after
+                            the start of the subdir video. (default: 0)
       --output OUTPUT       Path/Filename for the new movie file. Intermediate files will be stored in same folder.
                              (default: /Users/ehendrix/Movies/Tesla_Dashcam/)
       --keep-intermediate   Do not remove the intermediate video files that are
@@ -161,7 +184,6 @@ Usage
       --scale CLIP_SCALE    Set camera clip scale, scale of 1 is 1280x960 camera clip. Defaults:
                                 WIDESCREEN: 1/2 (640x480, video is 1920x480)
                                 FULLSCREEN: 1/2 (640x480, video is 1280x960)
-                                DIAGONAL: 1/4 (320x240, video is 980x380)
                                 PERSPECTIVE: 1/4 (320x240, video is 980x380)
                              (default: None)
       --mirror              Video from side cameras as if being viewed through the
@@ -196,8 +218,7 @@ Usage
                                                 For more information on supported cards see:
                                      https://developer.nvidia.com/video-encode-decode-gpu-support-matrix (default: False)
       --ffmpeg FFMPEG       Path and filename for ffmpeg. Specify if ffmpeg is not
-                            within path. (default: /Users/ehendrix/Documents/GitHu
-                            b/tesla_dashcam/tesla_dashcam/ffmpeg)
+                            within path. (default: tesla_dashcam/ffmpeg)
 
     Timestamp:
       Options for timestamp:
@@ -244,6 +265,13 @@ Usage
       --monitor_once        Enable monitoring and exit once drive with TeslaCam
                             folder has been attached and files processed.
                             (default: False)
+      --monitor_trigger MONITOR_TRIGGER
+                            Trigger file to look for instead of waiting for drive
+                            to be attached. Once file is discovered then
+                            processing will start, file will be deleted when
+                            processing has been completed. If source is not
+                            provided then folder where file is located will be
+                            used as source. (default: None)
 
     Update Check:
       Check for updates
@@ -255,7 +283,6 @@ Usage
                             this parameter that can be disabled (default: False)
       --include_test        Include test (beta) releases when checking for
                             updates. (default: False)
-
 
 
 
@@ -527,6 +554,30 @@ Also create a movie file that has them all merged together.
 
     python3 tesla_dashcam.py --slowdown 2 --rear --merge --output /home/me/Tesla --monitor_once SavedClips
 
+Enable monitoring using a trigger file (or folder) to start processing all the files from SavedClips.
+Note that for source we provide the folder name (SavedClips), the complete path will be created by the program using the
+path of the trigger file (if it is a file) or folder. Videos are stored in folder specified by --output. Videos from all
+the folders are then merged into 1 folder with name TeslaDashcam followed by timestamp of processing (timestamp is
+added automatically). Chapter offset is set to be 2 minutes (120 seconds) before the end of the respective folder clips.
+
+* Windows:
+
+.. code:: bash
+
+    tesla_dashcam.exe --merge --chapter_offset -120 --output c:\Tesla\TeslaDashcam.mp4 --monitor --monitor_trigger x:\TeslaCam\start_processing.txt SavedClips
+
+* Mac:
+
+.. code:: bash
+
+    tesla_dashcam --merge --chapter_offset -120 --output /Users/me/Desktop/Tesla --monitor --monitor_trigger /Users/me/TeslaCam/start_processing.txt SavedClips
+
+* Linux:
+
+.. code:: bash
+
+    python3 tesla_dashcam.py --merge --chapter_offset -120 --output /home/me/Tesla --monitor --monitor_trigger /home/me/TeslaCam/start_processing.txt SavedClips
+
 
 Argument (Parameter) file
 -------------------------
@@ -659,10 +710,23 @@ Release Notes
     - Fixed: Python version has to be 3.7 or higher due to use of capture_output `Issue #19 <https://github.com/ehendrix23/tesla_dashcam/issues/19>`_
 0.1.11:
     - Fixed: Traceback when getting ffmpeg path in Linux `Issue #39 <https://github.com/ehendrix23/tesla_dashcam/issues/39>`_
-    - Fixed: running tesla_dashcam when installed using pip. `Issue #38 <https://github.com/ehendrix23/tesla_dashcam/issues/38>`_
+    - Fixed: Running tesla_dashcam when installed using pip. `Issue #38 <https://github.com/ehendrix23/tesla_dashcam/issues/38>`_
     - Fixed: Just providing a filename for output would result in traceback.
     - Fixed: When providing a folder as output it would be possible that the last folder name was stripped potentially resulting in error.
-
+0.1.12:
+    - New: Added chapter markers in the concatenated movies. Folder ones will have a chapter marker for each intermediate clip, merged one has a chapter marker for each folder.
+    - New: Option --chapter_offset for use with --merge to offset the chapter marker in relation to the folder clip.
+    - New: Added flags -movstart and +faststart for video files better suited with browsers etc. (i.e. YouTube). Thanks to sf302 for suggestion.
+    - New: Option to add trigger (--monitor_trigger_file) to use existence of a file/folder/link for starting processing instead of USB/SD being inserted.
+    - Changed: Method for concatenating the clips together has been changed resulting in massive performance improvement (less then 1 second to do concatenation). Big thanks to sf302!
+    - Fixed: Folders will now be deleted if there are 0-byte or corrupt video files within the folder `Issue #40 <https://github.com/ehendrix23/tesla_dashcam/issues/40>`_
+    - Fixed: Providing a filename for --output would create a folder instead and not setting resulting file to filename provided `Issue #52 <https://github.com/ehendrix23/tesla_dashcam/issues/52>`_
+    - Fixed: Thread exception in Windows that ToastNotifier does not have an attribute classAtom (potential fix). `Issue #54 <https://github.com/ehendrix23/tesla_dashcam/issues/54>`_
+    - Fixed: Traceback when invalid output path (none-existing) is provided or when unable to create target folder in given path.
+    - Fixed: Including sub dirs did not work correctly, it would only grab the 1st folder.
+    - Fixed: When using monitor, if . was provided as source then nothing would be processed. Now it will process everything as intended.
+    - Fixed: File created when providing a filename with --output and --monitor option did not put timestamp in filename to ensure unique filenames
+    - Fixed: Argument to get release notes was provided incorrectly when checking for updates. Thank you to demonbane for fixing.
 
 TODO
 ----
@@ -670,8 +734,6 @@ TODO
 * Allow exclusion of camera(s) in output (i.e. don't include right, or don't include front, ...).
 * Implement option to crop individual camera output
 * Provide option to copy or move from source to output folder before starting to process
-* Add chapter markers
-* Allow for scanning if there are new folders and process if there are
 * Develop method to run as a service with --monitor option
 * GUI Front-end
 * Support drag&drop of video folder (supported in Windows now, MacOS not yet)
