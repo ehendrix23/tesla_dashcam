@@ -727,6 +727,8 @@ Release Notes
     - Fixed: When using monitor, if . was provided as source then nothing would be processed. Now it will process everything as intended.
     - Fixed: File created when providing a filename with --output and --monitor option did not put timestamp in filename to ensure unique filenames
     - Fixed: Argument to get release notes was provided incorrectly when checking for updates. Thank you to demonbane for fixing.
+0.1.13:
+    - Changed: Existence of font file (provided or default) will be checked and error returned if not existing.
 
 TODO
 ----
