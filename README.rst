@@ -729,6 +729,7 @@ Release Notes
     - Fixed: Argument to get release notes was provided incorrectly when checking for updates. Thank you to demonbane for fixing.
 0.1.13:
     - Changed: Existence of font file (provided or default) will be checked and error returned if not existing.
+    - Changed: If no filename provided for merged video then current date/time will be used for filename.
 
 TODO
 ----

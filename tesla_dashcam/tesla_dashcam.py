@@ -2458,6 +2458,14 @@ def main() -> None:
                     )
 
                     video_settings.update({"movie_filename": movie_filename})
+                else:
+                    # Set filename to right now if no filename provided.
+                    movie_filename = (
+                        datetime.today().strftime("%Y-%m-%d_%H_%M")
+                        if video_settings["target_filename"] is None
+                        else video_settings["target_filename"]
+                    )
+                    video_settings.update({"movie_filename": movie_filename})
 
                 process_folders(folders, video_settings, True, args.delete_source)
 
@@ -2522,6 +2530,15 @@ def main() -> None:
         folders = get_movie_files(
             video_settings["source_folder"], args.exclude_subdirs, video_settings
         )
+
+        # Set filename to right now if no filename provided.
+        movie_filename = (
+            datetime.today().strftime("%Y-%m-%d_%H_%M")
+            if video_settings["target_filename"] is None
+            else video_settings["target_filename"]
+        )
+        video_settings.update({"movie_filename": movie_filename})
+
         process_folders(folders, video_settings, False, args.delete_source)
 
 
