@@ -11,6 +11,7 @@ from glob import glob
 from pathlib import Path
 from re import search
 from subprocess import CalledProcessError, run
+from shutil import which
 from tempfile import mkstemp
 from time import sleep, time as timestamp
 
@@ -2082,6 +2083,11 @@ def main() -> None:
             print("Did not retrieve latest version info.")
 
     ffmpeg = ffmpeg_default if getattr(args, "ffmpeg", None) is None else args.ffmpeg
+    if which(ffmpeg) is None:
+        print(
+            f"ffmpeg is a requirement, unable to find {ffmpeg} executable. Please ensure it exist and is located"
+            f"within PATH environment."
+        )
 
     mirror_sides = ""
     if args.rear:
