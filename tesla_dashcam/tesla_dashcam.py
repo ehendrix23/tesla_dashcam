@@ -2548,4 +2548,10 @@ def main() -> None:
         process_folders(folders, video_settings, False, args.delete_source)
 
 
+if sys.version_info < (3, 7):
+    print(
+        f"Python version 3.7 or higher is required, you have: {sys.version}. Please update your Python version."
+    )
+    sys.exit(1)
+
 sys.exit(main())
