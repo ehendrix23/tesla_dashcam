@@ -2283,6 +2283,9 @@ def main() -> None:
         target_folder = args.output
         target_filename = None
 
+    # Convert target folder to absolute path if relative path has been provided.
+    target_folder = os.path.abspath(target_folder)
+
     # Create folder if not already existing.
     if not os.path.isdir(target_folder):
         current_path, add_folder = os.path.split(target_folder)
