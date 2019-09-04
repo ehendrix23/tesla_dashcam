@@ -728,6 +728,7 @@ Release Notes
     - Fixed: File created when providing a filename with --output and --monitor option did not put timestamp in filename to ensure unique filenames
     - Fixed: Argument to get release notes was provided incorrectly when checking for updates. Thank you to demonbane for fixing.
 0.1.13:
+    - New: Added option --gpu_type to provide GPU installed in the system for Windows/Linux. Options are nvidia and intel.
     - Changed: Check to ensure that Python version is at required level or higher (currently 3.7).
     - Changed: Existence of font file (provided or default) will be checked and error returned if not existing.
     - Changed: Existence of ffmpeg will be checked and error returned if not existing.

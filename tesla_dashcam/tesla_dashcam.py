@@ -1811,6 +1811,13 @@ def main() -> None:
     else:
         parser.add_argument("--gpu", dest="gpu", action="store_true", help=gpu_help)
 
+        parser.add_argument(
+            "--gpu_type",
+            choices=["nvidia", "intel"],
+            help="Type of graphics card (GPU) in the system. This determines the encoder that will be used."
+            "This parameter is mandatory if --gpu is provided.",
+        )
+
     timestamp_group = parser.add_argument_group(
         title="Timestamp", description="Options for " "timestamp:"
     )
@@ -2254,7 +2261,13 @@ def main() -> None:
                 video_encoding = video_encoding + ["-allow_sw", "1"]
                 encoding = encoding + "_mac"
             else:
-                encoding = encoding + "_nvidia"
+                if args.gpu_type is None:
+                    print(
+                        "Parameter --gpu_type is mandatory when parameter --use_gpu is used."
+                    )
+                    return
+
+                encoding = encoding + args.gpu_type
 
             bit_rate = str(int(10000 * layout_settings.scale)) + "K"
             video_encoding = video_encoding + ["-b:v", bit_rate]
