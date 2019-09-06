@@ -1169,16 +1169,18 @@ def create_movie(clips_list, movie_filename, video_settings, chapter_offset):
         "1",
         "-map_chapters",
         "1",
-        "-movflags",
-        "+faststart",
         "-c",
         "copy",
     ]
+    if video_settings["movflags_faststart"]:
+        print("Fast start enabled")
+        ffmpeg_params = ffmpeg_params + ["-movflags", "+faststart"]
 
     ffmpeg_command = (
         [video_settings["ffmpeg_exec"]] + ffmpeg_params + ["-y", movie_filename]
     )
 
+    print(ffmpeg_command)
     try:
         run(ffmpeg_command, capture_output=True, check=True)
     except CalledProcessError as exc:
@@ -1797,7 +1799,7 @@ def main() -> None:
         "that is then used as multiplier, "
         "providing 2 means half the speed.",
     )
-    swap_cameras.add_argument(
+    speed_group.add_argument(
         "--speedup",
         dest="speed_up",
         type=int,
@@ -1858,6 +1860,13 @@ def main() -> None:
             help="Type of graphics card (GPU) in the system. This determines the encoder that will be used."
             "This parameter is mandatory if --gpu is provided.",
         )
+
+    parser.add_argument(
+        "--no-faststart",
+        dest="faststart",
+        action="store_true",
+        help="Do not enable flag faststart on the resulting video files. Use this when using a network share and errors occur during encoding.",
+    )
 
     timestamp_group = parser.add_argument_group(
         title="Timestamp", description="Options for " "timestamp:"
@@ -2448,6 +2457,7 @@ def main() -> None:
         "clip_positions": ffmpeg_video_position,
         "timestamp_text": ffmpeg_timestamp,
         "ffmpeg_speed": ffmpeg_speed,
+        "movflags_faststart": not args.faststart,
         "input_clip": input_clip,
         "other_params": ffmpeg_params,
         "left_camera": ffmpeg_left_camera,

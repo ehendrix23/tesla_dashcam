@@ -716,7 +716,7 @@ Release Notes
 0.1.12:
     - New: Added chapter markers in the concatenated movies. Folder ones will have a chapter marker for each intermediate clip, merged one has a chapter marker for each folder.
     - New: Option --chapter_offset for use with --merge to offset the chapter marker in relation to the folder clip.
-    - New: Added flags -movstart and +faststart for video files better suited with browsers etc. (i.e. YouTube). Thanks to sf302 for suggestion.
+    - New: Added flag -movstart +faststart for video files better suited with browsers etc. (i.e. YouTube). Thanks to sf302 for suggestion.
     - New: Option to add trigger (--monitor_trigger_file) to use existence of a file/folder/link for starting processing instead of USB/SD being inserted.
     - Changed: Method for concatenating the clips together has been changed resulting in massive performance improvement (less then 1 second to do concatenation). Big thanks to sf302!
     - Fixed: Folders will now be deleted if there are 0-byte or corrupt video files within the folder `Issue #40 <https://github.com/ehendrix23/tesla_dashcam/issues/40>`_
@@ -730,6 +730,7 @@ Release Notes
 0.1.13:
     - New: Added option --gpu_type to provide GPU installed in the system for Windows/Linux. Options are nvidia and intel.
     - New: Ability to exclude cameras from the videos through options --no-front, --no-left, and --no-right.
+    - New: flag faststart can result in encoding issues on network shares, added option --no-faststart to allow not setting that flag. `Issue #62 <https://github.com/ehendrix23/tesla_dashcam/issues/62>`_
     - Changed: Check to ensure that Python version is at required level or higher (currently 3.7).
     - Changed: Existence of font file (provided or default) will be checked and error returned if not existing.
     - Changed: Existence of ffmpeg will be checked and error returned if not existing.
