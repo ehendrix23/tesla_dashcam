@@ -729,6 +729,7 @@ Release Notes
     - Fixed: Argument to get release notes was provided incorrectly when checking for updates. Thank you to demonbane for fixing.
 0.1.13:
     - New: Added option --gpu_type to provide GPU installed in the system for Windows/Linux. Options are nvidia and intel.
+    - New: Ability to exclude cameras from the videos through options --no-front, --no-left, and --no-right.
     - Changed: Check to ensure that Python version is at required level or higher (currently 3.7).
     - Changed: Existence of font file (provided or default) will be checked and error returned if not existing.
     - Changed: Existence of ffmpeg will be checked and error returned if not existing.
