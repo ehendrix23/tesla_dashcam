@@ -2456,7 +2456,7 @@ def main() -> None:
                     )
                     return
 
-                encoding = encoding + args.gpu_type
+                encoding = encoding + "_" + args.gpu_type
 
             bit_rate = str(int(10000 * layout_settings.scale)) + "K"
             video_encoding = video_encoding + ["-b:v", bit_rate]
