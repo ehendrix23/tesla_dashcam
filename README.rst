@@ -768,6 +768,7 @@ Release Notes
     - New: flag faststart can result in encoding issues on network shares, added option --no-faststart to allow not setting that flag. `Issue #62 <https://github.com/ehendrix23/tesla_dashcam/issues/62>`_
     - New: Options --start_offset and --end_offset can be used to provide starting and ending offset in seconds for resulting video (at folder level).
     - New: Options --start_timestamp and --end_timestamp can be used to restrict resulting video (and processing) to specific timestamps. This can be used in combination with --start_offset and/or --end_offset
+    - New: Added support for hardware encoding on Raspberry Pi (RPi) (H.264 only) `Issue #66 <https://github.com/ehendrix23/tesla_dashcam/issues/66>`_
     - Changed: Check to ensure that Python version is at required level or higher (currently 3.7).
     - Changed: Existence of font file (provided or default) will be checked and error returned if not existing.
     - Changed: Existence of ffmpeg will be checked and error returned if not existing.

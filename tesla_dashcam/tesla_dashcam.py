@@ -75,10 +75,12 @@ MOVIE_ENCODING = {
     "x264_nvidia": "h264_nvenc",
     "x264_mac": "h264_videotoolbox",
     "x264_intel": "h264_qsv",
+    "x264_RPi": "h264_omx",
     "x265": "libx265",
     "x265_nvidia": "hevc_nvenc",
     "x265_mac": "hevc_videotoolbox",
     "x265_intel": "h265_qsv",
+    "x265_RPi": "h265",
 }
 
 DEFAULT_FONT = {
@@ -1956,7 +1958,7 @@ def main() -> None:
 
         parser.add_argument(
             "--gpu_type",
-            choices=["nvidia", "intel"],
+            choices=["nvidia", "intel", "RPi"],
             help="Type of graphics card (GPU) in the system. This determines the encoder that will be used."
             "This parameter is mandatory if --gpu is provided.",
         )
@@ -2462,7 +2464,6 @@ def main() -> None:
             video_encoding = video_encoding + ["-b:v", bit_rate]
 
         video_encoding = video_encoding + ["-c:v", MOVIE_ENCODING[encoding]]
-
     else:
         video_encoding = video_encoding + ["-c:v", args.enc]
 
