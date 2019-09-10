@@ -6,6 +6,7 @@ import argparse
 import os
 import sys
 from datetime import datetime, timedelta, timezone
+from dateutil.parser import isoparse
 from fnmatch import fnmatch
 from glob import glob
 from pathlib import Path
@@ -645,6 +646,7 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
 
     folder_list = {}
     total_folders = 0
+
     for pathname in source_folder:
         if os.path.isdir(pathname):
             isfile = False
@@ -890,7 +892,12 @@ def get_metadata(ffmpeg, filenames):
 
 
 def create_intermediate_movie(
-    filename_timestamp, video, video_settings, clip_number, total_clips
+    filename_timestamp,
+    video,
+    folder_timestamps,
+    video_settings,
+    clip_number,
+    total_clips,
 ):
     """ Create intermediate movie files. This is the merging of the 3 camera
 
@@ -933,17 +940,55 @@ def create_intermediate_movie(
     if front_camera is None and left_camera is None and right_camera is None:
         return None, 0, True
 
+    # Determine if this clip is to be included based on potential start and end timestamp/offsets that were provided.
+    # Starting time cannot be between the start&end times we're looking for
+    # and end time cannot be between the start&end time we're looking for.
+    if not (
+        video["timestamp"]
+        <= folder_timestamps[0]
+        <= video["timestamp"] + timedelta(seconds=video["duration"])
+        or video["timestamp"]
+        <= folder_timestamps[1]
+        <= video["timestamp"] + timedelta(seconds=video["duration"])
+    ):
+        # This clip is not in-between the timestamps we want, skip it.
+        return None, 0, True
+
+    # Determine if we need to do an offset of the starting timestamp
+    starting_offset = 0
+    ffmpeg_offset_command = []
+    starting_timestmp = video["timestamp"]
+    clip_duration = video["duration"]
+
+    # This clip falls in between the start and end timestamps to include.
+    # Set offsets if required
+    if video["timestamp"] < folder_timestamps[0]:
+        # Starting timestamp is withing this clip.
+        starting_offset = (folder_timestamps[0] - video["timestamp"]).total_seconds()
+        starting_timestmp = folder_timestamps[0]
+        ffmpeg_offset_command = ["-ss", str(starting_offset)]
+        clip_duration = video["duration"] - starting_offset
+
+    # Adjust duration if end of clip's timestamp is after ending timestamp we need.
+    if video["timestamp"] + timedelta(seconds=video["duration"]) > folder_timestamps[1]:
+        # Duration has to be cut.
+        clip_duration = (
+            folder_timestamps[1]
+            - (video["timestamp"] + timedelta(seconds=starting_offset))
+        ).total_seconds()
+        ffmpeg_offset_command += ["-t", str(clip_duration)]
+
     # Confirm if files exist, if not replace with nullsrc
     input_count = 0
     if left_camera is not None and os.path.isfile(left_camera):
-        ffmpeg_left_command = ["-i", left_camera]
+        ffmpeg_left_command = ffmpeg_offset_command + ["-i", left_camera]
         ffmpeg_left_camera = ";[0:v] " + video_settings["left_camera"]
         input_count += 1
     else:
         ffmpeg_left_command = []
         ffmpeg_left_camera = (
             video_settings["background"].format(
-                duration=video["duration"],
+                duration=clip_duration,
                 speed=video_settings["movie_speed"],
                 width=video_settings["video_layout"].left_width,
                 height=video_settings["video_layout"].left_height,
@@ -954,7 +999,7 @@ def create_intermediate_movie(
         )
 
     if front_camera is not None and os.path.isfile(front_camera):
-        ffmpeg_front_command = ["-i", front_camera]
+        ffmpeg_front_command = ffmpeg_offset_command + ["-i", front_camera]
         ffmpeg_front_camera = (
             ";[" + str(input_count) + ":v] " + video_settings["front_camera"]
         )
@@ -963,7 +1008,7 @@ def create_intermediate_movie(
         ffmpeg_front_command = []
         ffmpeg_front_camera = (
             video_settings["background"].format(
-                duration=video["duration"],
+                duration=clip_duration,
                 speed=video_settings["movie_speed"],
                 width=video_settings["video_layout"].front_width,
                 height=video_settings["video_layout"].front_height,
@@ -974,7 +1019,7 @@ def create_intermediate_movie(
         )
 
     if right_camera is not None and os.path.isfile(right_camera):
-        ffmpeg_right_command = ["-i", right_camera]
+        ffmpeg_right_command = ffmpeg_offset_command + ["-i", right_camera]
         ffmpeg_right_camera = (
             ";[" + str(input_count) + ":v] " + video_settings["right_camera"]
         )
@@ -983,7 +1028,7 @@ def create_intermediate_movie(
         ffmpeg_right_command = []
         ffmpeg_right_camera = (
             video_settings["background"].format(
-                duration=video["duration"],
+                duration=clip_duration,
                 speed=video_settings["movie_speed"],
                 width=video_settings["video_layout"].right_width,
                 height=video_settings["video_layout"].right_height,
@@ -993,24 +1038,7 @@ def create_intermediate_movie(
             else ""
         )
 
-    # If we could not get a timestamp then retrieve it from the filename
-    # instead
-    if video["timestamp"] is None:
-        # Get the pure filename which would be timestamp in format:
-        # YYYY-MM-DD_HH-MM
-        # Split in date and time parts
-        timestamps = filename_timestamp.split("_")
-        # Split date
-        date = timestamps[0].split("-")
-        # Split time
-        time = timestamps[1].split("-")
-        video_timestamp = datetime(
-            int(date[0]), int(date[1]), int(date[2]), int(time[0]), int(time[1])
-        )
-    else:
-        video_timestamp = video["timestamp"]
-
-    local_timestamp = video_timestamp.astimezone(get_localzone())
+    local_timestamp = video["timestamp"].astimezone(get_localzone())
 
     print(
         "\t\tProcessing clip {clip_number}/{total_clips} from {timestamp} "
@@ -1018,15 +1046,15 @@ def create_intermediate_movie(
             clip_number=clip_number + 1,
             total_clips=total_clips,
             timestamp=local_timestamp.strftime("%x %X"),
-            duration=int(video["duration"]),
+            duration=int(clip_duration),
         )
     )
 
-    epoch_timestamp = int(video_timestamp.timestamp())
+    epoch_timestamp = int(starting_timestmp.timestamp())
 
     ffmpeg_filter = (
         video_settings["base"].format(
-            duration=video["duration"], speed=video_settings["movie_speed"]
+            duration=clip_duration, speed=video_settings["movie_speed"]
         )
         + ffmpeg_left_camera
         + ffmpeg_front_camera
@@ -1173,14 +1201,13 @@ def create_movie(clips_list, movie_filename, video_settings, chapter_offset):
         "copy",
     ]
     if video_settings["movflags_faststart"]:
-        print("Fast start enabled")
         ffmpeg_params = ffmpeg_params + ["-movflags", "+faststart"]
 
     ffmpeg_command = (
         [video_settings["ffmpeg_exec"]] + ffmpeg_params + ["-y", movie_filename]
     )
 
-    print(ffmpeg_command)
+    # print(ffmpeg_command)
     try:
         run(ffmpeg_command, capture_output=True, check=True)
     except CalledProcessError as exc:
@@ -1263,20 +1290,59 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
         # Get the start and ending timestamps, we add duration to
         # last timestamp to get true ending.
         first_clip_tmstp = files[sorted_video_clips[0]]["timestamp"]
-
         last_clip_tmstp = files[sorted_video_clips[-1]]["timestamp"] + timedelta(
             seconds=files[sorted_video_clips[-1]]["duration"]
         )
 
-        # Convert timestamp to local timezone.
-        first_clip_tmstp = first_clip_tmstp.astimezone(get_localzone())
-        last_clip_tmstp = last_clip_tmstp.astimezone(get_localzone())
+        # Skip this folder if we it does not fall within provided timestamps.
+        if (
+            video_settings["start_timestamp"] is not None
+            and last_clip_tmstp < video_settings["start_timestamp"]
+        ):
+            # Clips from this folder are from before start timestamp requested.
+            continue
+
+        if (
+            video_settings["end_timestamp"] is not None
+            and first_clip_tmstp > video_settings["end_timestamp"]
+        ):
+            # Clips from this folder are from after end timestamp requested.
+            continue
+
+        # Determine the starting and ending timestamps for the clips in this folder based on start/end timestamps
+        # provided and offsets.
+        folder_start_timestmp = (
+            timedelta(seconds=video_settings["start_offset"]) + first_clip_tmstp
+        )
+        # Use provided start timestamp if it is after folder timestamp + offset
+        folder_start_timestmp = (
+            video_settings["start_timestamp"]
+            if video_settings["start_timestamp"] is not None
+            and video_settings["start_timestamp"] > folder_start_timestmp
+            else folder_start_timestmp
+        )
+
+        # Figure out potential end timestamp for clip based on offset and end timestamp.
+        folder_end_timestmp = last_clip_tmstp - timedelta(
+            seconds=video_settings["end_offset"]
+        )
+        # Use provided end timestamp if it is before folder timestamp - offset
+        folder_end_timestmp = (
+            video_settings["end_timestamp"]
+            if video_settings["end_timestamp"] is not None
+            and video_settings["end_timestamp"] < folder_end_timestmp
+            else folder_end_timestmp
+        )
 
         # Put them together to create the filename for the folder.
         movie_filename = (
-            first_clip_tmstp.strftime("%Y-%m-%dT%H-%M-%S")
+            folder_start_timestmp.astimezone(get_localzone()).strftime(
+                "%Y-%m-%dT%H-%M-%S"
+            )
             + "_"
-            + last_clip_tmstp.strftime("%Y-%m-%dT%H-%M-%S")
+            + folder_end_timestmp.astimezone(get_localzone()).strftime(
+                "%Y-%m-%dT%H-%M-%S"
+            )
         )
 
         # Now add full path to it.
@@ -1325,6 +1391,7 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
             clip_name, clip_duration, files_processed = create_intermediate_movie(
                 filename_timestamp,
                 video_timestamp_info,
+                (folder_start_timestmp, folder_end_timestmp),
                 video_settings,
                 clip_number,
                 len(files),
@@ -1661,6 +1728,39 @@ def main() -> None:
         help="Merge the video files from different " "folders into 1 big video file.",
     )
 
+    filter_group = parser.add_argument_group(
+        title="Timestamp Restriction",
+        description="Restrict video to be between start and/or end timestamps. Timestamp to be provided in a ISO-8601"
+        "format (see https://fits.gsfc.nasa.gov/iso-time.html for examples)",
+    )
+
+    filter_group.add_argument(
+        "--start_timestamp", dest="start_timestamp", type=str, help="Starting timestamp"
+    )
+
+    filter_group.add_argument(
+        "--end_timestamp",
+        dest="end_timestamp",
+        type=str,
+        # type=lambda d: datetime.strptime(d, "%Y-%m-%d_%H-%M-%S").datetime(),
+        help="Ending timestamp",
+    )
+
+    offset_group = parser.add_argument_group(
+        title="Clip offsets", description="Start and/or end offsets"
+    )
+
+    offset_group.add_argument(
+        "--start_offset",
+        dest="start_offset",
+        type=int,
+        help="Starting offset in seconds. ",
+    )
+
+    offset_group.add_argument(
+        "--end_offset", dest="end_offset", type=int, help="Ending offset in seconds."
+    )
+
     parser.add_argument(
         "--chapter_offset",
         dest="chapter_offset",
@@ -1769,7 +1869,7 @@ def main() -> None:
     )
 
     camera_group = parser.add_argument_group(
-        title="Camera Exclusion", description="Exclude " "one or " "more " "cameras:"
+        title="Camera Exclusion", description="Exclude one or more cameras:"
     )
     camera_group.add_argument(
         "--no-front",
@@ -2181,13 +2281,9 @@ def main() -> None:
     else:
         layout_settings.swap_left_right = args.swap
 
-    # This portion is not ready yet, hence is temporary set to true for now.
     layout_settings.front = not args.no_front
     layout_settings.left = not args.no_left
     layout_settings.right = not args.no_right
-    # layout_settings.front = True
-    # layout_settings.left = True
-    # layout_settings.right = True
 
     ffmpeg_base = (
         black_base
@@ -2433,6 +2529,21 @@ def main() -> None:
         if runtype == "RUN":
             runtype = "MONITOR_ONCE"
 
+    start_timestamp = None
+    if args.start_timestamp is not None:
+        start_timestamp = isoparse(args.start_timestamp)
+        if start_timestamp.tzinfo is None:
+            start_timestamp = start_timestamp.astimezone(get_localzone())
+
+    end_timestamp = None
+    if args.end_timestamp is not None:
+        end_timestamp = isoparse(args.end_timestamp)
+        if end_timestamp.tzinfo is None:
+            end_timestamp = end_timestamp.astimezone(get_localzone())
+
+    start_offset = abs(args.start_offset) if args.start_offset is not None else 0
+    end_offset = abs(args.end_offset) if args.end_offset is not None else 0
+
     video_settings = {
         "source_folder": source_list,
         "output": args.output,
@@ -2463,6 +2574,10 @@ def main() -> None:
         "left_camera": ffmpeg_left_camera,
         "front_camera": ffmpeg_front_camera,
         "right_camera": ffmpeg_right_camera,
+        "start_timestamp": start_timestamp,
+        "start_offset": start_offset,
+        "end_timestamp": end_timestamp,
+        "end_offset": end_offset,
     }
 
     # If we constantly run and monitor for drive added or not.

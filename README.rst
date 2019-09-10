@@ -579,6 +579,41 @@ added automatically). Chapter offset is set to be 2 minutes (120 seconds) before
     python3 tesla_dashcam.py --merge --chapter_offset -120 --output /home/me/Tesla --monitor --monitor_trigger /home/me/TeslaCam/start_processing.txt SavedClips
 
 
+Start and End Timestamps
+-------------------------
+
+By providing either (or both) a start timestamp (--start_timestamp) and/or a end timestamp (--end_timestamp) one can restrict what is being
+processed and thus what is being output in the video files based on date/time. The provided timestamps do not have to match a specific timestamp
+of a folder or even of a clip. If the provided timestamp falls within a video clip then the portion of the clip that falls outside of the timestamp(s)
+will be skipped.
+The format for the timestamp is any valid ISO-8601 format. For example:
+2019 to process restrict video to year 2019.
+2019-09 for September, 2019.
+2019-09-10 or 20190910 for 10th of September, 2019
+2019-W37 (or 2019W37) for week 37 in 2019
+2019-W37-2 (or 2019W372) for Tuesday (day 2) of Week 37 in 2019
+2019-253 (or 2019253) for day 253 in 2019 (which is 10th of September, 2019)
+
+To identify the time, one can use hh, hh:mm, or hh:mm:ss.
+If providing both a date and a time then these are seperated using the letter T:
+2019-09-10T11:15:10 for 11:15AM on the 10th of September, 2019.
+
+By default the timezone will be the local timezone. For UTC time add the letter Z to the time: 2019-09-10T11:15:10Z for 11:15AM on the 10th of September, 2019 UTC time.
+One can also use +hh:mm, +hhmm, +hh, -hh:mm, -hhmm, -hh to use a different timezone. 2019-09-10T11:15:10-0500 is for 11:15AM on the 10th of September, 2019 EST.
+
+For further guidance also see: https://www.cl.cam.ac.uk/~mgk25/iso-time.html
+
+Start and End Offsets
+-------------------------
+Using the parameters --start_offset and --end_offset one can set at which point the processing of the clips within the folder should start. The value provided is in seconds.
+For example, to skip the 1st 5 minutes of each event (an event being the collection of video files within 1 folder) one can provide --start_offset 300.
+Similar, to skip the last 30 seconds of an event one can use --end_offset 30.
+The offsets are done for each folder (event) independently. Thus if processing 8 folders and a --start_offset 420 then 8 files will be
+created and each will be about 3 minutes long (as each folder normally has 10 minutes worth of video). If using --merge then the resulting merged video files will be 24 minutes long.
+
+The offsets are calculated before speed-up or slow-down of the video. Hence using --start_offset 420 --speed_up 2 would still result in the offset being at 7 minutes.
+
+
 Argument (Parameter) file
 -------------------------
 
@@ -731,6 +766,8 @@ Release Notes
     - New: Added option --gpu_type to provide GPU installed in the system for Windows/Linux. Options are nvidia and intel.
     - New: Ability to exclude cameras from the videos through options --no-front, --no-left, and --no-right.
     - New: flag faststart can result in encoding issues on network shares, added option --no-faststart to allow not setting that flag. `Issue #62 <https://github.com/ehendrix23/tesla_dashcam/issues/62>`_
+    - New: Options --start_offset and --end_offset can be used to provide starting and ending offset in seconds for resulting video (at folder level).
+    - New: Options --start_timestamp and --end_timestamp can be used to restrict resulting video (and processing) to specific timestamps. This can be used in combination with --start_offset and/or --end_offset
     - Changed: Check to ensure that Python version is at required level or higher (currently 3.7).
     - Changed: Existence of font file (provided or default) will be checked and error returned if not existing.
     - Changed: Existence of ffmpeg will be checked and error returned if not existing.
@@ -740,7 +777,6 @@ Release Notes
 TODO
 ----
 
-* Allow exclusion of camera(s) in output (i.e. don't include right, or don't include front, ...).
 * Implement option to crop individual camera output
 * Provide option to copy or move from source to output folder before starting to process
 * Develop method to run as a service with --monitor option
