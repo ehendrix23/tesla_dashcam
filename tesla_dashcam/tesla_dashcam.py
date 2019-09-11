@@ -655,16 +655,24 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
             if exclude_subdirs:
                 # Retrieve all the video files in current path:
                 search_path = os.path.join(pathname, "*.mp4")
-                files = glob(search_path)
+                files = [
+                    filename
+                    for filename in glob(search_path)
+                    if not os.path.basename(filename).startswith(".")
+                ]
                 print("Discovered {} files, retrieving clip data.".format(len(files)))
             else:
                 # Search all sub folder.
                 files = []
                 for folder, _, filenames in os.walk(pathname, followlinks=True):
                     total_folders = total_folders + 1
-                    for filename in filenames:
-                        if fnmatch(filename, "*.mp4"):
-                            files.append(os.path.join(folder, filename))
+                    for filename in (
+                        filename
+                        for filename in filenames
+                        if not os.path.basename(filename).startswith(".")
+                        and fnmatch(filename, "*.mp4")
+                    ):
+                        files.append(os.path.join(folder, filename))
 
                 print(
                     "Discovered {} folders containing total of {} files, retrieving clip data.".format(
@@ -787,8 +795,6 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
                             else video_timestamp
                         )
 
-            print(video_timestamp)
-            print(filename_timestamp)
             if video_timestamp is None:
                 # Firmware version 2019.16 changed filename timestamp format.
                 if len(filename_timestamp) == 16:
