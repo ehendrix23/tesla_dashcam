@@ -774,6 +774,7 @@ Release Notes
     - Changed: Existence of ffmpeg will be checked and error returned if not existing.
     - Changed: If no filename provided for merged video then current date/time will be used for filename.
     - Fixed: Merge of videos fails when a relative path instead of an absolute path is provided for --output `Issue #62 <https://github.com/ehendrix23/tesla_dashcam/issues/62>`_
+    - Fixed: Issue during processing of metadata if files were missing
 
 TODO
 ----

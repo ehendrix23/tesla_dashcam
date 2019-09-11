@@ -787,6 +787,8 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
                             else video_timestamp
                         )
 
+            print(video_timestamp)
+            print(filename_timestamp)
             if video_timestamp is None:
                 # Firmware version 2019.16 changed filename timestamp format.
                 if len(filename_timestamp) == 16:
@@ -822,13 +824,17 @@ def get_metadata(ffmpeg, filenames):
     ffmpeg_command = [ffmpeg]
 
     metadata = []
-    for file in filenames:
-        if os.path.isfile(file):
+    for camera_file in filenames:
+        if os.path.isfile(camera_file):
             ffmpeg_command.append("-i")
-            ffmpeg_command.append(file)
-
+            ffmpeg_command.append(camera_file)
             metadata.append(
-                {"filename": file, "timestamp": None, "duration": 0, "include": False}
+                {
+                    "filename": camera_file,
+                    "timestamp": None,
+                    "duration": 0,
+                    "include": False,
+                }
             )
 
     # Don't run ffmpeg if nothing to check for.
@@ -838,8 +844,8 @@ def get_metadata(ffmpeg, filenames):
     ffmpeg_command.append("-hide_banner")
 
     command_result = run(ffmpeg_command, capture_output=True, text=True)
+    metadata_iterator = iter(metadata)
     input_counter = 0
-    file = ""
 
     video_timestamp = None
     wait_for_input_line = True
@@ -847,7 +853,8 @@ def get_metadata(ffmpeg, filenames):
         if search("^Input #", line) is not None:
             # If filename was not yet appended then it means it is a corrupt file, in that case just add to list for
             # but identify not to include for processing
-            file = filenames[input_counter]
+            metadata_item = next(metadata_iterator)
+
             input_counter += 1
             video_timestamp = None
             wait_for_input_line = False
@@ -873,23 +880,15 @@ def get_metadata(ffmpeg, filenames):
                 + int(duration_list[2].split(".")[0])
                 + (float(duration_list[2].split(".")[1]) / 100)
             )
-
             # File will only be processed if duration is greater then 0
             include = duration > 0
 
-            # Update our metadata list.
-            element = next(
-                (item for item in metadata if item["filename"] == file), None
+            metadata_item.update(
+                {"timestamp": video_timestamp, "duration": duration, "include": include}
             )
-            # Should never be None but just in case. :-)
-            if element != None:
-                element.update(
-                    {
-                        "timestamp": video_timestamp,
-                        "duration": duration,
-                        "include": include,
-                    }
-                )
+
+            wait_for_input_line = True
+
     return metadata
 
 
@@ -2295,7 +2294,7 @@ def main() -> None:
         + "[base]"
     )
 
-    ffmpeg_black_video = black_base + black_size
+    ffmpeg_black_video = ";" + black_base + black_size
 
     input_clip = "base"
     ffmpeg_video_position = ""
