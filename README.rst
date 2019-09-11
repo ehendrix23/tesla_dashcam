@@ -775,6 +775,7 @@ Release Notes
     - Changed: If no filename provided for merged video then current date/time will be used for filename.
     - Fixed: Merge of videos fails when a relative path instead of an absolute path is provided for --output `Issue #62 <https://github.com/ehendrix23/tesla_dashcam/issues/62>`_
     - Fixed: Issue during processing of metadata if files were missing
+    - Fixed: Hidden files (files starting with period) on Mac/Linux were not ignored. This could cause issues as some programs might create these files when viewing the video.
 
 TODO
 ----
