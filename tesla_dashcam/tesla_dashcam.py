@@ -950,16 +950,18 @@ def create_intermediate_movie(
     # Determine if this clip is to be included based on potential start and end timestamp/offsets that were provided.
     # Starting time cannot be between the start&end times we're looking for
     # and end time cannot be between the start&end time we're looking for.
-    if not (
-        video["timestamp"]
-        <= folder_timestamps[0]
-        <= video["timestamp"] + timedelta(seconds=video["duration"])
-        or video["timestamp"]
-        <= folder_timestamps[1]
-        <= video["timestamp"] + timedelta(seconds=video["duration"])
-    ):
-        # This clip is not in-between the timestamps we want, skip it.
-        return None, 0, True
+#    if not (
+#        video["timestamp"]
+#        <= folder_timestamps[0]
+#        <= video["timestamp"] + timedelta(seconds=video["duration"])
+#        or video["timestamp"]
+#        <= folder_timestamps[1]
+#        <= video["timestamp"] + timedelta(seconds=video["duration"])
+#    ):
+		# This clip is not in-between the timestamps we want, skip it.
+#        print("Skipped: {}".format(clip_number + 1))
+		
+#        return None, 0, True
 
     # Determine if we need to do an offset of the starting timestamp
     starting_offset = 0
