@@ -1206,11 +1206,14 @@ def create_movie(clips_list, movie_filename, video_settings, chapter_offset):
         "1",
         "-map_chapters",
         "1",
-        "-c",
-        "copy",
     ]
     if video_settings["movflags_faststart"]:
         ffmpeg_params = ffmpeg_params + ["-movflags", "+faststart"]
+
+    if video_settings["shorten"]:
+        ffmpeg_params = ffmpeg_params + ["-vf","mpdecimate,setpts=N/FRAME_RATE/TB"]
+    else:
+        ffmpeg_params = ffmpeg_params + ["-c","copy"]
 
     ffmpeg_command = (
         [video_settings["ffmpeg_exec"]] + ffmpeg_params + ["-y", movie_filename]
@@ -1713,6 +1716,7 @@ def main() -> None:
     parser.add_argument(
         "--version", action="version", version=" %(prog)s " + VERSION_STR
     )
+
     parser.add_argument(
         "source",
         type=str,
@@ -1838,6 +1842,13 @@ def main() -> None:
         "980x380)\n",
     )
 
+    parser.add_argument(
+        "--shorten",
+        dest="shorten",
+        action="store_true",
+        help="Shorten video by removing duplicate frames.",
+    )
+	
     mirror_or_rear = parser.add_mutually_exclusive_group()
 
     mirror_or_rear.add_argument(
@@ -2586,6 +2597,7 @@ def main() -> None:
         "start_offset": start_offset,
         "end_timestamp": end_timestamp,
         "end_offset": end_offset,
+		"shorten":args.shorten,
     }
 
     # If we constantly run and monitor for drive added or not.
