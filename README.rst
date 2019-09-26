@@ -146,6 +146,7 @@ Usage
                             [--monitor_trigger MONITOR_TRIGGER]
                             [--check_for_update] [--no-check_for_update]
                             [--include_test]
+			    [--shorten]
                             [source [source ...]]
 
     tesla_dashcam - Tesla DashCam & Sentry Video Creator
@@ -219,6 +220,10 @@ Usage
                                      https://developer.nvidia.com/video-encode-decode-gpu-support-matrix (default: False)
       --ffmpeg FFMPEG       Path and filename for ffmpeg. Specify if ffmpeg is not
                             within path. (default: tesla_dashcam/ffmpeg)
+      --shorten             Shorten video by removing duplicate frames. This can reduce video length without slicing 
+                            the video to certain timestamps. Reduction of video length will vary based on video content
+			    and be as much as 95% (30 second video from 10 minute clip).
+	
 
     Timestamp:
       Options for timestamp:
