@@ -1731,7 +1731,7 @@ def create_movie(clips_list, movie_filename, video_settings, chapter_offset):
 
     ffmpeg_params = ffmpeg_params + [
         "-metadata",
-        f"description=Created using tesla_dashcam {VERSION_STR}",
+        f"description=Created by tesla_dashcam {VERSION_STR}",
     ]
 
     ffmpeg_command = (
@@ -3129,7 +3129,7 @@ def main() -> None:
     # Set metadata
     ffmpeg_params = ffmpeg_params + [
         "-metadata",
-        f"description=Created using tesla_dashcam {VERSION_STR}",
+        f"description=Created by tesla_dashcam {VERSION_STR}",
     ]
 
     # Determine the target folder and filename.

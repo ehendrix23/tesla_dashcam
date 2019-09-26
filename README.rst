@@ -825,8 +825,9 @@ Release Notes
 TODO
 ----
 
-* Implement option to crop individual camera output
+* Monitor path for new folders/files as trigger option
 * Provide option to copy or move from source to output folder before starting to process
+* Implement option to crop individual camera output
 * Develop method to run as a service with --monitor option
 * GUI Front-end
 * Support drag&drop of video folder (supported in Windows now, MacOS not yet)
