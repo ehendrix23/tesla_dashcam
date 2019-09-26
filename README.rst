@@ -67,8 +67,8 @@ Binaries
 
 Stand-alone binaries can be retrieved:
 
-- Windows: https://github.com/ehendrix23/tesla_dashcam/releases/download/v0.1.12/tesla_dashcam.zip
-- MacOS (OSX): https://github.com/ehendrix23/tesla_dashcam/releases/download/v0.1.12/tesla_dashcam.dmg
+- Windows: https://github.com/ehendrix23/tesla_dashcam/releases/download/v0.1.13/tesla_dashcam.zip
+- MacOS (OSX): https://github.com/ehendrix23/tesla_dashcam/releases/download/v0.1.13/tesla_dashcam.dmg
 
 `ffmpeg <https://www.ffmpeg.org/legal.html>`_ is included within the respective package.
 ffmpeg is a separately licensed product under the `GNU Lesser General Public License (LGPL) version 2.1 or later <http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html>`_.
@@ -129,15 +129,22 @@ Usage
 .. code:: bash
 
     usage: tesla_dashcam.py [-h] [--version] [--exclude_subdirs | --merge]
+                            [--start_timestamp START_TIMESTAMP]
+                            [--end_timestamp END_TIMESTAMP]
+                            [--start_offset START_OFFSET]
+                            [--end_offset END_OFFSET]
                             [--chapter_offset CHAPTER_OFFSET] [--output OUTPUT]
-                            [--keep-intermediate] [--delete_source]
+                            [--keep-intermediate] [--skip_existing]
+                            [--delete_source] [--temp_dir TEMP_DIR]
                             [--no-notification]
-                            [--layout {WIDESCREEN,FULLSCREEN,PERSPECTIVE}]
-                            [--scale CLIP_SCALE] [--mirror | --rear] [--swap]
-                            [--no-swap] [--slowdown SLOW_DOWN]
-                            [--speedup SPEED_UP]
+                            [--layout {WIDESCREEN,FULLSCREEN,PERSPECTIVE,CROSS,DIAMOND}]
+                            [--perspective] [--scale CLIP_SCALE] [--motion_only]
+                            [--mirror | --rear] [--swap | --no-swap] [--no-front]
+                            [--no-left] [--no-right] [--no-rear]
+                            [--slowdown SLOW_DOWN | --speedup SPEED_UP]
                             [--encoding {x264,x265} | --enc ENC] [--no-gpu]
-                            [--no-timestamp] [--halign {LEFT,CENTER,RIGHT}]
+                            [--no-faststart] [--no-timestamp]
+                            [--halign {LEFT,CENTER,RIGHT}]
                             [--valign {TOP,MIDDLE,BOTTOM}] [--font FONT]
                             [--fontsize FONTSIZE] [--fontcolor FONTCOLOR]
                             [--quality {LOWEST,LOWER,LOW,MEDIUM,HIGH}]
@@ -164,28 +171,38 @@ Usage
                             big video file. (default: False)
       --chapter_offset CHAPTER_OFFSET
                             Offset in seconds for chapters in merged video.
-                            Negative offset is \# of seconds before the end of the
-                            subdir video, positive offset if \# of seconds after
+                            Negative offset is # of seconds before the end of the
+                            subdir video, positive offset if # of seconds after
                             the start of the subdir video. (default: 0)
       --output OUTPUT       Path/Filename for the new movie file. Intermediate files will be stored in same folder.
-                             (default: /Users/ehendrix/Movies/Tesla_Dashcam/)
       --keep-intermediate   Do not remove the intermediate video files that are
                             created (default: False)
+      --skip_existing       Skip creating encoded video file if it already exist.
+                            Note that only existence is checked, not if layout
+                            etc. are the same. (default: False)
       --delete_source       Delete the processed files on the TeslaCam drive.
                             (default: False)
+      --temp_dir TEMP_DIR   Path to store temporary files. (default: None)
       --no-notification     Do not create a notification upon completion.
                             (default: True)
-      --layout {WIDESCREEN,FULLSCREEN,PERSPECTIVE}
+      --layout {WIDESCREEN,FULLSCREEN,PERSPECTIVE,CROSS,DIAMOND}
                             Layout of the created video.
-                                FULLSCREEN: Front camera center top, side cameras underneath it.
-                                WIDESCREEN: Output from all 3 cameras are next to each other.
-                                PERSPECTIVE: Front camera center top, side cameras next to it in perspective.
+                                FULLSCREEN: Front camera center top, side cameras underneath it with rear camera between side camera.
+                                WIDESCREEN: Front camera on top with side and rear cameras smaller underneath it.
+                                PERSPECTIVE: Similar to FULLSCREEN but then with side cameras in perspective.
+                                CROSS: Front camera center top, side cameras underneath, and rear camera center bottom.
+                                DIAMOND: Front camera center top, side cameras below front camera left and right of front, and rear camera center bottom.
                              (default: FULLSCREEN)
+      --perspective         Show side cameras in perspective. (default: False)
       --scale CLIP_SCALE    Set camera clip scale, scale of 1 is 1280x960 camera clip. Defaults:
-                                WIDESCREEN: 1/2 (640x480, video is 1920x480)
+                                WIDESCREEN: 1/3 (front 1280x960, others 426x320, video is 1280x960)
                                 FULLSCREEN: 1/2 (640x480, video is 1280x960)
                                 PERSPECTIVE: 1/4 (320x240, video is 980x380)
+                                CROSS: 1/2 (640x480, video is 1280x1440)
+                                DIAMOND: 1/2 (640x480, video is 1280x1440)
                              (default: None)
+      --motion_only         Fast-forward through video when there is no motion.
+                            (default: False)
       --mirror              Video from side cameras as if being viewed through the
                             sidemirrors. Cannot be used in combination with
                             --rear. (default: True)
@@ -210,24 +227,58 @@ Usage
                              (default: x264)
       --enc ENC             Provide a custom encoding for video creation.
                             Note: when using this option the --gpu option is ignored. To use GPU hardware acceleration specify a encoding that provides this. (default: None)
-      --no-gpu              Use GPU acceleration, only enable if supported by hardware.
+      --no-gpu (MAC)        Use GPU acceleration, only enable if supported by hardware.
                              MAC: All MACs with Haswell CPU or later  support this (Macs after 2013).
                                   See following link as well:
                                      https://en.wikipedia.org/wiki/List_of_Macintosh_models_grouped_by_CPU_type#Haswell
-                             Windows and Linux: PCs with NVIDIA graphic cards support this as well.
-                                                For more information on supported cards see:
-                                     https://developer.nvidia.com/video-encode-decode-gpu-support-matrix (default: False)
+      --gpu (Non-MAC)        Use GPU acceleration, only enable if supported by hardware.
+                             MAC: All MACs with Haswell CPU or later  support this (Macs after 2013).
+                                  See following link as well:
+                                     https://en.wikipedia.org/wiki/List_of_Macintosh_models_grouped_by_CPU_type#Haswell
+      --gpu_type (Non-MAC) {nvidia, intel, RPi}
+                            Type of graphics card (GPU) in the system. This determines the encoder that will be used.
+                            This parameter is mandatory if --gpu is provided.
+      --no-faststart        Do not enable flag faststart on the resulting video
+                            files. Use this when using a network share and errors
+                            occur during encoding. (default: False)
       --ffmpeg FFMPEG       Path and filename for ffmpeg. Specify if ffmpeg is not
-                            within path. (default: tesla_dashcam/ffmpeg)
+                            within path. (default: /Users/ehendrix/Documents_local
+                            /GitHub/tesla_dashcam/tesla_dashcam/ffmpeg)
+
+    Timestamp Restriction:
+      Restrict video to be between start and/or end timestamps. Timestamp to be
+      provided in a ISO-8601format (see https://fits.gsfc.nasa.gov/iso-time.html
+      for examples)
+
+      --start_timestamp START_TIMESTAMP
+                            Starting timestamp (default: None)
+      --end_timestamp END_TIMESTAMP
+                            Ending timestamp (default: None)
+
+    Clip offsets:
+      Start and/or end offsets
+
+      --start_offset START_OFFSET
+                            Starting offset in seconds. (default: None)
+      --end_offset END_OFFSET
+                            Ending offset in seconds. (default: None)
+
+    Camera Exclusion:
+      Exclude one or more cameras:
+
+      --no-front            Exclude front camera from video. (default: False)
+      --no-left             Exclude left camera from video. (default: False)
+      --no-right            Exclude right camera from video. (default: False)
+      --no-rear             Exclude rear camera from video. (default: False)
 
     Timestamp:
       Options for timestamp:
 
       --no-timestamp        Include timestamp in video (default: False)
       --halign {LEFT,CENTER,RIGHT}
-                            Horizontal alignment for timestamp (default: CENTER)
+                            Horizontal alignment for timestamp (default: None)
       --valign {TOP,MIDDLE,BOTTOM}
-                            Vertical Alignment for timestamp (default: BOTTOM)
+                            Vertical Alignment for timestamp (default: None)
       --font FONT           Fully qualified filename (.ttf) to the font to be
                             chosen for timestamp. (default:
                             /Library/Fonts/Arial.ttf)
@@ -289,36 +340,65 @@ Usage
 Layout:
 -------
 
-`FULLSCREEN:` Resolution: 1280x960
+`FULLSCREEN:` Resolution: 1920x960
 ::
 
-    +---------------+----------------+
-    |           Front Camera         |
-    +---------------+----------------+
-    | Left Camera   |  Right Camera  |
-    +---------------+----------------+
+    +---------------+----------------+----------------+
+    |               | Front Camera   |                |
+    +---------------+----------------+----------------+
+    | Left Camera   |  Rear Camera   |  Right Camera  |
+    +---------------+----------------+----------------+
 
 Video example: https://youtu.be/P5k9PXPGKWQ
 
-`PERSPECTIVE:` Resolution: 980x380
+`PERSPECTIVE:` Resolution: 1944x1204
 ::
 
     +---------------+----------------+---------------+
-    | Diagonal Left | Front Camera   | Diagonal Right|
+    |               | Front Camera   |               |
+    |               |                |               |
+    +---------------+----------------+---------------+
+    | Diagonal Left | Rear Camera    | Diagonal Right|
     | Camera        |                | Camera        |
     +---------------+----------------+---------------+
 
 Video example: https://youtu.be/fTUZQ-Ej5AY
 
 
-`WIDESCREEN:` Resolution: 1920x480
+`WIDESCREEN:` Resolution: 1920x1920
 ::
 
-    +---------------+----------------+---------------+
-    | Left Camera   | Front Camera   | Right Camera  |
-    +---------------+----------------+---------------+
+    +---------------+----------------+----------------+
+    |                 Front Camera                    |
+    +---------------+----------------+----------------+
+    | Left Camera   |  Rear Camera   |  Right Camera  |
+    +---------------+----------------+----------------+
 
 Video example: https://youtu.be/nPleIhVxyhQ
+
+
+`CROSS:` Resolution: 1280x1440
+::
+
+    +---------------+----------------+----------------+
+    |               | Front Camera   |                |
+    +---------------+----------------+----------------+
+    |     Left Camera      |       Right Camera       |
+    +---------------+----------------+----------------+
+    |               | Rear Camera    |                |
+    +---------------+----------------+----------------+
+
+
+`DIAMOND:` Resolution: 1920x976
+::
+
+    +---------------+----------------+----------------+
+    |               |  Front Camera  |                |
+    +---------------+                +----------------+
+    |   Left Camera |----------------| Right Camera   |
+    +               +  Rear Camera   +                +
+    |---------------|                |----------------|
+    +---------------+----------------+----------------+
 
 
 
@@ -579,6 +659,41 @@ added automatically). Chapter offset is set to be 2 minutes (120 seconds) before
     python3 tesla_dashcam.py --merge --chapter_offset -120 --output /home/me/Tesla --monitor --monitor_trigger /home/me/TeslaCam/start_processing.txt SavedClips
 
 
+Start and End Timestamps
+-------------------------
+
+By providing either (or both) a start timestamp (--start_timestamp) and/or a end timestamp (--end_timestamp) one can restrict what is being
+processed and thus what is being output in the video files based on date/time. The provided timestamps do not have to match a specific timestamp
+of a folder or even of a clip. If the provided timestamp falls within a video clip then the portion of the clip that falls outside of the timestamp(s)
+will be skipped.
+The format for the timestamp is any valid ISO-8601 format. For example:
+2019 to process restrict video to year 2019.
+2019-09 for September, 2019.
+2019-09-10 or 20190910 for 10th of September, 2019
+2019-W37 (or 2019W37) for week 37 in 2019
+2019-W37-2 (or 2019W372) for Tuesday (day 2) of Week 37 in 2019
+2019-253 (or 2019253) for day 253 in 2019 (which is 10th of September, 2019)
+
+To identify the time, one can use hh, hh:mm, or hh:mm:ss.
+If providing both a date and a time then these are seperated using the letter T:
+2019-09-10T11:15:10 for 11:15AM on the 10th of September, 2019.
+
+By default the timezone will be the local timezone. For UTC time add the letter Z to the time: 2019-09-10T11:15:10Z for 11:15AM on the 10th of September, 2019 UTC time.
+One can also use +hh:mm, +hhmm, +hh, -hh:mm, -hhmm, -hh to use a different timezone. 2019-09-10T11:15:10-0500 is for 11:15AM on the 10th of September, 2019 EST.
+
+For further guidance also see: https://www.cl.cam.ac.uk/~mgk25/iso-time.html
+
+Start and End Offsets
+-------------------------
+Using the parameters --start_offset and --end_offset one can set at which point the processing of the clips within the folder should start. The value provided is in seconds.
+For example, to skip the 1st 5 minutes of each event (an event being the collection of video files within 1 folder) one can provide --start_offset 300.
+Similar, to skip the last 30 seconds of an event one can use --end_offset 30.
+The offsets are done for each folder (event) independently. Thus if processing 8 folders and a --start_offset 420 then 8 files will be
+created and each will be about 3 minutes long (as each folder normally has 10 minutes worth of video). If using --merge then the resulting merged video files will be 24 minutes long.
+
+The offsets are calculated before speed-up or slow-down of the video. Hence using --start_offset 420 --speed_up 2 would still result in the offset being at 7 minutes.
+
+
 Argument (Parameter) file
 -------------------------
 
@@ -716,7 +831,7 @@ Release Notes
 0.1.12:
     - New: Added chapter markers in the concatenated movies. Folder ones will have a chapter marker for each intermediate clip, merged one has a chapter marker for each folder.
     - New: Option --chapter_offset for use with --merge to offset the chapter marker in relation to the folder clip.
-    - New: Added flags -movstart and +faststart for video files better suited with browsers etc. (i.e. YouTube). Thanks to sf302 for suggestion.
+    - New: Added flag -movstart +faststart for video files better suited with browsers etc. (i.e. YouTube). Thanks to sf302 for suggestion.
     - New: Option to add trigger (--monitor_trigger_file) to use existence of a file/folder/link for starting processing instead of USB/SD being inserted.
     - Changed: Method for concatenating the clips together has been changed resulting in massive performance improvement (less then 1 second to do concatenation). Big thanks to sf302!
     - Fixed: Folders will now be deleted if there are 0-byte or corrupt video files within the folder `Issue #40 <https://github.com/ehendrix23/tesla_dashcam/issues/40>`_
@@ -727,13 +842,38 @@ Release Notes
     - Fixed: When using monitor, if . was provided as source then nothing would be processed. Now it will process everything as intended.
     - Fixed: File created when providing a filename with --output and --monitor option did not put timestamp in filename to ensure unique filenames
     - Fixed: Argument to get release notes was provided incorrectly when checking for updates. Thank you to demonbane for fixing.
+0.1.13:
+    - New: Support for rear camera (introduced in V10). This also results in layouts having been modified to allow inclusion of rear camera. `Issue #71 <https://github.com/ehendrix23/tesla_dashcam/issues/71>`_
+    - New: Support for hardware encoding for systems with supported Intel GPUs.
+    - New: Support for hardware encoding on Raspberry Pi (RPi) (H.264 only) `Issue #66 <https://github.com/ehendrix23/tesla_dashcam/issues/66>`_
+    - New: Layout CROSS with front camera top centered, side camera underneath it, and rear camera then underneath side cameras centered.
+    - New: Layout DIAMOND with front camera top centered, rear camera under front and side camera centered at the left and right of front&rear.
+    - New: Option --motion_only to fast-forward through the portions in the video that does not have anything motion (done through removal of duplicate frames).
+    - New: Option --skip_existing to skip creation of video files that already exist. Existence only is checked, not if layout etc are the same.
+    - New: Option --perspective for showing side cameras to be displayed in perspective mode irrespective of layout. Layout PERSPECTIVE is thus same as layout FULLSCREEN with --perspective option.
+    - New: Options --start_offset and --end_offset can be used to provide starting and ending offset in seconds for resulting video (at folder level).
+    - New: Options --start_timestamp and --end_timestamp can be used to restrict resulting video (and processing) to specific timestamps. This can be used in combination with --start_offset and/or --end_offset
+    - New: Options --no-front, --no-left, --no-right, and --no-rear to exclude camera(s) from the videos
+    - New: Option --gpu_type to provide GPU installed in the system for Windows/Linux. Current supported options are nvidia, intel, and RPi.
+    - New: Option  --no-faststart for not setting the faststart flag in the video files as doing this can result in encoding failures on network shares `Issue #62 <https://github.com/ehendrix23/tesla_dashcam/issues/62>`_
+    - New: Option --temp_dir to provide a different path to store the temporary video files that are created `Issue #67 <https://github.com/ehendrix23/tesla_dashcam/issues/67>`_
+    - New: Description metadata to include video was created by tesla_dashcam with version number.
+    - Changed: WIDESCREEN layout will now by default show the front camera on top with higher resolution compared to others due to incorporation of rear camera
+    - Changed: Include folder SentryClips in default source list if no source provided (SavedClips was already default).
+    - Changed: Check to ensure that Python version is at required level or higher (currently 3.7).
+    - Changed: Existence of font file (provided or default) will be checked and error returned if not existing.
+    - Changed: Existence of ffmpeg will be checked and error returned if not existing.
+    - Changed: If no filename provided for merged video then current date/time will be used for filename.
+    - Fixed: Merge of videos fails when a relative path instead of an absolute path is provided for --output `Issue #62 <https://github.com/ehendrix23/tesla_dashcam/issues/62>`_
+    - Fixed: Issue during processing of metadata if files were missing
+    - Fixed: Hidden files (files starting with period) on Mac/Linux were not ignored. This could cause issues as some programs might create these files when viewing the video.
 
 TODO
 ----
 
-* Allow exclusion of camera(s) in output (i.e. don't include right, or don't include front, ...).
-* Implement option to crop individual camera output
+* Monitor path for new folders/files as trigger option
 * Provide option to copy or move from source to output folder before starting to process
+* Implement option to crop individual camera output
 * Develop method to run as a service with --monitor option
 * GUI Front-end
 * Support drag&drop of video folder (supported in Windows now, MacOS not yet)
