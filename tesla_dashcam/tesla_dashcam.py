@@ -29,7 +29,7 @@ from tzlocal import get_localzone
 #  different ones to be created based on where it should go to (stdout,
 #  log file, ...).
 
-VERSION = {"major": 0, "minor": 1, "patch": 13, "beta": 1}
+VERSION = {"major": 0, "minor": 1, "patch": 13, "beta": -1}
 VERSION_STR = "v{major}.{minor}.{patch}".format(
     major=VERSION["major"], minor=VERSION["minor"], patch=VERSION["patch"]
 )
@@ -2555,12 +2555,6 @@ def main() -> None:
         "      See following link as well: \n"
         "         https://en.wikipedia.org/wiki/List_of_"
         "Macintosh_models_grouped_by_CPU_type#Haswell\n"
-        " Windows and Linux: PCs with NVIDIA graphic "
-        "cards support this as well.\n"
-        "                    For more information on "
-        "supported cards see:\n"
-        "         https://developer.nvidia.com/"
-        "video-encode-decode-gpu-support-matrix"
     )
 
     if sys.platform == "darwin":

@@ -129,15 +129,22 @@ Usage
 .. code:: bash
 
     usage: tesla_dashcam.py [-h] [--version] [--exclude_subdirs | --merge]
+                            [--start_timestamp START_TIMESTAMP]
+                            [--end_timestamp END_TIMESTAMP]
+                            [--start_offset START_OFFSET]
+                            [--end_offset END_OFFSET]
                             [--chapter_offset CHAPTER_OFFSET] [--output OUTPUT]
-                            [--keep-intermediate] [--delete_source]
+                            [--keep-intermediate] [--skip_existing]
+                            [--delete_source] [--temp_dir TEMP_DIR]
                             [--no-notification]
-                            [--layout {WIDESCREEN,FULLSCREEN,PERSPECTIVE}]
-                            [--scale CLIP_SCALE] [--mirror | --rear] [--swap]
-                            [--no-swap] [--slowdown SLOW_DOWN]
-                            [--speedup SPEED_UP]
+                            [--layout {WIDESCREEN,FULLSCREEN,PERSPECTIVE,CROSS,DIAMOND}]
+                            [--perspective] [--scale CLIP_SCALE] [--motion_only]
+                            [--mirror | --rear] [--swap | --no-swap] [--no-front]
+                            [--no-left] [--no-right] [--no-rear]
+                            [--slowdown SLOW_DOWN | --speedup SPEED_UP]
                             [--encoding {x264,x265} | --enc ENC] [--no-gpu]
-                            [--no-timestamp] [--halign {LEFT,CENTER,RIGHT}]
+                            [--no-faststart] [--no-timestamp]
+                            [--halign {LEFT,CENTER,RIGHT}]
                             [--valign {TOP,MIDDLE,BOTTOM}] [--font FONT]
                             [--fontsize FONTSIZE] [--fontcolor FONTCOLOR]
                             [--quality {LOWEST,LOWER,LOW,MEDIUM,HIGH}]
@@ -146,7 +153,6 @@ Usage
                             [--monitor_trigger MONITOR_TRIGGER]
                             [--check_for_update] [--no-check_for_update]
                             [--include_test]
-			    [--shorten]
                             [source [source ...]]
 
     tesla_dashcam - Tesla DashCam & Sentry Video Creator
@@ -165,28 +171,38 @@ Usage
                             big video file. (default: False)
       --chapter_offset CHAPTER_OFFSET
                             Offset in seconds for chapters in merged video.
-                            Negative offset is \# of seconds before the end of the
-                            subdir video, positive offset if \# of seconds after
+                            Negative offset is # of seconds before the end of the
+                            subdir video, positive offset if # of seconds after
                             the start of the subdir video. (default: 0)
       --output OUTPUT       Path/Filename for the new movie file. Intermediate files will be stored in same folder.
-                             (default: /Users/ehendrix/Movies/Tesla_Dashcam/)
       --keep-intermediate   Do not remove the intermediate video files that are
                             created (default: False)
+      --skip_existing       Skip creating encoded video file if it already exist.
+                            Note that only existence is checked, not if layout
+                            etc. are the same. (default: False)
       --delete_source       Delete the processed files on the TeslaCam drive.
                             (default: False)
+      --temp_dir TEMP_DIR   Path to store temporary files. (default: None)
       --no-notification     Do not create a notification upon completion.
                             (default: True)
-      --layout {WIDESCREEN,FULLSCREEN,PERSPECTIVE}
+      --layout {WIDESCREEN,FULLSCREEN,PERSPECTIVE,CROSS,DIAMOND}
                             Layout of the created video.
-                                FULLSCREEN: Front camera center top, side cameras underneath it.
-                                WIDESCREEN: Output from all 3 cameras are next to each other.
-                                PERSPECTIVE: Front camera center top, side cameras next to it in perspective.
+                                FULLSCREEN: Front camera center top, side cameras underneath it with rear camera between side camera.
+                                WIDESCREEN: Front camera on top with side and rear cameras smaller underneath it.
+                                PERSPECTIVE: Similar to FULLSCREEN but then with side cameras in perspective.
+                                CROSS: Front camera center top, side cameras underneath, and rear camera center bottom.
+                                DIAMOND: Front camera center top, side cameras below front camera left and right of front, and rear camera center bottom.
                              (default: FULLSCREEN)
+      --perspective         Show side cameras in perspective. (default: False)
       --scale CLIP_SCALE    Set camera clip scale, scale of 1 is 1280x960 camera clip. Defaults:
-                                WIDESCREEN: 1/2 (640x480, video is 1920x480)
+                                WIDESCREEN: 1/3 (front 1280x960, others 426x320, video is 1280x960)
                                 FULLSCREEN: 1/2 (640x480, video is 1280x960)
                                 PERSPECTIVE: 1/4 (320x240, video is 980x380)
+                                CROSS: 1/2 (640x480, video is 1280x1440)
+                                DIAMOND: 1/2 (640x480, video is 1280x1440)
                              (default: None)
+      --motion_only         Fast-forward through video when there is no motion.
+                            (default: False)
       --mirror              Video from side cameras as if being viewed through the
                             sidemirrors. Cannot be used in combination with
                             --rear. (default: True)
@@ -211,28 +227,58 @@ Usage
                              (default: x264)
       --enc ENC             Provide a custom encoding for video creation.
                             Note: when using this option the --gpu option is ignored. To use GPU hardware acceleration specify a encoding that provides this. (default: None)
-      --no-gpu              Use GPU acceleration, only enable if supported by hardware.
+      --no-gpu (MAC)        Use GPU acceleration, only enable if supported by hardware.
                              MAC: All MACs with Haswell CPU or later  support this (Macs after 2013).
                                   See following link as well:
                                      https://en.wikipedia.org/wiki/List_of_Macintosh_models_grouped_by_CPU_type#Haswell
-                             Windows and Linux: PCs with NVIDIA graphic cards support this as well.
-                                                For more information on supported cards see:
-                                     https://developer.nvidia.com/video-encode-decode-gpu-support-matrix (default: False)
+      --gpu (Non-MAC)        Use GPU acceleration, only enable if supported by hardware.
+                             MAC: All MACs with Haswell CPU or later  support this (Macs after 2013).
+                                  See following link as well:
+                                     https://en.wikipedia.org/wiki/List_of_Macintosh_models_grouped_by_CPU_type#Haswell
+      --gpu_type (Non-MAC) {nvidia, intel, RPi}
+                            Type of graphics card (GPU) in the system. This determines the encoder that will be used.
+                            This parameter is mandatory if --gpu is provided.
+      --no-faststart        Do not enable flag faststart on the resulting video
+                            files. Use this when using a network share and errors
+                            occur during encoding. (default: False)
       --ffmpeg FFMPEG       Path and filename for ffmpeg. Specify if ffmpeg is not
-                            within path. (default: tesla_dashcam/ffmpeg)
-      --shorten             Shorten video by removing duplicate frames. This can reduce video length without slicing 
-                            the video to certain timestamps. Reduction of video length will vary based on video content
-			    and be as much as 95% (30 second video from 10 minute clip).
-	
+                            within path. (default: /Users/ehendrix/Documents_local
+                            /GitHub/tesla_dashcam/tesla_dashcam/ffmpeg)
+
+    Timestamp Restriction:
+      Restrict video to be between start and/or end timestamps. Timestamp to be
+      provided in a ISO-8601format (see https://fits.gsfc.nasa.gov/iso-time.html
+      for examples)
+
+      --start_timestamp START_TIMESTAMP
+                            Starting timestamp (default: None)
+      --end_timestamp END_TIMESTAMP
+                            Ending timestamp (default: None)
+
+    Clip offsets:
+      Start and/or end offsets
+
+      --start_offset START_OFFSET
+                            Starting offset in seconds. (default: None)
+      --end_offset END_OFFSET
+                            Ending offset in seconds. (default: None)
+
+    Camera Exclusion:
+      Exclude one or more cameras:
+
+      --no-front            Exclude front camera from video. (default: False)
+      --no-left             Exclude left camera from video. (default: False)
+      --no-right            Exclude right camera from video. (default: False)
+      --no-rear             Exclude rear camera from video. (default: False)
 
     Timestamp:
       Options for timestamp:
 
       --no-timestamp        Include timestamp in video (default: False)
       --halign {LEFT,CENTER,RIGHT}
-                            Horizontal alignment for timestamp (default: CENTER)
+                            Horizontal alignment for timestamp (default: None)
       --valign {TOP,MIDDLE,BOTTOM}
-                            Vertical Alignment for timestamp (default: BOTTOM)
+                            Vertical Alignment for timestamp (default: None)
       --font FONT           Fully qualified filename (.ttf) to the font to be
                             chosen for timestamp. (default:
                             /Library/Fonts/Arial.ttf)
