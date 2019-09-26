@@ -67,8 +67,8 @@ Binaries
 
 Stand-alone binaries can be retrieved:
 
-- Windows: https://github.com/ehendrix23/tesla_dashcam/releases/download/v0.1.12/tesla_dashcam.zip
-- MacOS (OSX): https://github.com/ehendrix23/tesla_dashcam/releases/download/v0.1.12/tesla_dashcam.dmg
+- Windows: https://github.com/ehendrix23/tesla_dashcam/releases/download/v0.1.13/tesla_dashcam.zip
+- MacOS (OSX): https://github.com/ehendrix23/tesla_dashcam/releases/download/v0.1.13/tesla_dashcam.dmg
 
 `ffmpeg <https://www.ffmpeg.org/legal.html>`_ is included within the respective package.
 ffmpeg is a separately licensed product under the `GNU Lesser General Public License (LGPL) version 2.1 or later <http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html>`_.
@@ -289,36 +289,65 @@ Usage
 Layout:
 -------
 
-`FULLSCREEN:` Resolution: 1280x960
+`FULLSCREEN:` Resolution: 1920x960
 ::
 
-    +---------------+----------------+
-    |           Front Camera         |
-    +---------------+----------------+
-    | Left Camera   |  Right Camera  |
-    +---------------+----------------+
+    +---------------+----------------+----------------+
+    |               | Front Camera   |                |
+    +---------------+----------------+----------------+
+    | Left Camera   |  Rear Camera   |  Right Camera  |
+    +---------------+----------------+----------------+
 
 Video example: https://youtu.be/P5k9PXPGKWQ
 
-`PERSPECTIVE:` Resolution: 980x380
+`PERSPECTIVE:` Resolution: 1944x1204
 ::
 
     +---------------+----------------+---------------+
-    | Diagonal Left | Front Camera   | Diagonal Right|
+    |               | Front Camera   |               |
+    |               |                |               |
+    +---------------+----------------+---------------+
+    | Diagonal Left | Rear Camera    | Diagonal Right|
     | Camera        |                | Camera        |
     +---------------+----------------+---------------+
 
 Video example: https://youtu.be/fTUZQ-Ej5AY
 
 
-`WIDESCREEN:` Resolution: 1920x480
+`WIDESCREEN:` Resolution: 1920x1920
 ::
 
-    +---------------+----------------+---------------+
-    | Left Camera   | Front Camera   | Right Camera  |
-    +---------------+----------------+---------------+
+    +---------------+----------------+----------------+
+    |                 Front Camera                    |
+    +---------------+----------------+----------------+
+    | Left Camera   |  Rear Camera   |  Right Camera  |
+    +---------------+----------------+----------------+
 
 Video example: https://youtu.be/nPleIhVxyhQ
+
+
+`CROSS:` Resolution: 1280x1440
+::
+
+    +---------------+----------------+----------------+
+    |               | Front Camera   |                |
+    +---------------+----------------+----------------+
+    |     Left Camera      |       Right Camera       |
+    +---------------+----------------+----------------+
+    |               | Rear Camera    |                |
+    +---------------+----------------+----------------+
+
+
+`DIAMOND:` Resolution: 1920x976
+::
+
+    +---------------+----------------+----------------+
+    |               |  Front Camera  |                |
+    +---------------+                +----------------+
+    |   Left Camera |----------------| Right Camera   |
+    +               +  Rear Camera   +                +
+    |---------------|                |----------------|
+    +---------------+----------------+----------------+
 
 
 
@@ -763,12 +792,21 @@ Release Notes
     - Fixed: File created when providing a filename with --output and --monitor option did not put timestamp in filename to ensure unique filenames
     - Fixed: Argument to get release notes was provided incorrectly when checking for updates. Thank you to demonbane for fixing.
 0.1.13:
-    - New: Added option --gpu_type to provide GPU installed in the system for Windows/Linux. Options are nvidia and intel.
-    - New: Ability to exclude cameras from the videos through options --no-front, --no-left, and --no-right.
+    - New: Added support for rear camera (introduced in V10). This also results in layouts having been modified to allow inclusion of rear camera. `Issue #71 <https://github.com/ehendrix23/tesla_dashcam/issues/71>`_
+    - New: New layout CROSS with front camera top centered, side camera underneath it, and rear camera then underneath side cameras centered.
+    - New: New layout DIAMOND with front camera top centered, rear camera under front and side camera centered at the left and right of front&rear.
+    - New: Added option --perspective for showing side cameras to be displayed in perspective mode irrespective of layout. Layout PERSPECTIVE is thus same as layout FULLSCREEN with --perspective option.
+    - New: Added option --gpu_type to provide GPU installed in the system for Windows/Linux. Current supported options are nvidia, intel, and RPi.
+    - New: Ability to exclude cameras from the videos through options --no-front, --no-left, --no-right, and --no-rear.
     - New: flag faststart can result in encoding issues on network shares, added option --no-faststart to allow not setting that flag. `Issue #62 <https://github.com/ehendrix23/tesla_dashcam/issues/62>`_
     - New: Options --start_offset and --end_offset can be used to provide starting and ending offset in seconds for resulting video (at folder level).
     - New: Options --start_timestamp and --end_timestamp can be used to restrict resulting video (and processing) to specific timestamps. This can be used in combination with --start_offset and/or --end_offset
+    - New: Option --temp_dir to provide a different path to store the temporary video files that are created `Issue #67 <https://github.com/ehendrix23/tesla_dashcam/issues/67>`_
+    - New: Added support for hardware encoding for systems with supported Intel GPUs.
     - New: Added support for hardware encoding on Raspberry Pi (RPi) (H.264 only) `Issue #66 <https://github.com/ehendrix23/tesla_dashcam/issues/66>`_
+    - New: Description metadata to include video was created by tesla_dashcam with version number.
+    - Changed: WIDESCREEN layout will now by default show the front camera on top with higher resolution compared to others due to incorporation of rear camera
+    - Changed: If no source provided then folder SentryClips will be included as well together with SavedClips (SentryClips is new folder in V10).
     - Changed: Check to ensure that Python version is at required level or higher (currently 3.7).
     - Changed: Existence of font file (provided or default) will be checked and error returned if not existing.
     - Changed: Existence of ffmpeg will be checked and error returned if not existing.
