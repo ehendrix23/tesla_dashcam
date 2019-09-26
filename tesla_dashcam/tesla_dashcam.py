@@ -1522,6 +1522,48 @@ def create_intermediate_movie(
 
     local_timestamp = video["timestamp"].astimezone(get_localzone())
 
+    # Check if target video file exist if skip existing.
+    file_already_exist = False
+    if video_settings["skip_existing"]:
+        temp_movie_name = (
+            os.path.join(video_settings["target_folder"], filename_timestamp) + ".mp4"
+        )
+        if os.path.isfile(temp_movie_name):
+            file_already_exist = True
+        elif (
+            not video_settings["keep_intermediate"]
+            and video_settings["temp_dir"] is not None
+        ):
+            temp_movie_name = (
+                os.path.join(video_settings["temp_dir"], filename_timestamp) + ".mp4"
+            )
+            if os.path.isfile(temp_movie_name):
+                file_already_exist = True
+
+        if file_already_exist:
+            print(
+                "\t\tSkipping clip {clip_number}/{total_clips} from {timestamp} "
+                "and {duration} seconds as it already exist.".format(
+                    clip_number=clip_number + 1,
+                    total_clips=total_clips,
+                    timestamp=local_timestamp.strftime("%x %X"),
+                    duration=int(clip_duration),
+                )
+            )
+            # Get actual duration of our new video, required for chapters when concatenating.
+            metadata = get_metadata(video_settings["ffmpeg_exec"], [temp_movie_name])
+            duration = metadata[0]["duration"] if metadata else video["duration"]
+
+            return temp_movie_name, duration, True
+    else:
+        target_folder = (
+            video_settings["temp_dir"]
+            if not video_settings["keep_intermediate"]
+            and video_settings["temp_dir"] is not None
+            else video_settings["target_folder"]
+        )
+        temp_movie_name = os.path.join(target_folder, filename_timestamp) + ".mp4"
+
     print(
         "\t\tProcessing clip {clip_number}/{total_clips} from {timestamp} "
         "and {duration} seconds long.".format(
@@ -1545,6 +1587,7 @@ def create_intermediate_movie(
         + video_settings["clip_positions"]
         + video_settings["timestamp_text"].format(epoch_time=epoch_timestamp)
         + video_settings["ffmpeg_speed"]
+        + video_settings["ffmpeg_motiononly"]
     )
 
     ffmpeg_command = (
@@ -1558,14 +1601,6 @@ def create_intermediate_movie(
         + video_settings["other_params"]
     )
 
-    target_folder = (
-        video_settings["temp_dir"]
-        if not video_settings["keep_intermediate"]
-        and video_settings["temp_dir"] is not None
-        else video_settings["target_folder"]
-    )
-
-    temp_movie_name = os.path.join(target_folder, filename_timestamp) + ".mp4"
     ffmpeg_command = ffmpeg_command + ["-y", temp_movie_name]
     # print(ffmpeg_command)
     # Run the command.
@@ -1602,6 +1637,7 @@ def create_movie(clips_list, movie_filename, video_settings, chapter_offset):
     total_clips = 0
     meta_content = ""
     meta_start = 0
+    total_videoduration = 0
     chapter_offset = chapter_offset * 1000000000
     with os.fdopen(ffmpeg_join_filehandle, "w") as fp:
         # Loop through the list sorted by video timestamp.
@@ -1626,6 +1662,7 @@ def create_movie(clips_list, movie_filename, video_settings, chapter_offset):
             title = video_clip["video_timestamp"].astimezone(get_localzone())
             # For duration need to also calculate if video was sped-up or slowed down.
             video_duration = int(video_clip["video_duration"] * 1000000000)
+            total_videoduration += video_duration
             chapter_start = meta_start
             if video_duration > abs(chapter_offset):
                 if chapter_offset < 0:
@@ -1690,10 +1727,12 @@ def create_movie(clips_list, movie_filename, video_settings, chapter_offset):
     if video_settings["movflags_faststart"]:
         ffmpeg_params = ffmpeg_params + ["-movflags", "+faststart"]
 
-    if video_settings["shorten"]:
-        ffmpeg_params = ffmpeg_params + ["-vf","mpdecimate,setpts=N/FRAME_RATE/TB"]
-    else:
-        ffmpeg_params = ffmpeg_params + ["-c","copy"]
+    ffmpeg_params = ffmpeg_params + ["-c", "copy"]
+
+    ffmpeg_params = ffmpeg_params + [
+        "-metadata",
+        f"description=Created using tesla_dashcam {VERSION_STR}",
+    ]
 
     ffmpeg_command = (
         [video_settings["ffmpeg_exec"]] + ffmpeg_params + ["-y", movie_filename]
@@ -1718,7 +1757,7 @@ def create_movie(clips_list, movie_filename, video_settings, chapter_offset):
     else:
         # Get actual duration of our new video, required for chapters when concatenating.
         metadata = get_metadata(video_settings["ffmpeg_exec"], [movie_filename])
-        duration = metadata[0]["duration"] if metadata else video["duration"]
+        duration = metadata[0]["duration"] if metadata else total_videoduration
 
     # Remove temp join file.
     try:
@@ -1784,7 +1823,7 @@ def delete_intermediate(movie_files):
                     print("\t\tError trying to remove folder {}: {}".format(file, exc))
 
 
-def process_folders(folders, video_settings, skip_existing, delete_source):
+def process_folders(folders, video_settings, delete_source):
     """ Process all clips found within folders. """
     start_time = timestamp()
 
@@ -1869,7 +1908,7 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
 
         # Do not process the files from this folder if we're to skip it if
         # the target movie file already exist.
-        if skip_existing and os.path.isfile(movie_filename):
+        if video_settings["skip_existing"] and os.path.isfile(movie_filename):
             print(
                 "\tSkipping folder {folder} as {filename} is already "
                 "created ({folder_number}/{total_folders})".format(
@@ -1878,6 +1917,17 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
                     folder_number=folder_number + 1,
                     total_folders=len(folders),
                 )
+            )
+
+            # Get actual duration of our new video, required for chapters when concatenating.
+            metadata = get_metadata(video_settings["ffmpeg_exec"], [movie_filename])
+            movie_duration = metadata[0]["duration"] if metadata else 0
+            dashcam_clips.append(
+                {
+                    "video_timestamp": first_clip_tmstp,
+                    "video_filename": movie_filename,
+                    "video_duration": movie_duration,
+                }
             )
             continue
 
@@ -1905,6 +1955,7 @@ def process_folders(folders, video_settings, skip_existing, delete_source):
                 if folder_timestamp is None
                 else folder_timestamp
             )
+
             clip_name, clip_duration, files_processed = create_intermediate_movie(
                 filename_timestamp,
                 video_timestamp_info,
@@ -2310,7 +2361,15 @@ def main() -> None:
         "--keep-intermediate",
         dest="keep_intermediate",
         action="store_true",
-        help="Do not remove the intermediate video files that " "are created",
+        help="Do not remove the intermediate video files that are created",
+    )
+
+    parser.add_argument(
+        "--skip_existing",
+        dest="skip_existing",
+        action="store_true",
+        help="Skip creating encoded video file if it already exist. Note that only existence is checked, not if "
+        "layout etc. are the same.",
     )
 
     parser.add_argument(
@@ -2372,12 +2431,12 @@ def main() -> None:
     )
 
     parser.add_argument(
-        "--shorten",
-        dest="shorten",
+        "--motion_only",
+        dest="motion_only",
         action="store_true",
-        help="Shorten video by removing duplicate frames.",
+        help="Fast-forward through video when there is no motion.",
     )
-	
+
     mirror_or_rear = parser.add_mutually_exclusive_group()
 
     mirror_or_rear.add_argument(
@@ -3024,6 +3083,16 @@ def main() -> None:
         input_clip = f"tmp{filter_counter}"
         filter_counter += 1
 
+    ffmpeg_motiononly = ""
+    if args.motion_only:
+        ffmpeg_motiononly = filter_string.format(
+            input_clip=input_clip,
+            filter=f"mpdecimate, setpts=N/FRAME_RATE/TB",
+            filter_counter=filter_counter,
+        )
+        input_clip = f"tmp{filter_counter}"
+        filter_counter += 1
+
     ffmpeg_params = ["-preset", args.compression, "-crf", MOVIE_QUALITY[args.quality]]
 
     use_gpu = args.gpu
@@ -3060,7 +3129,7 @@ def main() -> None:
     # Set metadata
     ffmpeg_params = ffmpeg_params + [
         "-metadata",
-        f'description="Created using tesla_dashcam {VERSION_STR}"',
+        f"description=Created using tesla_dashcam {VERSION_STR}",
     ]
 
     # Determine the target folder and filename.
@@ -3151,6 +3220,7 @@ def main() -> None:
         "clip_positions": ffmpeg_video_position,
         "timestamp_text": ffmpeg_timestamp,
         "ffmpeg_speed": ffmpeg_speed,
+        "ffmpeg_motiononly": ffmpeg_motiononly,
         "movflags_faststart": not args.faststart,
         "input_clip": input_clip,
         "other_params": ffmpeg_params,
@@ -3162,11 +3232,14 @@ def main() -> None:
         "start_offset": start_offset,
         "end_timestamp": end_timestamp,
         "end_offset": end_offset,
-		"shorten":args.shorten,
+        "skip_existing": args.skip_existing,
     }
 
     # If we constantly run and monitor for drive added or not.
     if video_settings["run_type"] in ["MONITOR", "MONITOR_ONCE"]:
+
+        video_settings.update({"skip_existing": True})
+
         trigger_exist = False
         if monitor_file is None:
             print("Monitoring for TeslaCam Drive to be inserted. Press CTRL-C to stop")
@@ -3273,7 +3346,7 @@ def main() -> None:
                     )
                     video_settings.update({"movie_filename": movie_filename})
 
-                process_folders(folders, video_settings, True, args.delete_source)
+                process_folders(folders, video_settings, args.delete_source)
 
                 print("Processing of movies has completed.")
                 if args.system_notification:
@@ -3345,7 +3418,7 @@ def main() -> None:
         )
         video_settings.update({"movie_filename": movie_filename})
 
-        process_folders(folders, video_settings, False, args.delete_source)
+        process_folders(folders, video_settings, args.delete_source)
 
 
 if sys.version_info < (3, 7):
