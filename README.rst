@@ -67,8 +67,8 @@ Binaries
 
 Stand-alone binaries can be retrieved:
 
-- Windows: https://github.com/ehendrix23/tesla_dashcam/releases/download/v0.1.13/tesla_dashcam.zip
-- MacOS (OSX): https://github.com/ehendrix23/tesla_dashcam/releases/download/v0.1.13/tesla_dashcam.dmg
+- Windows: https://github.com/ehendrix23/tesla_dashcam/releases/download/v0.1.14/tesla_dashcam.zip
+- MacOS (OSX): https://github.com/ehendrix23/tesla_dashcam/releases/download/v0.1.14/tesla_dashcam.dmg
 
 `ffmpeg <https://www.ffmpeg.org/legal.html>`_ is included within the respective package.
 ffmpeg is a separately licensed product under the `GNU Lesser General Public License (LGPL) version 2.1 or later <http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html>`_.
@@ -867,6 +867,8 @@ Release Notes
     - Fixed: Merge of videos fails when a relative path instead of an absolute path is provided for --output `Issue #62 <https://github.com/ehendrix23/tesla_dashcam/issues/62>`_
     - Fixed: Issue during processing of metadata if files were missing
     - Fixed: Hidden files (files starting with period) on Mac/Linux were not ignored. This could cause issues as some programs might create these files when viewing the video.
+0.1.14:
+    - Fixed: Checking if font path exist in Windows failed.
 
 TODO
 ----

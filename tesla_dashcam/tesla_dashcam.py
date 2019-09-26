@@ -29,7 +29,7 @@ from tzlocal import get_localzone
 #  different ones to be created based on where it should go to (stdout,
 #  log file, ...).
 
-VERSION = {"major": 0, "minor": 1, "patch": 13, "beta": -1}
+VERSION = {"major": 0, "minor": 1, "patch": 14, "beta": -1}
 VERSION_STR = "v{major}.{minor}.{patch}".format(
     major=VERSION["major"], minor=VERSION["minor"], patch=VERSION["patch"]
 )
@@ -3015,7 +3015,8 @@ def main() -> None:
     ffmpeg_timestamp = ""
     if not args.no_timestamp:
         if args.font is not None and args.font != "":
-            if not os.path.isfile(args.font):
+            temp_font_file = f"c:\{args.font}" if sys.platform == "win32" else args.font
+            if not os.path.isfile(temp_font_file):
                 print(
                     f"Provided font file {args.font} does exist, please provide a valid font file."
                 )
@@ -3027,7 +3028,8 @@ def main() -> None:
                 print("Unable to get a font file. Please provide valid font file.")
                 return
 
-            if not os.path.isfile(font_file):
+            temp_font_file = f"c:\{font_file}" if sys.platform == "win32" else font_file
+            if not os.path.isfile(temp_font_file):
                 print(
                     f"Seems default font file {font_file} does exist, please provide a font file."
                 )
