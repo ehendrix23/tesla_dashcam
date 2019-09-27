@@ -3024,14 +3024,16 @@ def main() -> None:
             font_file = DEFAULT_FONT.get(sys.platform, None)
             if font_file is None:
                 print(
-                    f"Unable to get a font file for platform {sys.platform}. Please provide valid font file using --font or disable timestamp using --no-timestamp."
+                    f"Unable to get a font file for platform {sys.platform}. Please provide valid font file using "
+                    f"--font or disable timestamp using --no-timestamp."
                 )
                 return
 
             temp_font_file = f"c:\{font_file}" if sys.platform == "win32" else font_file
             if not os.path.isfile(temp_font_file):
                 print(
-                    f"Default font file {font_file} does not exist, please provide a font file using --font or disable timestamp using --no-timestamp"
+                    f"Default font file {font_file} does not exist, please provide a font file using --font or "
+                    f"disable timestamp using --no-timestamp"
                 )
                 return
 
