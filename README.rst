@@ -869,6 +869,8 @@ Release Notes
     - Fixed: Hidden files (files starting with period) on Mac/Linux were not ignored. This could cause issues as some programs might create these files when viewing the video.
 0.1.14:
     - Fixed: Checking if font path exist in Windows failed.
+0.1.15:
+
 
 TODO
 ----

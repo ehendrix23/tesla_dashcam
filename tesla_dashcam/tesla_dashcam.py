@@ -29,7 +29,7 @@ from tzlocal import get_localzone
 #  different ones to be created based on where it should go to (stdout,
 #  log file, ...).
 
-VERSION = {"major": 0, "minor": 1, "patch": 14, "beta": -1}
+VERSION = {"major": 0, "minor": 1, "patch": 15, "beta": 0}
 VERSION_STR = "v{major}.{minor}.{patch}".format(
     major=VERSION["major"], minor=VERSION["minor"], patch=VERSION["patch"]
 )
@@ -2849,7 +2849,7 @@ def main() -> None:
     if which(ffmpeg) is None:
         print(
             f"ffmpeg is a requirement, unable to find {ffmpeg} executable. Please ensure it exist and is located"
-            f"within PATH environment."
+            f"within PATH environment or provide full path using parameter --ffmpeg."
         )
 
     mirror_sides = ""
@@ -3017,21 +3017,21 @@ def main() -> None:
         if args.font is not None and args.font != "":
             temp_font_file = f"c:\{args.font}" if sys.platform == "win32" else args.font
             if not os.path.isfile(temp_font_file):
-                print(
-                    f"Provided font file {args.font} does exist, please provide a valid font file."
-                )
+                print(f"Provided font file {args.font} does not exist.")
                 return
             font_file = args.font
         else:
             font_file = DEFAULT_FONT.get(sys.platform, None)
             if font_file is None:
-                print("Unable to get a font file. Please provide valid font file.")
+                print(
+                    f"Unable to get a font file for platform {sys.platform}. Please provide valid font file using --font or disable timestamp using --no-timestamp."
+                )
                 return
 
             temp_font_file = f"c:\{font_file}" if sys.platform == "win32" else font_file
             if not os.path.isfile(temp_font_file):
                 print(
-                    f"Seems default font file {font_file} does exist, please provide a font file."
+                    f"Default font file {font_file} does not exist, please provide a font file using --font or disable timestamp using --no-timestamp"
                 )
                 return
 
