@@ -1154,7 +1154,7 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
             right_filename = str(filename_timestamp) + "-right_repeater.mp4"
             right_path = os.path.join(movie_folder, right_filename)
 
-            rear_filename = str(filename_timestamp) + "-rear_view.mp4"
+            rear_filename = str(filename_timestamp) + "-back.mp4"
             rear_path = os.path.join(movie_folder, rear_filename)
 
             # Get meta data for each video to determine creation time and duration.
