@@ -1,7 +1,7 @@
 FROM python:3
 
 ARG DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && apt-get install -y ffmpeg && apt-get autoremove && apt-get clean
+RUN apt-get update && apt-get install -y ffmpeg tzdata fonts-freefont-ttf && apt-get autoremove && apt-get clean
 
 
 WORKDIR /usr/src/app/tesla_dashcam
