@@ -3014,28 +3014,21 @@ def main() -> None:
     filter_string = ";[{input_clip}] {filter} [tmp{filter_counter}]"
     ffmpeg_timestamp = ""
     if not args.no_timestamp:
-        if args.font is not None and args.font != "":
-            temp_font_file = f"c:\{args.font}" if sys.platform == "win32" else args.font
-            if not os.path.isfile(temp_font_file):
-                print(f"Provided font file {args.font} does not exist.")
-                return
-            font_file = args.font
-        else:
-            font_file = DEFAULT_FONT.get(sys.platform, None)
-            if font_file is None:
-                print(
-                    f"Unable to get a font file for platform {sys.platform}. Please provide valid font file using "
-                    f"--font or disable timestamp using --no-timestamp."
-                )
-                return
+        if args.font is None:
+            print(
+                f"Unable to get a font file for platform {sys.platform}. Please provide valid font file using "
+                f"--font or disable timestamp using --no-timestamp."
+            )
+            return
 
-            temp_font_file = f"c:\{font_file}" if sys.platform == "win32" else font_file
-            if not os.path.isfile(temp_font_file):
-                print(
-                    f"Default font file {font_file} does not exist, please provide a font file using --font or "
-                    f"disable timestamp using --no-timestamp"
-                )
-                return
+        temp_font_file = f"c:\{args.font}" if sys.platform == "win32" else args.font
+        if not os.path.isfile(temp_font_file):
+            print(
+                f"Font file {temp_font_file} does not exist. Provide a valid font file using --font or"
+                f" disable timestamp using --no-timestamp"
+            )
+            return
+        font_file = args.font
 
         ffmpeg_timestamp = f"drawtext=fontfile={font_file}:"
 
