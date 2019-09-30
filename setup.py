@@ -27,6 +27,7 @@ REQUIRED = [  # type: ignore
     "tzlocal",
     "requests",
     "psutil",
+    "python-dateutil",
 ]
 
 # The rest you shouldn't have to touch too much :)
