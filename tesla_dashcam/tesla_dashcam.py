@@ -1600,7 +1600,7 @@ def create_intermediate_movie(
     )
 
     ffmpeg_command = ffmpeg_command + ["-y", temp_movie_name]
-    # print(ffmpeg_command)
+    print(ffmpeg_command)
     # Run the command.
     try:
         run(ffmpeg_command, capture_output=True, check=True)
@@ -3076,7 +3076,7 @@ def main() -> None:
     if args.motion_only:
         ffmpeg_motiononly = filter_string.format(
             input_clip=input_clip,
-            filter=f"mpdecimate, setpts=N/FRAME_RATE/TB",
+            filter=f"mpdecimate=hi=64*48, setpts=N/FRAME_RATE/TB",
             filter_counter=filter_counter,
         )
         input_clip = f"tmp{filter_counter}"
