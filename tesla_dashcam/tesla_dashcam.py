@@ -1600,7 +1600,7 @@ def create_intermediate_movie(
     )
 
     ffmpeg_command = ffmpeg_command + ["-y", temp_movie_name]
-    print(ffmpeg_command)
+    # print(ffmpeg_command)
     # Run the command.
     try:
         run(ffmpeg_command, capture_output=True, check=True)
