@@ -1080,7 +1080,7 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
                     for filename in glob(search_path)
                     if not os.path.basename(filename).startswith(".")
                 ]
-                print("Discovered {} files, retrieving clip data.".format(len(files)))
+                print(f"Discovered {len(files)} files in {pathname}")
             else:
                 # Search all sub folder.
                 files = []
@@ -1095,9 +1095,7 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
                         files.append(os.path.join(folder, filename))
 
                 print(
-                    "Discovered {} folders containing total of {} files, retrieving clip data.".format(
-                        total_folders, len(files)
-                    )
+                    f"Discovered {total_folders} folders containing total of {len(files)} files in {pathname}"
                 )
         else:
             files = [pathname]
@@ -3266,10 +3264,14 @@ def main() -> None:
 
                     # Got a folder, append what was provided as source unless
                     # . was provided in which case everything is done.
-                    if video_settings["source_folder"][0] != ".":
-                        source_folder = os.path.join(
-                            source_folder, video_settings["source_folder"][0]
-                        )
+                    source_folder_list = []
+                    for folder in video_settings["source_folder"]:
+                        if folder == ".":
+                            source_folder_list.append(folder)
+                        else:
+                            source_folder_list.append(
+                                os.path.join(source_folder, folder)
+                            )
 
                     message = "TeslaCam folder found on {partition}.".format(
                         partition=source_partition
@@ -3294,25 +3296,33 @@ def main() -> None:
                         monitor_path, _ = os.path.split(monitor_file)
 
                     # If . is provided then source folder is path where monitor file exist.
-                    if video_settings["source_folder"][0] == ".":
-                        source_folder = monitor_path
-                    else:
-                        # If source path provided is absolute then use that for source path
-                        if os.path.isabs(video_settings["source_folder"][0]):
-                            source_folder = video_settings["source_folder"][0]
+                    source_folder_list = []
+                    for folder in video_settings["source_folder"]:
+                        if folder == ".":
+                            source_folder_list.append(monitor_path)
                         else:
-                            # Path provided is relative, hence based on path of trigger file.
-                            source_folder = os.path.join(
-                                monitor_path, video_settings["source_folder"][0]
-                            )
+                            # If source path provided is absolute then use that for source path
+                            if os.path.isabs(folder):
+                                source_folder_list.append(folder)
+                            else:
+                                # Path provided is relative, hence based on path of trigger file.
+                                source_folder_list.append(
+                                    os.path.join(monitor_path, folder)
+                                )
 
                 print(message)
                 if args.system_notification:
                     notify("TeslaCam", "Started", message)
 
-                print("Retrieving all files from {}".format(source_folder))
+                if len(source_folder_list) == 1:
+                    print(f"Retrieving all files from {source_folder_list[0]}")
+                else:
+                    print(f"Retrieving all files from: ")
+                    for folder in source_folder_list:
+                        print(f"                          {folder}")
+
                 folders = get_movie_files(
-                    [source_folder], args.exclude_subdirs, video_settings
+                    source_folder_list, args.exclude_subdirs, video_settings
                 )
 
                 if video_settings["run_type"] == "MONITOR":

@@ -874,6 +874,7 @@ Release Notes
     - Fixed: Rear view camera file was changed from -rear_view to -back in TeslaCam folders. `Issue #78 <https://github.com/ehendrix23/tesla_dashcam/issues/78>`_
     - Fixed: Missing python-dateutil package when installing from PIP `Issue #77 <https://github.com/ehendrix23/tesla_dashcam/issues/77>`_
     - Fixed: Missing fonts in Docker Image (thanks to moorecp for providing fix)
+    - Fixed: Only the 1st source was processed When using MONITOR or MONITOR_ONCE, or with V10 only SavedClips was processed when not providing a source
 
 TODO
 ----
