@@ -29,7 +29,7 @@ from tzlocal import get_localzone
 #  different ones to be created based on where it should go to (stdout,
 #  log file, ...).
 
-VERSION = {"major": 0, "minor": 1, "patch": 14, "beta": -1}
+VERSION = {"major": 0, "minor": 1, "patch": 15, "beta": -1}
 VERSION_STR = "v{major}.{minor}.{patch}".format(
     major=VERSION["major"], minor=VERSION["minor"], patch=VERSION["patch"]
 )
@@ -1080,7 +1080,7 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
                     for filename in glob(search_path)
                     if not os.path.basename(filename).startswith(".")
                 ]
-                print("Discovered {} files, retrieving clip data.".format(len(files)))
+                print(f"Discovered {len(files)} files in {pathname}")
             else:
                 # Search all sub folder.
                 files = []
@@ -1095,9 +1095,7 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
                         files.append(os.path.join(folder, filename))
 
                 print(
-                    "Discovered {} folders containing total of {} files, retrieving clip data.".format(
-                        total_folders, len(files)
-                    )
+                    f"Discovered {total_folders} folders containing total of {len(files)} files in {pathname}"
                 )
         else:
             files = [pathname]
@@ -1154,7 +1152,7 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
             right_filename = str(filename_timestamp) + "-right_repeater.mp4"
             right_path = os.path.join(movie_folder, right_filename)
 
-            rear_filename = str(filename_timestamp) + "-rear_view.mp4"
+            rear_filename = str(filename_timestamp) + "-back.mp4"
             rear_path = os.path.join(movie_folder, rear_filename)
 
             # Get meta data for each video to determine creation time and duration.
@@ -1602,7 +1600,7 @@ def create_intermediate_movie(
     )
 
     ffmpeg_command = ffmpeg_command + ["-y", temp_movie_name]
-    # print(ffmpeg_command)
+    print(ffmpeg_command)
     # Run the command.
     try:
         run(ffmpeg_command, capture_output=True, check=True)
@@ -2849,7 +2847,7 @@ def main() -> None:
     if which(ffmpeg) is None:
         print(
             f"ffmpeg is a requirement, unable to find {ffmpeg} executable. Please ensure it exist and is located"
-            f"within PATH environment."
+            f"within PATH environment or provide full path using parameter --ffmpeg."
         )
 
     mirror_sides = ""
@@ -3014,26 +3012,21 @@ def main() -> None:
     filter_string = ";[{input_clip}] {filter} [tmp{filter_counter}]"
     ffmpeg_timestamp = ""
     if not args.no_timestamp:
-        if args.font is not None and args.font != "":
-            temp_font_file = f"c:\{args.font}" if sys.platform == "win32" else args.font
-            if not os.path.isfile(temp_font_file):
-                print(
-                    f"Provided font file {args.font} does exist, please provide a valid font file."
-                )
-                return
-            font_file = args.font
-        else:
-            font_file = DEFAULT_FONT.get(sys.platform, None)
-            if font_file is None:
-                print("Unable to get a font file. Please provide valid font file.")
-                return
+        if args.font is None:
+            print(
+                f"Unable to get a font file for platform {sys.platform}. Please provide valid font file using "
+                f"--font or disable timestamp using --no-timestamp."
+            )
+            return
 
-            temp_font_file = f"c:\{font_file}" if sys.platform == "win32" else font_file
-            if not os.path.isfile(temp_font_file):
-                print(
-                    f"Seems default font file {font_file} does exist, please provide a font file."
-                )
-                return
+        temp_font_file = f"c:\{args.font}" if sys.platform == "win32" else args.font
+        if not os.path.isfile(temp_font_file):
+            print(
+                f"Font file {temp_font_file} does not exist. Provide a valid font file using --font or"
+                f" disable timestamp using --no-timestamp"
+            )
+            return
+        font_file = args.font
 
         ffmpeg_timestamp = f"drawtext=fontfile={font_file}:"
 
@@ -3083,7 +3076,7 @@ def main() -> None:
     if args.motion_only:
         ffmpeg_motiononly = filter_string.format(
             input_clip=input_clip,
-            filter=f"mpdecimate, setpts=N/FRAME_RATE/TB",
+            filter=f"mpdecimate=hi=64*48, setpts=N/FRAME_RATE/TB",
             filter_counter=filter_counter,
         )
         input_clip = f"tmp{filter_counter}"
@@ -3271,10 +3264,14 @@ def main() -> None:
 
                     # Got a folder, append what was provided as source unless
                     # . was provided in which case everything is done.
-                    if video_settings["source_folder"][0] != ".":
-                        source_folder = os.path.join(
-                            source_folder, video_settings["source_folder"][0]
-                        )
+                    source_folder_list = []
+                    for folder in video_settings["source_folder"]:
+                        if folder == ".":
+                            source_folder_list.append(folder)
+                        else:
+                            source_folder_list.append(
+                                os.path.join(source_folder, folder)
+                            )
 
                     message = "TeslaCam folder found on {partition}.".format(
                         partition=source_partition
@@ -3299,25 +3296,33 @@ def main() -> None:
                         monitor_path, _ = os.path.split(monitor_file)
 
                     # If . is provided then source folder is path where monitor file exist.
-                    if video_settings["source_folder"][0] == ".":
-                        source_folder = monitor_path
-                    else:
-                        # If source path provided is absolute then use that for source path
-                        if os.path.isabs(video_settings["source_folder"][0]):
-                            source_folder = video_settings["source_folder"][0]
+                    source_folder_list = []
+                    for folder in video_settings["source_folder"]:
+                        if folder == ".":
+                            source_folder_list.append(monitor_path)
                         else:
-                            # Path provided is relative, hence based on path of trigger file.
-                            source_folder = os.path.join(
-                                monitor_path, video_settings["source_folder"][0]
-                            )
+                            # If source path provided is absolute then use that for source path
+                            if os.path.isabs(folder):
+                                source_folder_list.append(folder)
+                            else:
+                                # Path provided is relative, hence based on path of trigger file.
+                                source_folder_list.append(
+                                    os.path.join(monitor_path, folder)
+                                )
 
                 print(message)
                 if args.system_notification:
                     notify("TeslaCam", "Started", message)
 
-                print("Retrieving all files from {}".format(source_folder))
+                if len(source_folder_list) == 1:
+                    print(f"Retrieving all files from {source_folder_list[0]}")
+                else:
+                    print(f"Retrieving all files from: ")
+                    for folder in source_folder_list:
+                        print(f"                          {folder}")
+
                 folders = get_movie_files(
-                    [source_folder], args.exclude_subdirs, video_settings
+                    source_folder_list, args.exclude_subdirs, video_settings
                 )
 
                 if video_settings["run_type"] == "MONITOR":

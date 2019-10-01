@@ -848,7 +848,7 @@ Release Notes
     - New: Support for hardware encoding on Raspberry Pi (RPi) (H.264 only) `Issue #66 <https://github.com/ehendrix23/tesla_dashcam/issues/66>`_
     - New: Layout CROSS with front camera top centered, side camera underneath it, and rear camera then underneath side cameras centered.
     - New: Layout DIAMOND with front camera top centered, rear camera under front and side camera centered at the left and right of front&rear.
-    - New: Option --motion_only to fast-forward through the portions in the video that does not have anything motion (done through removal of duplicate frames).
+    - New: Option --motion_only to fast-forward through the portions in the video that does not have anything motion (done through removal of duplicate frames). Thanks to supRy for providing this
     - New: Option --skip_existing to skip creation of video files that already exist. Existence only is checked, not if layout etc are the same.
     - New: Option --perspective for showing side cameras to be displayed in perspective mode irrespective of layout. Layout PERSPECTIVE is thus same as layout FULLSCREEN with --perspective option.
     - New: Options --start_offset and --end_offset can be used to provide starting and ending offset in seconds for resulting video (at folder level).
@@ -869,6 +869,13 @@ Release Notes
     - Fixed: Hidden files (files starting with period) on Mac/Linux were not ignored. This could cause issues as some programs might create these files when viewing the video.
 0.1.14:
     - Fixed: Checking if font path exist in Windows failed.
+0.1.15:
+    - Changed: Reduced sensitivity for motion detection
+    - Changed: Minor improvement for font path checking, mainly message provided.
+    - Fixed: Rear view camera filename was changed from -rear_view to -back in TeslaCam folders. `Issue #78 <https://github.com/ehendrix23/tesla_dashcam/issues/78>`_
+    - Fixed: Missing python-dateutil package when installing from PIP `Issue #77 <https://github.com/ehendrix23/tesla_dashcam/issues/77>`_
+    - Fixed: Missing fonts in Docker Image (thanks to moorecp for providing fix)
+    - Fixed: Only the 1st source was processed When using MONITOR or MONITOR_ONCE, or with V10 only SavedClips was processed when not providing a source
 
 TODO
 ----
