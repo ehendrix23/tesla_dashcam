@@ -259,7 +259,6 @@ class MovieLayout(object):
     @font_valign.setter
     def font_valign(self, alignment):
         self._font_valign = VALIGN.get(alignment, self._font_valign)
-        print(self._font_valign)
 
     @property
     def front_width(self):
@@ -2441,20 +2440,20 @@ def main() -> None:
         "--mirror",
         dest="mirror",
         action="store_true",
-        help="Video from side cameras as if being "
-        "viewed through the sidemirrors. Cannot "
+        default=argparse.SUPPRESS,
+        help="Video from side and rear cameras as if being "
+        "viewed through the mirror. Default when not providing parameter --no-front. Cannot "
         "be used in combination with --rear.",
     )
     mirror_or_rear.add_argument(
         "--rear",
         dest="rear",
         action="store_true",
-        help="Video from side cameras as if looking "
-        "backwards. Cannot be used in "
+        default=argparse.SUPPRESS,
+        help="Video from side and rear cameras as if looking "
+        "backwards. Default when providing parameter --no-front. Cannot be used in "
         "combination with --mirror.",
     )
-    parser.set_defaults(mirror=True)
-    parser.set_defaults(rear=False)
 
     swap_cameras = parser.add_mutually_exclusive_group()
     swap_cameras.add_argument(
@@ -2462,16 +2461,16 @@ def main() -> None:
         dest="swap",
         action="store_const",
         const=1,
-        help="Swap left and right cameras, default when "
-        "layout FULLSCREEN with --rear option is "
-        "chosen.",
+        help="Swap left and right cameras in output, default when side and rear cameras are as if looking backwards. "
+        "See --rear parameter.",
     )
     swap_cameras.add_argument(
         "--no-swap",
         dest="swap",
         action="store_const",
         const=0,
-        help="Do not swap left and right cameras, " "default with all other options.",
+        help="Do not swap left and right cameras, default when side and rear cameras are as if looking through a "
+        "mirror. Also see --mirror parameter",
     )
 
     camera_group = parser.add_argument_group(
@@ -2850,18 +2849,6 @@ def main() -> None:
             f"within PATH environment or provide full path using parameter --ffmpeg."
         )
 
-    mirror_sides = ""
-    if args.rear:
-        side_camera_as_mirror = False
-    else:
-        side_camera_as_mirror = True
-
-    if side_camera_as_mirror:
-        mirror_sides = ", hflip"
-
-    black_base = "color=duration={duration}:"
-    black_size = "s={width}x{height}:c=black "
-
     if args.layout == "PERSPECTIVE":
         layout_settings = FullScreen()
         layout_settings.perspective = True
@@ -2879,30 +2866,40 @@ def main() -> None:
 
         layout_settings.perspective = args.perspective
 
-    if args.clip_scale is not None and args.clip_scale > 0:
-        layout_settings.scale = args.clip_scale
-
-    # Determine if left and right cameras should be swapped or not.
-    if args.swap is None:
-        # Default is set based on layout chosen.
-        if args.layout == "FULLSCREEN":
-            # FULLSCREEN is different, if doing mirror then default should
-            # not be swapping. If not doing mirror then default should be
-            # to swap making it seem more like a "rear" camera.
-            layout_settings.swap_left_right = not side_camera_as_mirror
-    else:
-        layout_settings.swap_left_right = args.swap
-
     layout_settings.front = not args.no_front
     layout_settings.left = not args.no_left
     layout_settings.right = not args.no_right
     layout_settings.rear = not args.no_rear
 
-    if args.halign is not None:
-        layout_settings.font_halign = args.halign
+    # Check if either rear or mirror argument has been provided.
+    # If front camera then default to mirror, if no front camera then default to rear.
+    side_camera_as_mirror = (
+        layout_settings.front
+        if not ("rear" in args or "mirror" in args)
+        else "mirror" in args
+    )
+    mirror_sides = ", hflip" if side_camera_as_mirror else ""
 
-    if args.valign is not None:
-        layout_settings.font_valign = args.valign
+    # Determine if left and right cameras should be swapped or not.
+    layout_settings.swap_left_right = (
+        not side_camera_as_mirror if args.swap is None else args.swap
+    )
+
+    layout_settings.scale = (
+        args.clip_scale
+        if args.clip_scale is not None and args.clip_scale > 0
+        else layout_settings.scale
+    )
+
+    layout_settings.font_halign = (
+        args.halign if args.halign is not None else layout_settings.font_halign
+    )
+    layout_settings.font_valign = (
+        args.valign if args.valign is not None else layout_settings.font_valign
+    )
+
+    black_base = "color=duration={duration}:"
+    black_size = "s={width}x{height}:c=black "
 
     ffmpeg_base = (
         black_base
@@ -2990,10 +2987,11 @@ def main() -> None:
     if layout_settings.rear:
         ffmpeg_rear_camera = (
             "setpts=PTS-STARTPTS, "
-            "scale={clip_width}x{clip_height} {options}"
+            "scale={clip_width}x{clip_height} {mirror}{options}"
             " [rear]".format(
                 clip_width=layout_settings.rear_width,
                 clip_height=layout_settings.rear_height,
+                mirror=mirror_sides,
                 options=layout_settings.rear_options,
             )
         )
@@ -3032,10 +3030,11 @@ def main() -> None:
 
         # If fontsize is not provided then scale font size based on scaling
         # of video clips, otherwise use fixed font size.
-        if args.fontsize is None or args.fontsize == 0:
-            fontsize = 16 * layout_settings.font_scale * layout_settings.scale
-        else:
-            fontsize = args.fontsize
+        fontsize = (
+            16 * layout_settings.font_scale * layout_settings.scale
+            if args.fontsize is None or args.fontsize == 0
+            else args.fontsize
+        )
 
         ffmpeg_timestamp = (
             ffmpeg_timestamp + "fontcolor={fontcolor}:fontsize={fontsize}:"
@@ -3084,9 +3083,7 @@ def main() -> None:
 
     ffmpeg_params = ["-preset", args.compression, "-crf", MOVIE_QUALITY[args.quality]]
 
-    use_gpu = args.gpu
-    if sys.platform == "darwin":
-        use_gpu = not args.gpu
+    use_gpu = not args.gpu if sys.platform == "darwin" else args.gpu
 
     video_encoding = []
     if args.enc is None:

@@ -876,6 +876,10 @@ Release Notes
     - Fixed: Missing python-dateutil package when installing from PIP `Issue #77 <https://github.com/ehendrix23/tesla_dashcam/issues/77>`_
     - Fixed: Missing fonts in Docker Image (thanks to moorecp for providing fix)
     - Fixed: Only the 1st source was processed When using MONITOR or MONITOR_ONCE, or with V10 only SavedClips was processed when not providing a source
+0.1.16:
+    - Changed: View of rear camera will be mirrored as well if side cameras are shown as mirror
+    - Changed: For all layouts default is to show mirror for rear&side if front camera is shown, otherwise show as rear viewing.
+    - Changed: Default is to swap left&right cameras when showing rear&side as rear viewing, and not to swap them when showing rear&side as mirror view.
 
 TODO
 ----
