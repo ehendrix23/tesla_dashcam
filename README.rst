@@ -65,10 +65,10 @@ start processing all the folders within the SavedClips folder. Once processing o
 Binaries
 --------
 
-Stand-alone binaries can be retrieved:
+Stand-alone binaries can be retrieved from:
 
-- Windows: https://github.com/ehendrix23/tesla_dashcam/releases/download/v0.1.14/tesla_dashcam.zip
-- MacOS (OSX): https://github.com/ehendrix23/tesla_dashcam/releases/download/v0.1.14/tesla_dashcam.dmg
+- Windows: https://github.com/ehendrix23/tesla_dashcam/releases/latest/download/tesla_dashcam.zip
+- MacOS (OSX): https://github.com/ehendrix23/tesla_dashcam/releases/latest/download/tesla_dashcam.dmg
 
 `ffmpeg <https://www.ffmpeg.org/legal.html>`_ is included within the respective package.
 ffmpeg is a separately licensed product under the `GNU Lesser General Public License (LGPL) version 2.1 or later <http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html>`_.
