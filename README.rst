@@ -67,8 +67,8 @@ Binaries
 
 Stand-alone binaries can be retrieved:
 
-- Windows: https://github.com/ehendrix23/tesla_dashcam/releases/download/v0.1.14/tesla_dashcam.zip
-- MacOS (OSX): https://github.com/ehendrix23/tesla_dashcam/releases/download/v0.1.14/tesla_dashcam.dmg
+- Windows: https://github.com/ehendrix23/tesla_dashcam/releases/download/v0.1.15/tesla_dashcam.zip
+- MacOS (OSX): https://github.com/ehendrix23/tesla_dashcam/releases/download/v0.1.15/tesla_dashcam.dmg
 
 `ffmpeg <https://www.ffmpeg.org/legal.html>`_ is included within the respective package.
 ffmpeg is a separately licensed product under the `GNU Lesser General Public License (LGPL) version 2.1 or later <http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html>`_.
