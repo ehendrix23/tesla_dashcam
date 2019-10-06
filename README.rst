@@ -46,7 +46,7 @@ Option --chapter_offset can be provided to offset the chapter markers within the
 result in the chapter marker being set not at the start for the folder video but instead be set provided number of
 seconds before the end of that video. For example, with 10 minute video for a folder a value of -120 would result
 in the chapter markers being set 2 minutes before the end of that video. A positive number will result in chapter marker
-being set to provided number of seconds after the start of the video. Value of 600 would result in chapter markers being
+being set to provided number of seconds after the start of the video. Value of 300 would result in chapter markers being
 set 5 minutes into that folder's video.
 
 If --merge is not provided as an option and there are multiple sub-folders then the filename (if provided in output)
