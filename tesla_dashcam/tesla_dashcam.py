@@ -243,6 +243,7 @@ class MovieLayout(object):
         self._font = Font(layout=self)
 
         self._swap_left_right = False
+        self._swap_front_rear = False
 
         self._perspective = False
 
@@ -267,9 +268,6 @@ class MovieLayout(object):
     @swap_left_right.setter
     def swap_left_right(self, swap):
         if not self._swap_left_right == swap:
-            self.cameras("Left").camera = "right"
-            self.cameras("Right").camera = "left"
-
             temp_options = self.cameras("Left").options
             self.cameras("Left").options = self.cameras("Right").options
             self.cameras("Right").options = temp_options
@@ -278,6 +276,22 @@ class MovieLayout(object):
             self._cameras.update({"Left": self.cameras("Right")})
             self._cameras.update({"Right": temp_camera})
             self._swap_left_right = swap
+
+    @property
+    def swap_front_rear(self):
+        return self._swap_front_rear
+
+    @swap_front_rear.setter
+    def swap_front_rear(self, swap):
+        if not self._swap_front_rear == swap:
+            temp_options = self.cameras("Front").options
+            self.cameras("Front").options = self.cameras("Rear").options
+            self.cameras("Right").options = temp_options
+
+            temp_camera = self.cameras("Front")
+            self._cameras.update({"Front": self.cameras("Rear")})
+            self._cameras.update({"Rear": temp_camera})
+            self._swap_front_rear = swap
 
     @property
     def perspective(self):
@@ -2262,22 +2276,29 @@ def main() -> None:
         "combination with --mirror.",
     )
 
-    swap_cameras = parser.add_mutually_exclusive_group()
-    swap_cameras.add_argument(
+    swap_leftright_cameras = parser.add_mutually_exclusive_group()
+    swap_leftright_cameras.add_argument(
         "--swap",
-        dest="swap",
+        dest="swap_leftright",
         action="store_const",
         const=1,
         help="Swap left and right cameras in output, default when side and rear cameras are as if looking backwards. "
         "See --rear parameter.",
     )
-    swap_cameras.add_argument(
+    swap_leftright_cameras.add_argument(
         "--no-swap",
-        dest="swap",
+        dest="swap_leftright",
         action="store_const",
         const=0,
         help="Do not swap left and right cameras, default when side and rear cameras are as if looking through a "
         "mirror. Also see --mirror parameter",
+    )
+
+    parser.add_argument(
+        "--swap_frontrear",
+        dest="swap_frontrear",
+        action="store_true",
+        help="Swap front and rear cameras in output.",
     )
 
     camera_group = parser.add_argument_group(
@@ -2715,8 +2736,12 @@ def main() -> None:
     # Up till now Left means left camera and Right means Right camera.
     # From this point forward Left can mean Right camera if we're swapping output.
     layout_settings.swap_left_right = (
-        not side_camera_as_mirror if args.swap is None else args.swap
+        not side_camera_as_mirror
+        if args.swap_leftright is None
+        else args.swap_leftright
     )
+
+    layout_settings.swap_front_rear = args.swap_frontrear
 
     layout_settings.font.font = args.font
     layout_settings.font.color = args.fontcolor
