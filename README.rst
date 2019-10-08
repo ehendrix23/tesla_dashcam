@@ -877,23 +877,25 @@ Release Notes
     - Fixed: Missing fonts in Docker Image (thanks to moorecp for providing fix)
     - Fixed: Only the 1st source was processed When using MONITOR or MONITOR_ONCE, or with V10 only SavedClips was processed when not providing a source
 0.1.16:
+    - New: Options --front_scale, --rear_scale, --left_scale, and --right_scale to set the scale of each clip individually (value of 1 is existing size of 1280x960 for the clip)
+    - New: Option --background to provide background color (default is black).
+    - Changed: --speedup and --slowdown now accepts a float allowing for example to speed video up by 1.5
     - Changed: View of rear camera will be mirrored as well if side cameras are shown as mirror
     - Changed: For all layouts default is to show mirror for rear&side if front camera is shown, otherwise show as rear viewing.
-    - Changed: Default is to swap left&right cameras when showing rear&side as rear viewing, and not to swap them when showing rear&side as mirror view.
+    - Changed: Swap left&right cameras when showing rear&side as rear viewing, and not to swap them when showing rear&side as mirror view.
 
 TODO
 ----
 
+* Implement option to crop individual camera output
+* Option for end-user layout
 * Monitor path for new folders/files as trigger option
 * Provide option to copy or move from source to output folder before starting to process
-* Implement option to crop individual camera output
 * Develop method to run as a service with --monitor option
 * GUI Front-end
 * Support drag&drop of video folder (supported in Windows now, MacOS not yet)
 * Add object detection (i.e. people) and possible output when object was detected
 * Saving of options
-* Option to specify resolutions as an argument
-* Option for end-user layout
 * Use timestamp in video to ensure full synchronization between the 3 cameras
 * Add option for source/output to be S3 bucket (with temp folder for creating temporary files)
 * Develop Web Front-End

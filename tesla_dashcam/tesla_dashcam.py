@@ -29,7 +29,7 @@ from tzlocal import get_localzone
 #  different ones to be created based on where it should go to (stdout,
 #  log file, ...).
 
-VERSION = {"major": 0, "minor": 1, "patch": 15, "beta": -1}
+VERSION = {"major": 0, "minor": 1, "patch": 16, "beta": 0}
 VERSION_STR = "v{major}.{minor}.{patch}".format(
     major=VERSION["major"], minor=VERSION["minor"], patch=VERSION["patch"]
 )
@@ -97,30 +97,150 @@ VALIGN = {"TOP": "10", "MIDDLE": "(h/2-(text_h/2))", "BOTTOM": "(h-(text_h*2))"}
 TOASTER_INSTANCE = None
 
 
+class Font(object):
+    """ Font Class
+    """
+
+    def __init__(self, layout, font=None, size=None, color=None):
+        self._layout = layout
+        self._font = font
+        self._size = size
+        self._color = color
+
+    @property
+    def font(self):
+        return self._font
+
+    @font.setter
+    def font(self, value):
+        self._font = value
+
+    @property
+    def size(self):
+        if hasattr(self._layout, "font_size"):
+            return getattr(self._layout, "font_size")
+
+        return (
+            int(max(16, 16 * self._layout.scale)) if self._size is None else self._size
+        )
+
+    @size.setter
+    def size(self, value):
+        self._size = value
+
+    @property
+    def color(self):
+        return self._color
+
+    @color.setter
+    def color(self, value):
+        self._color = value
+
+
+class Camera(object):
+    """ Camera Class
+    """
+
+    def __init__(self, layout, camera):
+        self._layout = layout
+        self._camera = camera
+        self._include = True
+        self._width = 1280
+        self._height = 960
+        self._xpos = 0
+        self._ypos = 0
+        self._scale = 0
+        self._options = ""
+
+    @property
+    def camera(self):
+        return self._camera
+
+    @camera.setter
+    def camera(self, value):
+        self._camera = value
+
+    @property
+    def include(self):
+        return self._include
+
+    @include.setter
+    def include(self, value):
+        self._include = value
+
+    @property
+    def width(self):
+        return (
+            getattr(self._layout, self._camera + "_width")
+            if hasattr(self._layout, self._camera + "_width")
+            else int(self._width * self.scale * self.include)
+        )
+
+    @width.setter
+    def width(self, value):
+        self._width = value
+
+    @property
+    def height(self):
+        return (
+            getattr(self._layout, self._camera + "_height")
+            if hasattr(self._layout, self._camera + "_height")
+            else int(self._height * self.scale * self.include)
+        )
+
+    @height.setter
+    def height(self, value):
+        self._height = value
+
+    @property
+    def xpos(self):
+        return getattr(self._layout, self._camera + "_xpos", self._xpos) * self.include
+
+    @xpos.setter
+    def xpos(self, value):
+        self._xpos = value
+
+    @property
+    def ypos(self):
+        return getattr(self._layout, self._camera + "_ypos", self._ypos) * self.include
+
+    @ypos.setter
+    def ypos(self, value):
+        self._ypos = value
+
+    @property
+    def scale(self):
+        return self._scale
+
+    @scale.setter
+    def scale(self, value):
+        self._scale = value
+
+    @property
+    def options(self):
+        return self._options
+
+    @options.setter
+    def options(self, value):
+        self._options = value
+
+    @staticmethod
+    def is_method(obj, name):
+        return callable(getattr(obj, name))
+
+
 class MovieLayout(object):
     """ Main Layout class
     """
 
     def __init__(self):
-        self._include_front = False
-        self._include_left = False
-        self._include_right = False
-        self._include_rear = False
-        self._scale = 0
-        self._font_scale = 1
-        self._front_width = 0
-        self._front_height = 0
-        self._left_width = 0
-        self._left_height = 0
-        self._right_width = 0
-        self._right_height = 0
-        self._rear_width = 0
-        self._rear_height = 0
-
-        self._left_options = ""
-        self._front_options = ""
-        self._right_options = ""
-        self._rear_options = ""
+        self._cameras = {
+            "Front": Camera(layout=self, camera="front"),
+            "Left": Camera(layout=self, camera="left"),
+            "Right": Camera(layout=self, camera="right"),
+            "Rear": Camera(layout=self, camera="rear"),
+        }
+        self._font = Font(layout=self)
 
         self._swap_left_right = False
 
@@ -129,37 +249,16 @@ class MovieLayout(object):
         self._font_halign = HALIGN["CENTER"]
         self._font_valign = VALIGN["BOTTOM"]
 
-    @property
-    def front_options(self):
-        return self._front_options
-
-    @front_options.setter
-    def front_options(self, options):
-        self._front_options = options
+    def cameras(self, camera):
+        return self._cameras.get(camera, self._cameras)
 
     @property
-    def left_options(self):
-        return self._left_options if not self.swap_left_right else self._right_options
+    def font(self):
+        return self._font
 
-    @left_options.setter
-    def left_options(self, options):
-        self._left_options = options
-
-    @property
-    def right_options(self):
-        return self._right_options if not self.swap_left_right else self._left_options
-
-    @right_options.setter
-    def right_options(self, options):
-        self._right_options = options
-
-    @property
-    def rear_options(self):
-        return self._rear_options
-
-    @rear_options.setter
-    def rear_options(self, options):
-        self._rear_options = options
+    @font.setter
+    def font(self, value):
+        self._font = value
 
     @property
     def swap_left_right(self):
@@ -167,7 +266,18 @@ class MovieLayout(object):
 
     @swap_left_right.setter
     def swap_left_right(self, swap):
-        self._swap_left_right = swap
+        if not self._swap_left_right == swap:
+            self.cameras("Left").camera = "right"
+            self.cameras("Right").camera = "left"
+
+            temp_options = self.cameras("Left").options
+            self.cameras("Left").options = self.cameras("Right").options
+            self.cameras("Right").options = temp_options
+
+            temp_camera = self.cameras("Left")
+            self._cameras.update({"Left": self.cameras("Right")})
+            self._cameras.update({"Right": temp_camera})
+            self._swap_left_right = swap
 
     @property
     def perspective(self):
@@ -178,71 +288,31 @@ class MovieLayout(object):
         self._perspective = new_perspective
 
         if self._perspective:
-            self.left_options = (
+            self.cameras("Left").options = (
                 ", pad=iw+4:3/2*ih:-1:ih/8:0x00000000, "
                 "perspective=x0=0:y0=1*H/5:x1=W:y1=-3/44*H:"
                 "x2=0:y2=6*H/5:x3=7/8*W:y3=5*H/6:sense=destination"
             )
-            self.right_options = (
+            self.cameras("Right").options = (
                 ", pad=iw+4:3/2*ih:-1:ih/8:0x00000000,"
                 "perspective=x0=0:y1=1*H/5:x1=W:y0=-3/44*H:"
                 "x2=1/8*W:y3=6*H/5:x3=W:y2=5*H/6:sense=destination"
             )
         else:
-            self.left_options = ""
-            self.right_options = ""
-
-    @property
-    def offset(self):
-        return 5 if self.perspective and (self.left or self.right) else 0
-
-    @property
-    def front(self):
-        return self._include_front
-
-    @front.setter
-    def front(self, include):
-        self._include_front = include
-
-    @property
-    def left(self):
-        return self._include_left
-
-    @left.setter
-    def left(self, include):
-        self._include_left = include
-
-    @property
-    def right(self):
-        return self._include_right
-
-    @right.setter
-    def right(self, include):
-        self._include_right = include
-
-    @property
-    def rear(self):
-        return self._include_rear
-
-    @rear.setter
-    def rear(self, include):
-        self._include_rear = include
+            self.cameras("Left").options = ""
+            self.cameras("Right").options = ""
 
     @property
     def scale(self):
-        return self._scale
+        # Return scale of new video based on 1280x960 video = scale:1
+        return (self.video_height * self.video_width) / (1280 * 960)
 
     @scale.setter
     def scale(self, scale):
-        self._scale = scale
-
-    @property
-    def font_scale(self):
-        return self._font_scale
-
-    @font_scale.setter
-    def font_scale(self, scale):
-        self._font_scale = scale
+        self.cameras("Front").scale = scale
+        self.cameras("Left").scale = scale
+        self.cameras("Right").scale = scale
+        self.cameras("Rear").scale = scale
 
     @property
     def font_halign(self):
@@ -261,240 +331,37 @@ class MovieLayout(object):
         self._font_valign = VALIGN.get(alignment, self._font_valign)
 
     @property
-    def front_width(self):
-        return int(self._front_width * self.scale * self.front)
-
-    @front_width.setter
-    def front_width(self, size):
-        self._front_width = size
-
-    @property
-    def front_height(self):
-        return int(self._front_height * self.scale * self.front)
-
-    @front_height.setter
-    def front_height(self, size):
-        self._front_height = size
-
-    @property
-    def left_width(self):
-        return int(self._left_width * self.scale * self.left)
-
-    @left_width.setter
-    def left_width(self, size):
-        self._left_width = size
-
-    @property
-    def left_height(self):
-        return int(self._left_height * self.scale * self.left)
-
-    @left_height.setter
-    def left_height(self, size):
-        self._left_height = size
-
-    @property
-    def right_width(self):
-        return int(self._right_width * self.scale * self.right)
-
-    @right_width.setter
-    def right_width(self, size):
-        self._right_width = size
-
-    @property
-    def right_height(self):
-        return int(self._right_height * self.scale * self.right)
-
-    @right_height.setter
-    def right_height(self, size):
-        self._right_height = size
-
-    @property
-    def rear_width(self):
-        return int(self._rear_width * self.scale * self.rear)
-
-    @rear_width.setter
-    def rear_width(self, size):
-        self._rear_width = size
-
-    @property
-    def rear_height(self):
-        return int(self._rear_height * self.scale * self.rear)
-
-    @rear_height.setter
-    def rear_height(self, size):
-        self._rear_height = size
-
-    @property
     def video_width(self):
-        return (
+        return int(
             max(
-                self.left_x + self.left_width + self.offset * self.left,
-                self.front_x + self.front_width + self.offset * self.front,
-                self.right_x + self.right_width + self.offset * self.right,
-                self.rear_x + self.rear_width + self.offset * self.rear,
+                self.cameras("Front").xpos + self.cameras("Front").width,
+                self.cameras("Left").xpos + self.cameras("Left").width,
+                self.cameras("Right").xpos + self.cameras("Right").width,
+                self.cameras("Rear").xpos + self.cameras("Rear").width,
             )
-            + self.offset
         )
 
     @property
     def video_height(self):
-        if self.perspective:
-            height = int(max(3 / 2 * self.left_height, 3 / 2 * self.right_height))
-            height = (
-                max(height, self.rear_height) + self.front_height
-                if self.rear
-                else max(height, self.front_height)
+        perspective_adjustement = 3 / 2 if self.perspective else 1
+        return int(
+            max(
+                self.cameras("Front").ypos + self.cameras("Front").height,
+                perspective_adjustement * self.cameras("Left").ypos
+                + self.cameras("Left").height,
+                perspective_adjustement * self.cameras("Right").ypos
+                + self.cameras("Right").height,
+                self.cameras("Rear").ypos + self.cameras("Rear").height,
             )
-            height = height + 5 if height > 0 else 0
-            return height
-        else:
-            return max(
-                self.left_y + self.left_height,
-                self.front_y + self.front_height,
-                self.right_y + self.right_height,
-                self.rear_y + self.rear_height,
-            )
-
-    @property
-    def front_x(self):
-        return self.get_front_xy[0]
-
-    @property
-    def front_y(self):
-        return self.get_front_xy[1]
-
-    @property
-    def get_front_xy(self):
-        return (0, 0)
-
-    @property
-    def left_x(self):
-        return self.get_left_xy[0] if not self.swap_left_right else self.get_right_xy[0]
-
-    @property
-    def left_y(self):
-        return self.get_left_xy[1] if not self.swap_left_right else self.get_right_xy[1]
-
-    @property
-    def get_left_xy(self):
-        return (0, 0)
-
-    @property
-    def right_x(self):
-        return self.get_right_xy[0] if not self.swap_left_right else self.get_left_xy[0]
-
-    @property
-    def right_y(self):
-        return self.get_right_xy[1] if not self.swap_left_right else self.get_left_xy[1]
-
-    @property
-    def get_right_xy(self):
-        return (0, 0)
-
-    @property
-    def rear_x(self):
-        return self.get_rear_xy[0]
-
-    @property
-    def rear_y(self):
-        return self.get_rear_xy[1]
-
-    @property
-    def get_rear_xy(self):
-        return (0, 0)
-
-
-class WideScreen(MovieLayout):
-    """ WideScreen Movie Layout
-
-    [             FRONT_CAMERA             ]
-    [LEFT_CAMERA][REAR_CAMERA][RIGHT_CAMERA]
-    """
-
-    def __init__(self):
-        super().__init__()
-        self.front = True
-        self.left = True
-        self.right = True
-        self.rear = True
-        self.scale = 1 / 2
-        self.font_scale = 4
-        self._front_width = 1280
-        self._front_height = 960
-        self._left_width = 1280
-        self._left_height = 960
-        self._right_width = 1280
-        self._right_height = 960
-        self._rear_width = 1280
-        self._rear_height = 960
-
-        self.left_options = ""
-        self.front_options = ""
-        self.right_options = ""
-        self.rear_options = ""
-
-        self.swap_left_right = False
-
-    @property
-    def front_width(self):
-        return (
-            (self.left_width + self.right_width + self.rear_width) * self.front
-            if self.rear
-            else super().front_width
         )
 
     @property
-    def front_height(self):
-        return (
-            (self.left_height + self.right_height + self.rear_height) * self.front
-            if self.rear
-            else super().front_height
-        )
+    def center_xpos(self):
+        return int(self.video_width / 2)
 
     @property
-    def get_front_xy(self):
-        if not self.swap_left_right:
-            x_pos = self.left_x
-            width = self.left_width
-        else:
-            x_pos = self.right_x
-            width = self.right_width
-
-        return (
-            (self.offset, self.offset)
-            if self.rear
-            else (x_pos + width + self.offset, self.offset)
-        )
-
-    @property
-    def get_left_xy(self):
-        return (
-            (self.offset, self.front_height + self.offset)
-            if self.rear
-            else (self.offset, self.offset)
-        )
-
-    @property
-    def get_right_xy(self):
-        return (
-            (
-                self.rear_x + self.rear_width + self.offset,
-                self.front_height + self.offset,
-            )
-            if self.rear
-            else (self.front_x + self.front_width + self.offset, self.offset)
-        )
-
-    @property
-    def get_rear_xy(self):
-        if not self.swap_left_right:
-            x_pos = self.left_x
-            width = self.left_width
-        else:
-            x_pos = self.right_x
-            width = self.right_width
-
-        return (x_pos + width + self.offset, self.front_height + self.offset)
+    def center_ypos(self):
+        return int(self.video_height / 2)
 
 
 class FullScreen(MovieLayout):
@@ -506,85 +373,155 @@ class FullScreen(MovieLayout):
 
     def __init__(self):
         super().__init__()
-        self.front = True
-        self.left = True
-        self.right = True
-        self.rear = True
         self.scale = 1 / 2
-        self.font_scale = 4
-        self.front_width = 1280
-        self.front_height = 960
-        self.left_width = 1280
-        self.left_height = 960
-        self.right_width = 1280
-        self.right_height = 960
-        self.rear_width = 1280
-        self.rear_height = 960
 
-        self.left_options = ""
-        self.front_options = ""
-        self.right_options = ""
-        self.rear_options = ""
-
-        self.swap_left_right = False
+    @property
+    def video_width(self):
+        return int(
+            max(
+                self.cameras("Front").width,
+                self.cameras("Left").width
+                + self.cameras("Rear").width
+                + self.cameras("Right").width,
+            )
+        )
 
     @property
     def video_height(self):
-        if self.perspective:
-            height = int(max(3 / 2 * self.left_height, 3 / 2 * self.right_height))
-            height = (
-                max(height, self.rear_height) + self.front_height
-                if self.rear
-                else height + self.front_height
+        perspective_adjustement = 3 / 2 if self.perspective else 1
+        return int(
+            self.cameras("Front").height
+            + max(
+                perspective_adjustement * self.cameras("Left").height,
+                self.cameras("Rear").height,
+                perspective_adjustement * self.cameras("Right").height,
             )
-            height = height + 5 if height > 0 else 0
-            return height
-        else:
-            return max(
-                self.left_y + self.left_height,
-                self.front_y + self.front_height,
-                self.right_y + self.right_height,
-                self.rear_y + self.rear_height,
-            )
-
-    @property
-    def get_front_xy(self):
-        if self.swap_left_right:
-            x_pos = self.left_x
-            width = self.left_width
-        else:
-            x_pos = self.right_x
-            width = self.right_width
-
-        return (
-            max(0, int((x_pos + width) / 2 - (self.front_width / 2))) + self.offset,
-            self.offset,
         )
 
     @property
-    def get_left_xy(self):
-        return (self.offset, self.front_height + self.offset)
+    def front_height(self):
+        # For height keep same ratio of 4/3
+        return int(self.cameras("Front").width / 4 * 3)
 
     @property
-    def get_right_xy(self):
+    def front_xpos(self):
+        # Make sure that front is placed in the middle
         return (
-            self.rear_x + self.rear_width + self.offset,
-            self.front_height + self.offset,
+            max(0, self.center_xpos - int(self.cameras("Front").width / 2))
+            * self.cameras("Front").include
         )
 
     @property
-    def get_rear_xy(self):
-        if not self.swap_left_right:
-            x_pos = self.left_x
-            width = self.left_width
-        else:
-            x_pos = self.right_x
-            width = self.right_width
+    def left_xpos(self):
+        return (
+            max(
+                0,
+                self.center_xpos
+                - int(
+                    (
+                        self.cameras("Left").width
+                        + self.cameras("Rear").width
+                        + self.cameras("Right").width
+                    )
+                    / 2
+                ),
+            )
+            * self.cameras("Left").include
+        )
 
-        return (x_pos + width + self.offset, self.front_height + self.offset)
+    @property
+    def left_ypos(self):
+        return (
+            self.cameras("Front").ypos + self.cameras("Front").height
+        ) * self.cameras("Left").include
+
+    @property
+    def rear_xpos(self):
+        return (
+            max(
+                0,
+                self.center_xpos
+                - int(
+                    (
+                        self.cameras("Left").width
+                        + self.cameras("Rear").width
+                        + self.cameras("Right").width
+                    )
+                    / 2
+                )
+                + self.cameras("Left").width,
+            )
+            * self.cameras("Rear").include
+        )
+
+    @property
+    def rear_ypos(self):
+        return (
+            self.cameras("Front").ypos + self.cameras("Front").height
+        ) * self.cameras("Rear").include
+
+    @property
+    def right_xpos(self):
+        return (
+            max(
+                0,
+                self.center_xpos
+                - int(
+                    (
+                        self.cameras("Left").width
+                        + self.cameras("Rear").width
+                        + self.cameras("Right").width
+                    )
+                    / 2
+                )
+                + self.cameras("Left").width
+                + self.cameras("Rear").width,
+            )
+            * self.cameras("Right").include
+        )
+
+    @property
+    def right_ypos(self):
+        return (
+            self.cameras("Front").ypos + self.cameras("Front").height
+        ) * self.cameras("Right").include
 
 
-class Cross(MovieLayout):
+class WideScreen(FullScreen):
+    """ WideScreen Movie Layout
+
+    [             FRONT_CAMERA             ]
+    [LEFT_CAMERA][REAR_CAMERA][RIGHT_CAMERA]
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.scale = 1 / 2
+        # Set front scale to None so we know if it was overriden or not.
+        self.cameras("Front").scale = None
+
+    # Only front_width has to be adjusted as by default width would be left+rear+right instead of normal scale.
+    @property
+    def front_width(self):
+        return (
+            (
+                self.cameras("Left").width
+                + self.cameras("Rear").width
+                + self.cameras("Right").width
+            )
+            * self.cameras("Front").include
+            if self.cameras("Front").scale is None
+            else int(
+                (
+                    self.cameras("Front")._width
+                    * self.cameras("Front").scale
+                    * self.cameras("Front").include
+                )
+            )
+        )
+
+
+class Cross(FullScreen):
     """ Cross Movie Layout
 
              [FRONT_CAMERA]
@@ -594,100 +531,111 @@ class Cross(MovieLayout):
 
     def __init__(self):
         super().__init__()
-        self.front = True
-        self.left = True
-        self.right = True
-        self.rear = True
         self.scale = 1 / 2
-        self.font_scale = 4
-        self.front_width = 1280
-        self.front_height = 960
-        self.left_width = 1280
-        self.left_height = 960
-        self.right_width = 1280
-        self.right_height = 960
-        self.rear_width = 1280
-        self.rear_height = 960
 
-        self.left_options = ""
-        self.front_options = ""
-        self.right_options = ""
-        self.rear_options = ""
-
-        self.swap_left_right = False
+    @property
+    def video_width(self):
+        return max(
+            self.cameras("Front").width,
+            self.cameras("Left").width + self.cameras("Right").width,
+            self.cameras("Rear").width,
+        )
 
     @property
     def video_height(self):
         if self.perspective:
-            height = int(max(3 / 2 * self.left_height, 3 / 2 * self.right_height))
-            # If output from both left and rear cameras is shown then we're going to make it so that
-            # the rear camera is moved up to fit more between both.
-            if self.left and self.rear:
+            height = int(
+                max(
+                    3 / 2 * self.cameras("Left").height,
+                    3 / 2 * self.cameras("Right").height,
+                )
+            )
+            if (
+                self.cameras("Left").include
+                and self.cameras("Left").scale >= self.cameras("Rear").scale
+                and self.cameras("Right").include
+                and self.cameras("Right").scale >= self.cameras("Rear").scale
+                and self.cameras("Rear").include
+            ):
                 height = int(height / 3 * 2)
-
-            return height + self.rear_height + self.front_height + self.offset
+            height += self.cameras("Rear").height
         else:
-            return max(
-                self.left_y + self.left_height,
-                self.front_y + self.front_height,
-                self.right_y + self.right_height,
-                self.rear_y + self.rear_height,
+            height = (
+                max(self.cameras("Left").height, self.cameras("Right").height)
+                + self.cameras("Rear").height
             )
 
-    @property
-    def get_front_xy(self):
-        if self.swap_left_right:
-            x_pos = self.left_x
-            width = self.left_width
-        else:
-            x_pos = self.right_x
-            width = self.right_width
+        return int(height + self.cameras("Front").height)
 
+    @property
+    def front_xpos(self):
         return (
-            max(0, int((x_pos + width) / 2 - (self.front_width / 2))) + self.offset,
-            self.offset,
+            int(max(0, self.center_xpos - (self.cameras("Front").width / 2)))
+            * self.cameras("Front").include
         )
 
     @property
-    def get_left_xy(self):
-        return (self.offset, self.front_height + self.offset)
-
-    @property
-    def get_right_xy(self):
-        if not self.swap_left_right:
-            x_pos = self.left_x
-            width = self.left_width
-        else:
-            x_pos = self.right_x
-            width = self.right_width
-
-        return (x_pos + width + self.offset, self.front_height + self.offset)
-
-    @property
-    def get_rear_xy(self):
-        if self.swap_left_right:
-            x_pos = self.left_x
-            width = self.left_width
-        else:
-            x_pos = self.right_x
-            width = self.right_width
-
-        if self.perspective:
-            height = int(max(3 / 2 * self.left_height, 3 / 2 * self.right_height))
-            # If output from both left and rear cameras is shown then we're going to make it so that
-            # the rear camera is moved up to fit more between both.
-            if self.left and self.right:
-                height = int(height / 3 * 2)
-        else:
-            height = max(self.left_height, self.right_height)
-
+    def left_xpos(self):
         return (
-            max(0, int((x_pos + width) / 2 - (self.rear_width / 2))) + self.offset,
-            height + self.front_height + self.offset,
+            max(
+                0,
+                self.center_xpos
+                - int((self.cameras("Left").width + self.cameras("Right").width) / 2),
+            )
+            * self.cameras("Left").include
         )
 
+    @property
+    def left_ypos(self):
+        return (
+            self.cameras("Front").height
+            + int(
+                (
+                    max(self.cameras("Left").height, self.cameras("Right").height)
+                    - self.cameras("Left").height
+                )
+                / 2
+            )
+        ) * self.cameras("Left").include
 
-class Diamond(MovieLayout):
+    @property
+    def right_xpos(self):
+        return (
+            max(
+                0,
+                self.center_xpos
+                - int((self.cameras("Left").width + self.cameras("Right").width) / 2)
+                + self.cameras("Left").width,
+            )
+            * self.cameras("Right").include
+        )
+
+    @property
+    def right_ypos(self):
+        return (
+            self.cameras("Front").height
+            + int(
+                (
+                    max(self.cameras("Left").height, self.cameras("Right").height)
+                    - self.cameras("Right").height
+                )
+                / 2
+            )
+        ) * self.cameras("Right").include
+
+    @property
+    def rear_xpos(self):
+        return (
+            int(max(0, self.center_xpos - (self.cameras("Rear").width / 2)))
+            * self.cameras("Rear").include
+        )
+
+    @property
+    def rear_ypos(self):
+        return int(max(0, self.video_height - self.cameras("Rear").height))
+
+
+class Diamond(Cross):
     """ Diamond Movie Layout
 
                     [FRONT_CAMERA]
@@ -697,27 +645,7 @@ class Diamond(MovieLayout):
 
     def __init__(self):
         super().__init__()
-        self.front = True
-        self.left = True
-        self.right = True
-        self.rear = True
         self.scale = 1 / 2
-        self.font_scale = 2
-        self.front_width = 1280
-        self.front_height = 960
-        self.left_width = 1280
-        self.left_height = 960
-        self.right_width = 1280
-        self.right_height = 960
-        self.rear_width = 1280
-        self.rear_height = 960
-
-        self.left_options = ""
-        self.front_options = ""
-        self.right_options = ""
-        self.rear_options = ""
-
-        self.swap_left_right = False
 
         self._font_valign = VALIGN["MIDDLE"]
 
@@ -725,11 +653,13 @@ class Diamond(MovieLayout):
     def font_halign(self):
         if self._font_halign == HALIGN["CENTER"]:
             # Change alignment to left or right if one of the left/right cameras is excluded.
-            if (self.left and not self.right) or (self.right and not self.left):
+            if (self.cameras("Left").include and not self.cameras("Right").include) or (
+                self.cameras("Right").include and not self.cameras("Left").include
+            ):
                 x_pos = int(
                     max(
-                        self.front_x + self.front_width / 2,
-                        self.rear_x + self.rear_width / 2,
+                        self.cameras("Front").xpos + self.cameras("Front").width / 2,
+                        self.cameras("Rear").xpos + self.cameras("Rear").width / 2,
                     )
                 )
                 return f"({x_pos} - text_w / 2)"
@@ -743,10 +673,12 @@ class Diamond(MovieLayout):
     @property
     def font_valign(self):
         if self._font_valign == VALIGN["MIDDLE"]:
-            if self.front and not self.rear:
-                return f"({self.front_y + self.front_height} + 5)"
-            elif self.rear and not self.front:
-                return f"({self.rear_y} - 5 - text_h)"
+            if self.cameras("Front").include and not self.cameras("Rear").include:
+                return (
+                    f'({self.cameras("Front").ypos + self.cameras("Front").height} + 5)'
+                )
+            elif self.cameras("Rear").include and not self.cameras("Front").include:
+                return f'({self.cameras("Rear").ypos} - 5 - text_h)'
 
         return self._font_valign
 
@@ -755,253 +687,88 @@ class Diamond(MovieLayout):
         super(Diamond, self.__class__).font_valign.fset(self, alignment)
 
     @property
+    def font_size(self):
+        # For this layout the video height has to include font size. But default for calculating
+        # font size is based on video height.
+        # Thus overriding font size to get video height without font size to figure our scaling.
+        if self.font._size is None:
+            scale = (
+                self._video_height(include_fontsize=False)
+                * self.video_width
+                / (1280 * 960)
+            )
+            return int(max(16, 16 * scale))
+        else:
+            return self.font.size
+
+    @property
+    def video_width(self):
+        return (
+            max(self.cameras("Front").width, self.cameras("Rear").width)
+            + self.cameras("Left").width
+            + self.cameras("Right").width
+        )
+
+    def _video_height(self, include_fontsize=True):
+        perspective = 3 / 2 if self.perspective else 1
+        fontsize = self.font.size if include_fontsize else 0
+
+        return int(
+            max(
+                perspective
+                * max(self.cameras("Left").height, self.cameras("Right").height),
+                self.cameras("Front").height + self.cameras("Rear").height + fontsize,
+            )
+        )
+
+    @property
     def video_height(self):
-        if self.perspective:
-            return (
-                int(
-                    max(
-                        3 / 2 * self.left_height + self.left_y,
-                        3 / 2 * self.right_height + self.right_y,
-                        self.front_height + self.front_y,
-                        self.rear_height + self.rear_y,
-                    )
+        return self._video_height(include_fontsize=True)
+
+    @property
+    def front_xpos(self):
+        return (
+            self.cameras("Left").width
+            + int(
+                (
+                    max(self.cameras("Front").width, self.cameras("Rear").width)
+                    - self.cameras("Front").width
                 )
-                + self.offset
+                / 2
             )
-        else:
-            return max(
-                self.left_y + self.left_height,
-                self.front_y + self.front_height,
-                self.right_y + self.right_height,
-                self.rear_y + self.rear_height,
-            )
+        ) * self.cameras("Front").include
 
     @property
-    def get_front_xy(self):
-        if not self.swap_left_right:
-            x_pos = self.left_x
-            width = self.left_width
-        else:
-            x_pos = self.right_x
-            width = self.right_width
-
-        return (x_pos + width + self.offset, self.offset)
+    def left_xpos(self):
+        return 0
 
     @property
-    def get_left_xy(self):
-        return (self.offset, int(self.front_height / 2) + self.offset)
+    def left_ypos(self):
+        return max(0, self.center_ypos - int(self.cameras("Left").height / 2))
 
     @property
-    def get_right_xy(self):
+    def right_xpos(self):
+        return max(
+            self.cameras("Front").xpos + self.cameras("Front").width,
+            self.cameras("Rear").xpos + self.cameras("Rear").width,
+        )
+
+    @property
+    def right_ypos(self):
+        return max(0, self.center_ypos - int(self.cameras("Right").height / 2))
+
+    @property
+    def rear_xpos(self):
         return (
-            max(self.front_x + self.front_width, self.rear_x + self.rear_width)
-            + self.offset,
-            int(self.front_height / 2) + self.offset,
-        )
-
-    @property
-    def get_rear_xy(self):
-        if not self.swap_left_right:
-            x_pos = self.left_x
-            width = self.left_width
-        else:
-            x_pos = self.right_x
-            width = self.right_width
-
-        return (
-            x_pos + width + self.offset,
-            max(
-                int(self.front_height / 2 + (self.left_height / 2)),
-                int(self.front_height / 2 + (self.right_height / 2)),
-                self.front_height,
+            self.cameras("Left").width
+            + int(
+                (
+                    max(self.cameras("Front").width, self.cameras("Rear").width)
+                    - self.cameras("Rear").width
+                )
+                / 2
             )
-            + self.offset
-            + int((16 * self.font_scale * self.scale)),
-        )
-
-
-class Perspective(MovieLayout):
-    """ Perspective Movie Layout
-
-                       [FRONT_CAMERA]
-        \[LEFT_CAMERA]\[REAR_CAMERA]/[RIGHT_CAMERA]/
-    """
-
-    def __init__(self):
-        super().__init__()
-        self.front = True
-        self.left = True
-        self.right = True
-        self.rear = True
-        self.scale = 1 / 4
-        self.font_scale = 4
-        self.front_width = 1280
-        self.front_height = 960
-        self.left_width = 1280
-        self.left_height = 960
-        self.right_width = 1280
-        self.right_height = 960
-        self.rear_width = 1280
-        self.rear_height = 960
-
-        self._left_options = (
-            ", pad=iw+4:3/2*ih:-1:ih/8:0x00000000, "
-            "perspective=x0=0:y0=1*H/5:x1=W:y1=-3/44*H:"
-            "x2=0:y2=6*H/5:x3=7/8*W:y3=5*H/6:sense=destination"
-        )
-        self.front_options = ""
-        self._right_options = (
-            ", pad=iw+4:3/2*ih:-1:ih/8:0x00000000,"
-            "perspective=x0=0:y1=1*H/5:x1=W:y0=-3/44*H:"
-            "x2=1/8*W:y3=6*H/5:x3=W:y2=5*H/6:sense=destination"
-        )
-        self.rear_options = ""
-
-        self.swap_left_right = False
-
-    @property
-    def video_width(self):
-        width = self.left_width + 5 * self.left + self.right_width + 5 * self.right
-        width += (
-            (self.rear_width + 5 * self.rear)
-            if self.rear
-            else (self.front_width + 5 * self.front)
-        )
-        return width + 5 if width > 0 else 0
-
-    @property
-    def video_height(self):
-        height = int(max(3 / 2 * self.left_height, 3 / 2 * self.right_height))
-        height = (
-            max(height, self.rear_height) + self.front_height
-            if self.rear
-            else max(height, self.front_height)
-        )
-        height = height + 5 if height > 0 else 0
-        return height
-
-    @property
-    def get_front_xy(self):
-        if not self.swap_left_right:
-            x_pos = self.left_x
-            width = self.left_width
-        else:
-            x_pos = self.right_x
-            width = self.right_width
-
-        return (x_pos + width + 5, 5)
-
-    @property
-    def get_left_xy(self):
-        return (5, self.front_height + 5)
-
-    @property
-    def get_right_xy(self):
-        return (
-            (self.rear_x + self.rear_width * self.rear + 5, self.front_height + 5)
-            if self.rear
-            else (
-                self.front_x + self.front_width * self.front + 5,
-                self.front_height + 5,
-            )
-        )
-
-    @property
-    def get_rear_xy(self):
-        if not self.swap_left_right:
-            x_pos = self.left_x
-            width = self.left_width
-        else:
-            x_pos = self.right_x
-            width = self.right_width
-
-        return (x_pos + width + 5, self.front_height + 5)
-
-
-class Diagonal(MovieLayout):
-    """ Perspective Movie Layout
-    """
-
-    def __init__(self):
-        super().__init__()
-        self.front = True
-        self.left = True
-        self.right = True
-        self.scale = 1 / 4
-        self.font_scale = 4
-        self.front_width = 1280
-        self.front_height = 960
-        self.left_width = 1280
-        self.left_height = 960
-        self.right_width = 1280
-        self.right_height = 960
-
-        self.left_options = (
-            ", pad=iw+4:11/6*ih:-1:30:0x00000000,"
-            "perspective=x0=0:y0=1*H/5:x1=W:y1=-3/44*H:"
-            "x2=0:y2=6*H/5:x3=W:y3=410:sense=destination"
-        )
-        self.front_options = ""
-        self.right_options = (
-            ", pad=iw+4:11/6*ih:-1:30:0x00000000,"
-            "perspective=x0=0:y0=-3/44*H:x1=W:y1=1*H/5:"
-            "x2=0:y2=410:x3=W:y3=6*H/5:sense=destination"
-        )
-
-        self.swap_left_right = False
-
-    @property
-    def front_width(self):
-        return super() + 5 if self.front else 0
-
-    @property
-    def left_width(self):
-        return super() + 5 if self.left else 0
-
-    @property
-    def right_width(self):
-        return super() + 5 if self.right else 0
-
-    @property
-    def video_width(self):
-        width = self.front_width + self.left_width + self.right_width
-        return width + 5 if width > 0 else 0
-
-    @property
-    def video_height(self):
-        height = int(
-            max(
-                (6 * self.left_height / 5 + 1 * self.left_height / 5),
-                self.front_height,
-                (self.right_height / 5 + 6 * self.right_height / 5),
-            )
-        )
-        height = height + 5 if height > 0 else 0
-        return height
-
-    @property
-    def front_x(self):
-        return self.left_width + 5
-
-    @property
-    def front_y(self):
-        return 5
-
-    @property
-    def left_x(self):
-        return 5
-
-    @property
-    def left_y(self):
-        return 5
-
-    @property
-    def right_x(self):
-        return self.front_x + self.front_width
-
-    @property
-    def right_y(self):
-        return 5
+        ) * self.cameras("Rear").include
 
 
 class MyArgumentParser(argparse.ArgumentParser):
@@ -1174,7 +941,7 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
                     video_filename = front_filename
                     include_clip = (
                         item["include"]
-                        if video_settings["video_layout"].front
+                        if video_settings["video_layout"].cameras("Front").include
                         else False
                     )
                 elif filename == left_filename:
@@ -1182,7 +949,7 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
                     video_filename = left_filename
                     include_clip = (
                         item["include"]
-                        if video_settings["video_layout"].left
+                        if video_settings["video_layout"].cameras("Left").include
                         else False
                     )
                 elif filename == right_filename:
@@ -1190,7 +957,7 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
                     video_filename = right_filename
                     include_clip = (
                         item["include"]
-                        if video_settings["video_layout"].right
+                        if video_settings["video_layout"].cameras("Right").include
                         else False
                     )
                 elif filename == rear_filename:
@@ -1198,7 +965,7 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
                     video_filename = rear_filename
                     include_clip = (
                         item["include"]
-                        if video_settings["video_layout"].rear
+                        if video_settings["video_layout"].cameras("Rear").include
                         else False
                     )
                 else:
@@ -1449,11 +1216,11 @@ def create_intermediate_movie(
             video_settings["background"].format(
                 duration=clip_duration,
                 speed=video_settings["movie_speed"],
-                width=video_settings["video_layout"].left_width,
-                height=video_settings["video_layout"].left_height,
+                width=video_settings["video_layout"].cameras("Left").width,
+                height=video_settings["video_layout"].cameras("Left").height,
             )
             + "[left]"
-            if video_settings["video_layout"].left
+            if video_settings["video_layout"].cameras("Left").include
             else ""
         )
 
@@ -1469,11 +1236,11 @@ def create_intermediate_movie(
             video_settings["background"].format(
                 duration=clip_duration,
                 speed=video_settings["movie_speed"],
-                width=video_settings["video_layout"].front_width,
-                height=video_settings["video_layout"].front_height,
+                width=video_settings["video_layout"].cameras("Front").width,
+                height=video_settings["video_layout"].cameras("Front").height,
             )
             + "[front]"
-            if video_settings["video_layout"].front
+            if video_settings["video_layout"].cameras("Front").include
             else ""
         )
 
@@ -1489,11 +1256,11 @@ def create_intermediate_movie(
             video_settings["background"].format(
                 duration=clip_duration,
                 speed=video_settings["movie_speed"],
-                width=video_settings["video_layout"].right_width,
-                height=video_settings["video_layout"].right_height,
+                width=video_settings["video_layout"].cameras("Right").width,
+                height=video_settings["video_layout"].cameras("Right").height,
             )
             + "[right]"
-            if video_settings["video_layout"].right
+            if video_settings["video_layout"].cameras("Right").include
             else ""
         )
 
@@ -1509,11 +1276,11 @@ def create_intermediate_movie(
             video_settings["background"].format(
                 duration=clip_duration,
                 speed=video_settings["movie_speed"],
-                width=video_settings["video_layout"].rear_width,
-                height=video_settings["video_layout"].rear_height,
+                width=video_settings["video_layout"].cameras("Rear").width,
+                height=video_settings["video_layout"].cameras("Rear").height,
             )
             + "[rear]"
-            if video_settings["video_layout"].rear
+            if video_settings["video_layout"].cameras("Rear").include
             else ""
         )
 
@@ -1589,6 +1356,7 @@ def create_intermediate_movie(
 
     ffmpeg_command = (
         [video_settings["ffmpeg_exec"]]
+        + ["-loglevel", "error"]
         + ffmpeg_left_command
         + ffmpeg_front_command
         + ffmpeg_right_command
@@ -1599,7 +1367,7 @@ def create_intermediate_movie(
     )
 
     ffmpeg_command = ffmpeg_command + ["-y", temp_movie_name]
-    print(ffmpeg_command)
+    # print(ffmpeg_command)
     # Run the command.
     try:
         run(ffmpeg_command, capture_output=True, check=True)
@@ -1732,7 +1500,10 @@ def create_movie(clips_list, movie_filename, video_settings, chapter_offset):
     ]
 
     ffmpeg_command = (
-        [video_settings["ffmpeg_exec"]] + ffmpeg_params + ["-y", movie_filename]
+        [video_settings["ffmpeg_exec"]]
+        + ["-loglevel", "error"]
+        + ffmpeg_params
+        + ["-y", movie_filename]
     )
 
     # print(ffmpeg_command)
@@ -2409,22 +2180,58 @@ def main() -> None:
     parser.set_defaults(perspective=False)
 
     parser.add_argument(
+        "--background",
+        dest="background",
+        default="black",
+        help="Background color for video. Can be a color string or RGB value. Also see --fontcolor.",
+    )
+
+    scaling_group = parser.add_argument_group(
+        title="Video scaling", description="Set what clips should be scaled to based."
+    )
+
+    scaling_group.add_argument(
         "--scale",
         dest="clip_scale",
         type=float,
-        help="R|Set camera clip scale, scale of 1 "
-        "is 1280x960 camera clip. "
+        help="R|Set camera clip scale for all clips, scale of 1 is 1280x960 camera clip.\n"
         "Defaults:\n"
-        "    WIDESCREEN: 1/3 (front 1280x960, others 426x320, video is "
-        "1280x960)\n"
+        "    WIDESCREEN: 1/2 (front 1280x960, others 640x480, video is "
+        "1920x1920)\n"
         "    FULLSCREEN: 1/2 (640x480, video is "
-        "1280x960)\n"
-        "    PERSPECTIVE: 1/4 (320x240, video is "
-        "980x380)\n"
+        "1920x960)\n"
         "    CROSS: 1/2 (640x480, video is "
         "1280x1440)\n"
         "    DIAMOND: 1/2 (640x480, video is "
-        "1280x1440)\n",
+        "1920x976)\n",
+    )
+
+    scaling_group.add_argument(
+        "--front_scale",
+        dest="front_clip_scale",
+        type=float,
+        help="R|Set camera clip scale for front camera.\n",
+    )
+
+    scaling_group.add_argument(
+        "--left_scale",
+        dest="left_clip_scale",
+        type=float,
+        help="R|Set camera clip scale for left camera.\n",
+    )
+
+    scaling_group.add_argument(
+        "--right_scale",
+        dest="right_clip_scale",
+        type=float,
+        help="R|Set camera clip scale for right camera.\n",
+    )
+
+    scaling_group.add_argument(
+        "--rear_scale",
+        dest="rear_clip_scale",
+        type=float,
+        help="R|Set camera clip scale for rear camera.\n",
     )
 
     parser.add_argument(
@@ -2505,7 +2312,7 @@ def main() -> None:
     speed_group.add_argument(
         "--slowdown",
         dest="slow_down",
-        type=int,
+        type=float,
         help="Slow down video output. Accepts a number "
         "that is then used as multiplier, "
         "providing 2 means half the speed.",
@@ -2513,7 +2320,7 @@ def main() -> None:
     speed_group.add_argument(
         "--speedup",
         dest="speed_up",
-        type=int,
+        type=float,
         help="Speed up the video. Accepts a number "
         "that is then used as a multiplier, "
         "providing 2 means twice the speed.",
@@ -2610,7 +2417,7 @@ def main() -> None:
         "--fontsize",
         required=False,
         type=int,
-        help="Font size for timestamp. Default is " "scaled based on video scaling.",
+        help="Font size for timestamp. Default is scaled based on video scaling.",
     )
 
     timestamp_group.add_argument(
@@ -2866,30 +2673,35 @@ def main() -> None:
 
         layout_settings.perspective = args.perspective
 
-    layout_settings.front = not args.no_front
-    layout_settings.left = not args.no_left
-    layout_settings.right = not args.no_right
-    layout_settings.rear = not args.no_rear
+    layout_settings.cameras("Front").include = not args.no_front
+    layout_settings.cameras("Left").include = not args.no_left
+    layout_settings.cameras("Right").include = not args.no_right
+    layout_settings.cameras("Rear").include = not args.no_rear
 
     # Check if either rear or mirror argument has been provided.
     # If front camera then default to mirror, if no front camera then default to rear.
     side_camera_as_mirror = (
-        layout_settings.front
+        layout_settings.cameras("Front").include
         if not ("rear" in args or "mirror" in args)
         else "mirror" in args
     )
     mirror_sides = ", hflip" if side_camera_as_mirror else ""
 
-    # Determine if left and right cameras should be swapped or not.
-    layout_settings.swap_left_right = (
-        not side_camera_as_mirror if args.swap is None else args.swap
-    )
+    # For scale first set the main clip one if provided, this than allows camera specific ones to override for that camera.
+    if args.clip_scale:
+        layout_settings.scale = args.clip_scale
 
-    layout_settings.scale = (
-        args.clip_scale
-        if args.clip_scale is not None and args.clip_scale > 0
-        else layout_settings.scale
-    )
+    if args.front_clip_scale:
+        layout_settings.cameras("Front").scale = args.front_clip_scale
+
+    if args.left_clip_scale:
+        layout_settings.cameras("Left").scale = args.left_clip_scale
+
+    if args.right_clip_scale:
+        layout_settings.cameras("Right").scale = args.right_clip_scale
+
+    if args.rear_clip_scale:
+        layout_settings.cameras("Rear").scale = args.rear_clip_scale
 
     layout_settings.font_halign = (
         args.halign if args.halign is not None else layout_settings.font_halign
@@ -2898,8 +2710,21 @@ def main() -> None:
         args.valign if args.valign is not None else layout_settings.font_valign
     )
 
+    # Determine if left and right cameras should be swapped or not.
+    # No more arguments related to cameras (i.e .scale, include or not) can be processed from now on.
+    # Up till now Left means left camera and Right means Right camera.
+    # From this point forward Left can mean Right camera if we're swapping output.
+    layout_settings.swap_left_right = (
+        not side_camera_as_mirror if args.swap is None else args.swap
+    )
+
+    layout_settings.font.font = args.font
+    layout_settings.font.color = args.fontcolor
+    if args.fontsize is not None and args.fontsize > 0:
+        layout_settings.font.size = args.fontsize
+
     black_base = "color=duration={duration}:"
-    black_size = "s={width}x{height}:c=black "
+    black_size = f"s={{width}}x{{height}}:c={args.background} "
 
     ffmpeg_base = (
         black_base
@@ -2915,15 +2740,16 @@ def main() -> None:
     ffmpeg_video_position = ""
 
     ffmpeg_left_camera = ""
-    if layout_settings.left:
+    camera = "Left"
+    if layout_settings.cameras(camera).include:
         ffmpeg_left_camera = (
             "setpts=PTS-STARTPTS, "
             "scale={clip_width}x{clip_height} {mirror}{options}"
             " [left]".format(
-                clip_width=layout_settings.left_width,
-                clip_height=layout_settings.left_height,
+                clip_width=layout_settings.cameras(camera).width,
+                clip_height=layout_settings.cameras(camera).height,
                 mirror=mirror_sides,
-                options=layout_settings.left_options,
+                options=layout_settings.cameras(camera).options,
             )
         )
 
@@ -2932,21 +2758,22 @@ def main() -> None:
             + ";[{input_clip}][left] overlay=eof_action=pass:repeatlast=0:"
             "x={x_pos}:y={y_pos} [left1]".format(
                 input_clip=input_clip,
-                x_pos=layout_settings.left_x,
-                y_pos=layout_settings.left_y,
+                x_pos=layout_settings.cameras(camera).xpos,
+                y_pos=layout_settings.cameras(camera).ypos,
             )
         )
         input_clip = "left1"
 
     ffmpeg_front_camera = ""
-    if layout_settings.front:
+    camera = "Front"
+    if layout_settings.cameras(camera).include:
         ffmpeg_front_camera = (
             "setpts=PTS-STARTPTS, "
             "scale={clip_width}x{clip_height} {options}"
             " [front]".format(
-                clip_width=layout_settings.front_width,
-                clip_height=layout_settings.front_height,
-                options=layout_settings.front_options,
+                clip_width=layout_settings.cameras(camera).width,
+                clip_height=layout_settings.cameras(camera).height,
+                options=layout_settings.cameras(camera).options,
             )
         )
         ffmpeg_video_position = (
@@ -2954,22 +2781,23 @@ def main() -> None:
             + ";[{input_clip}][front] overlay=eof_action=pass:repeatlast=0:"
             "x={x_pos}:y={y_pos} [front1]".format(
                 input_clip=input_clip,
-                x_pos=layout_settings.front_x,
-                y_pos=layout_settings.front_y,
+                x_pos=layout_settings.cameras(camera).xpos,
+                y_pos=layout_settings.cameras(camera).ypos,
             )
         )
         input_clip = "front1"
 
     ffmpeg_right_camera = ""
-    if layout_settings.right:
+    camera = "Right"
+    if layout_settings.cameras(camera).include:
         ffmpeg_right_camera = (
             "setpts=PTS-STARTPTS, "
             "scale={clip_width}x{clip_height} {mirror}{options}"
             " [right]".format(
-                clip_width=layout_settings.right_width,
-                clip_height=layout_settings.right_height,
+                clip_width=layout_settings.cameras(camera).width,
+                clip_height=layout_settings.cameras(camera).height,
                 mirror=mirror_sides,
-                options=layout_settings.right_options,
+                options=layout_settings.cameras(camera).options,
             )
         )
         ffmpeg_video_position = (
@@ -2977,22 +2805,24 @@ def main() -> None:
             + ";[{input_clip}][right] overlay=eof_action=pass:repeatlast=0:"
             "x={x_pos}:y={y_pos} [right1]".format(
                 input_clip=input_clip,
-                x_pos=layout_settings.right_x,
-                y_pos=layout_settings.right_y,
+                x_pos=layout_settings.cameras(camera).xpos,
+                y_pos=layout_settings.cameras(camera).ypos,
             )
         )
         input_clip = "right1"
 
     ffmpeg_rear_camera = ""
-    if layout_settings.rear:
+    camera = "Rear"
+    if layout_settings.cameras(camera).include:
         ffmpeg_rear_camera = (
             "setpts=PTS-STARTPTS, "
+            # "crop=512:798:225:26, "
             "scale={clip_width}x{clip_height} {mirror}{options}"
             " [rear]".format(
-                clip_width=layout_settings.rear_width,
-                clip_height=layout_settings.rear_height,
+                clip_width=layout_settings.cameras(camera).width,
+                clip_height=layout_settings.cameras(camera).height,
                 mirror=mirror_sides,
-                options=layout_settings.rear_options,
+                options=layout_settings.cameras(camera).options,
             )
         )
         ffmpeg_video_position = (
@@ -3000,8 +2830,8 @@ def main() -> None:
             + ";[{input_clip}][rear] overlay=eof_action=pass:repeatlast=0:"
             "x={x_pos}:y={y_pos} [rear1]".format(
                 input_clip=input_clip,
-                x_pos=layout_settings.rear_x,
-                y_pos=layout_settings.rear_y,
+                x_pos=layout_settings.cameras(camera).xpos,
+                y_pos=layout_settings.cameras(camera).ypos,
             )
         )
         input_clip = "rear1"
@@ -3010,45 +2840,31 @@ def main() -> None:
     filter_string = ";[{input_clip}] {filter} [tmp{filter_counter}]"
     ffmpeg_timestamp = ""
     if not args.no_timestamp:
-        if args.font is None:
+        if layout_settings.font.font is None:
             print(
                 f"Unable to get a font file for platform {sys.platform}. Please provide valid font file using "
                 f"--font or disable timestamp using --no-timestamp."
             )
             return
 
-        temp_font_file = f"c:\{args.font}" if sys.platform == "win32" else args.font
+        temp_font_file = (
+            f"c:\{layout_settings.font.font}"
+            if sys.platform == "win32"
+            else layout_settings.font.font
+        )
         if not os.path.isfile(temp_font_file):
             print(
                 f"Font file {temp_font_file} does not exist. Provide a valid font file using --font or"
                 f" disable timestamp using --no-timestamp"
             )
             return
-        font_file = args.font
-
-        ffmpeg_timestamp = f"drawtext=fontfile={font_file}:"
-
-        # If fontsize is not provided then scale font size based on scaling
-        # of video clips, otherwise use fixed font size.
-        fontsize = (
-            16 * layout_settings.font_scale * layout_settings.scale
-            if args.fontsize is None or args.fontsize == 0
-            else args.fontsize
-        )
 
         ffmpeg_timestamp = (
-            ffmpeg_timestamp + "fontcolor={fontcolor}:fontsize={fontsize}:"
+            ffmpeg_timestamp + f"drawtext=fontfile={layout_settings.font.font}:"
+            f"fontcolor={layout_settings.font.color}:fontsize={layout_settings.font.size}:"
             "borderw=2:bordercolor=black@1.0:"
-            "x={halign}:y={valign}:".format(
-                fontcolor=args.fontcolor,
-                fontsize=fontsize,
-                valign=layout_settings.font_valign,
-                halign=layout_settings.font_halign,
-            )
-        )
-
-        ffmpeg_timestamp = (
-            ffmpeg_timestamp + "text='%{{pts\:localtime\:{epoch_time}\:%x %X}}'"
+            f"x={layout_settings.font_halign}:y={layout_settings.font_valign}:"
+            "text='%{{pts\:localtime\:{epoch_time}\:%x %X}}'"
         )
 
         ffmpeg_timestamp = filter_string.format(
@@ -3060,7 +2876,7 @@ def main() -> None:
         filter_counter += 1
 
     speed = args.slow_down if args.slow_down is not None else ""
-    speed = 1 / args.speed_up if args.speed_up is not None else speed
+    speed = round(1 / args.speed_up, 4) if args.speed_up is not None else speed
     ffmpeg_speed = ""
     if speed != "":
         ffmpeg_speed = filter_string.format(
