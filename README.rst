@@ -4,12 +4,12 @@ tesla_dashcam
 Python program that provides an easy method to merge saved Tesla Dashcam footage into a single video.
 
 When saving Tesla Dashcam footage a folder is created on the USB drive and within it multiple MP4 video files are
-created. Currently the dashcam leverages three (3) cameras (front, left repeater, and right repeater) and will create a
+created. Currently the dashcam leverages four (4) cameras (front, rear, left repeater, and right repeater) and will create a
 file for each of them. Every minute is stored into a separate file as well. This means that when saving dashcam footage
-there is a total of 30 files video files for every 10 minutes. Each block of 10 minutes is put into a folder, thus often
+there is a total of 40 files video files for every 10 minutes. Each block of 10 minutes is put into a folder, thus often
 there will be multiple folders.
 
-Using this program, one can combine all of these into 1 video file. The video of the three cameras is merged
+Using this program, one can combine all of these into 1 video file. The video of the four cameras is merged
 into one picture, with the video for all the minutes further put together into one.
 
 By default sub-folders are included when retrieving the video clips. One can, for example, just provide the path to the
@@ -46,7 +46,7 @@ Option --chapter_offset can be provided to offset the chapter markers within the
 result in the chapter marker being set not at the start for the folder video but instead be set provided number of
 seconds before the end of that video. For example, with 10 minute video for a folder a value of -120 would result
 in the chapter markers being set 2 minutes before the end of that video. A positive number will result in chapter marker
-being set to provided number of seconds after the start of the video. Value of 600 would result in chapter markers being
+being set to provided number of seconds after the start of the video. Value of 300 would result in chapter markers being
 set 5 minutes into that folder's video.
 
 If --merge is not provided as an option and there are multiple sub-folders then the filename (if provided in output)
@@ -83,7 +83,7 @@ MacOS binary of ffmpeg was downloaded from: https://evermeet.cx/ffmpeg/
 Notes
 -----
 
-The video files for the same minute between the 3 cameras are not always the same length. If there is a difference in
+The video files for the same minute between the 4 cameras are not always the same length. If there is a difference in
 their duration then a black screen will be shown for the camera which video ended before the others (within the minute).
 It is thus possible within a video to see a black screen for one of the cameras, and then when that minute has passed
 for it to show video again.
@@ -896,7 +896,7 @@ TODO
 * Support drag&drop of video folder (supported in Windows now, MacOS not yet)
 * Add object detection (i.e. people) and possible output when object was detected
 * Saving of options
-* Use timestamp in video to ensure full synchronization between the 3 cameras
+* Use timestamp in video to ensure full synchronization between the 4 cameras
 * Add option for source/output to be S3 bucket (with temp folder for creating temporary files)
 * Develop Web Front-End
 * Develop method to have run in AWS, allowing user to upload video files and interact using Web Front-End
