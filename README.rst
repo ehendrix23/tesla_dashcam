@@ -878,6 +878,7 @@ Release Notes
     - Fixed: Only the 1st source was processed When using MONITOR or MONITOR_ONCE, or with V10 only SavedClips was processed when not providing a source
 0.1.16:
     - New: Options --front_scale, --rear_scale, --left_scale, and --right_scale to set the scale of each clip individually (value of 1 is existing size of 1280x960 for the clip)
+    - New: Option --swap_frontrear to swap front&rear cameras in output.
     - New: Option --background to provide background color (default is black).
     - Changed: --speedup and --slowdown now accepts a float allowing for example to speed video up by 1.5
     - Changed: View of rear camera will be mirrored as well if side cameras are shown as mirror
