@@ -880,11 +880,13 @@ Release Notes
     - New: Options --front_scale, --rear_scale, --left_scale, and --right_scale to set the scale of each clip individually (value of 1 is existing size of 1280x960 for the clip)
     - New: Option --swap_frontrear to swap front&rear cameras in output.
     - New: Option --background to provide background color (default is black).
+    - New: Parameter file (provided using @) can now include comments (specify using #)
     - Changed: --speedup and --slowdown now accepts a float allowing for example to speed video up by 1.5
     - Changed: Option scale (and clip scale options) also accept fixed resolution (i.e. 640x480) for the clip.
     - Changed: View of rear camera will be mirrored as well if side cameras are shown as mirror
     - Changed: For all layouts default is to show mirror for rear&side if front camera is shown, otherwise show as rear viewing.
     - Changed: Swap left&right cameras when showing rear&side as rear viewing, and not to swap them when showing rear&side as mirror view.
+    - Fixed: Providing paths with spaces did not work in parameter files even although it worked from command line. `Issue #89 <https://github.com/ehendrix23/tesla_dashcam/issues/89>`_
 
 TODO
 ----

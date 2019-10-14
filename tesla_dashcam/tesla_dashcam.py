@@ -12,6 +12,7 @@ from glob import glob
 from pathlib import Path
 from re import search
 from subprocess import CalledProcessError, run
+from shlex import split as shlex_split
 from shutil import which
 from tempfile import mkstemp
 from time import sleep, time as timestamp
@@ -787,7 +788,8 @@ class Diamond(Cross):
 
 class MyArgumentParser(argparse.ArgumentParser):
     def convert_arg_line_to_args(self, arg_line):
-        return arg_line.split()
+        # Remove comments.
+        return shlex_split(arg_line, comments=True)
 
 
 # noinspection PyCallByClass,PyProtectedMember,PyProtectedMember
