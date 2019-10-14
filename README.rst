@@ -881,6 +881,7 @@ Release Notes
     - New: Option --swap_frontrear to swap front&rear cameras in output.
     - New: Option --background to provide background color (default is black).
     - Changed: --speedup and --slowdown now accepts a float allowing for example to speed video up by 1.5
+    - Changed: Option scale (and clip scale options) also accept fixed resolution (i.e. 640x480) for the clip.
     - Changed: View of rear camera will be mirrored as well if side cameras are shown as mirror
     - Changed: For all layouts default is to show mirror for rear&side if front camera is shown, otherwise show as rear viewing.
     - Changed: Swap left&right cameras when showing rear&side as rear viewing, and not to swap them when showing rear&side as mirror view.

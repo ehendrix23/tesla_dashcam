@@ -106,6 +106,10 @@ class Font(object):
         self._font = font
         self._size = size
         self._color = color
+        self._halign = None
+        self._valign = None
+        self._xpos = None
+        self._ypos = None
 
     @property
     def font(self):
@@ -117,8 +121,8 @@ class Font(object):
 
     @property
     def size(self):
-        if hasattr(self._layout, "font_size"):
-            return getattr(self._layout, "font_size")
+        if hasattr(self._layout, "_font_size"):
+            return getattr(self._layout, "_font_size")()
 
         return (
             int(max(16, 16 * self._layout.scale)) if self._size is None else self._size
@@ -135,6 +139,44 @@ class Font(object):
     @color.setter
     def color(self, value):
         self._color = value
+
+    @property
+    def halign(self):
+        if hasattr(self._layout, "_font_halign"):
+            return getattr(self._layout, "_font_halign")()
+
+        return HALIGN.get(self._halign, self._halign)
+
+    @halign.setter
+    def halign(self, value):
+        self._halign = value
+
+    @property
+    def valign(self):
+        if hasattr(self._layout, "_font_valign"):
+            return getattr(self._layout, "_font_valign")()
+
+        return VALIGN.get(self._valign, self._valign)
+
+    @valign.setter
+    def valign(self, value):
+        self._valign = value
+
+    @property
+    def xpos(self):
+        return self._xpos
+
+    @xpos.setter
+    def xpos(self, value):
+        self._xpos = value
+
+    @property
+    def ypos(self):
+        return self._ypos
+
+    @ypos.setter
+    def ypos(self, value):
+        self._ypos = value
 
 
 class Camera(object):
@@ -171,8 +213,8 @@ class Camera(object):
     @property
     def width(self):
         return (
-            getattr(self._layout, self._camera + "_width")
-            if hasattr(self._layout, self._camera + "_width")
+            getattr(self._layout, "_" + self._camera + "_width")()
+            if hasattr(self._layout, "_" + self._camera + "_width")
             else int(self._width * self.scale * self.include)
         )
 
@@ -183,8 +225,8 @@ class Camera(object):
     @property
     def height(self):
         return (
-            getattr(self._layout, self._camera + "_height")
-            if hasattr(self._layout, self._camera + "_height")
+            getattr(self._layout, "_" + self._camera + "_height")()
+            if hasattr(self._layout, "_" + self._camera + "_height")
             else int(self._height * self.scale * self.include)
         )
 
@@ -194,7 +236,10 @@ class Camera(object):
 
     @property
     def xpos(self):
-        return getattr(self._layout, self._camera + "_xpos", self._xpos) * self.include
+        if hasattr(self._layout, "_" + self._camera + "_xpos"):
+            return getattr(self._layout, "_" + self._camera + "_xpos")() * self.include
+
+        return self._xpos * self.include
 
     @xpos.setter
     def xpos(self, value):
@@ -202,7 +247,10 @@ class Camera(object):
 
     @property
     def ypos(self):
-        return getattr(self._layout, self._camera + "_ypos", self._ypos) * self.include
+        if hasattr(self._layout, "_" + self._camera + "_ypos"):
+            return getattr(self._layout, "_" + self._camera + "_ypos")() * self.include
+
+        return self._ypos * self.include
 
     @ypos.setter
     def ypos(self, value):
@@ -214,7 +262,16 @@ class Camera(object):
 
     @scale.setter
     def scale(self, value):
-        self._scale = value
+        if value is None:
+            self._scale = None
+        elif len(str(value).split("x")) == 1:
+            # Scale provided is a multiplier
+            self._scale = float(str(value).split("x")[0])
+        else:
+            # Scale is a resolution.
+            self.width = int(str(value).split("x")[0])
+            self.height = int(str(value).split("x")[1])
+            self._scale = 1
 
     @property
     def options(self):
@@ -223,10 +280,6 @@ class Camera(object):
     @options.setter
     def options(self, value):
         self._options = value
-
-    @staticmethod
-    def is_method(obj, name):
-        return callable(getattr(obj, name))
 
 
 class MovieLayout(object):
@@ -247,8 +300,8 @@ class MovieLayout(object):
 
         self._perspective = False
 
-        self._font_halign = HALIGN["CENTER"]
-        self._font_valign = VALIGN["BOTTOM"]
+        self._font.halign = "CENTER"
+        self._font.valign = "BOTTOM"
 
     def cameras(self, camera):
         return self._cameras.get(camera, self._cameras)
@@ -266,32 +319,16 @@ class MovieLayout(object):
         return self._swap_left_right
 
     @swap_left_right.setter
-    def swap_left_right(self, swap):
-        if not self._swap_left_right == swap:
-            temp_options = self.cameras("Left").options
-            self.cameras("Left").options = self.cameras("Right").options
-            self.cameras("Right").options = temp_options
-
-            temp_camera = self.cameras("Left")
-            self._cameras.update({"Left": self.cameras("Right")})
-            self._cameras.update({"Right": temp_camera})
-            self._swap_left_right = swap
+    def swap_left_right(self, value):
+        self._swap_left_right = value
 
     @property
     def swap_front_rear(self):
         return self._swap_front_rear
 
     @swap_front_rear.setter
-    def swap_front_rear(self, swap):
-        if not self._swap_front_rear == swap:
-            temp_options = self.cameras("Front").options
-            self.cameras("Front").options = self.cameras("Rear").options
-            self.cameras("Right").options = temp_options
-
-            temp_camera = self.cameras("Front")
-            self._cameras.update({"Front": self.cameras("Rear")})
-            self._cameras.update({"Rear": temp_camera})
-            self._swap_front_rear = swap
+    def swap_front_rear(self, value):
+        self._swap_front_rear = value
 
     @property
     def perspective(self):
@@ -327,22 +364,6 @@ class MovieLayout(object):
         self.cameras("Left").scale = scale
         self.cameras("Right").scale = scale
         self.cameras("Rear").scale = scale
-
-    @property
-    def font_halign(self):
-        return self._font_halign
-
-    @font_halign.setter
-    def font_halign(self, alignment):
-        self._font_halign = HALIGN.get(alignment, self._font_halign)
-
-    @property
-    def font_valign(self):
-        return self._font_valign
-
-    @font_valign.setter
-    def font_valign(self, alignment):
-        self._font_valign = VALIGN.get(alignment, self._font_valign)
 
     @property
     def video_width(self):
@@ -412,21 +433,30 @@ class FullScreen(MovieLayout):
             )
         )
 
-    @property
-    def front_height(self):
+    def _front_height(self):
         # For height keep same ratio of 4/3
         return int(self.cameras("Front").width / 4 * 3)
 
-    @property
-    def front_xpos(self):
+    def _front_xpos(self):
         # Make sure that front is placed in the middle
         return (
-            max(0, self.center_xpos - int(self.cameras("Front").width / 2))
+            max(
+                0,
+                self.center_xpos
+                - int(
+                    (
+                        self.cameras("Left").width
+                        + self.cameras("Front").width
+                        + self.cameras("Right").width
+                    )
+                    / 2
+                )
+                + self.cameras("Left").width,
+            )
             * self.cameras("Front").include
         )
 
-    @property
-    def left_xpos(self):
+    def _left_xpos(self):
         return (
             max(
                 0,
@@ -443,14 +473,12 @@ class FullScreen(MovieLayout):
             * self.cameras("Left").include
         )
 
-    @property
-    def left_ypos(self):
+    def _left_ypos(self):
         return (
             self.cameras("Front").ypos + self.cameras("Front").height
         ) * self.cameras("Left").include
 
-    @property
-    def rear_xpos(self):
+    def _rear_xpos(self):
         return (
             max(
                 0,
@@ -468,14 +496,12 @@ class FullScreen(MovieLayout):
             * self.cameras("Rear").include
         )
 
-    @property
-    def rear_ypos(self):
+    def _rear_ypos(self):
         return (
             self.cameras("Front").ypos + self.cameras("Front").height
         ) * self.cameras("Rear").include
 
-    @property
-    def right_xpos(self):
+    def _right_xpos(self):
         return (
             max(
                 0,
@@ -494,8 +520,7 @@ class FullScreen(MovieLayout):
             * self.cameras("Right").include
         )
 
-    @property
-    def right_ypos(self):
+    def _right_ypos(self):
         return (
             self.cameras("Front").ypos + self.cameras("Front").height
         ) * self.cameras("Right").include
@@ -515,8 +540,7 @@ class WideScreen(FullScreen):
         self.cameras("Front").scale = None
 
     # Only front_width has to be adjusted as by default width would be left+rear+right instead of normal scale.
-    @property
-    def front_width(self):
+    def _front_width(self):
         return (
             (
                 self.cameras("Left").width
@@ -581,15 +605,13 @@ class Cross(FullScreen):
 
         return int(height + self.cameras("Front").height)
 
-    @property
-    def front_xpos(self):
+    def _front_xpos(self):
         return (
             int(max(0, self.center_xpos - (self.cameras("Front").width / 2)))
             * self.cameras("Front").include
         )
 
-    @property
-    def left_xpos(self):
+    def _left_xpos(self):
         return (
             max(
                 0,
@@ -599,8 +621,7 @@ class Cross(FullScreen):
             * self.cameras("Left").include
         )
 
-    @property
-    def left_ypos(self):
+    def _left_ypos(self):
         return (
             self.cameras("Front").height
             + int(
@@ -612,8 +633,7 @@ class Cross(FullScreen):
             )
         ) * self.cameras("Left").include
 
-    @property
-    def right_xpos(self):
+    def _right_xpos(self):
         return (
             max(
                 0,
@@ -624,8 +644,7 @@ class Cross(FullScreen):
             * self.cameras("Right").include
         )
 
-    @property
-    def right_ypos(self):
+    def _right_ypos(self):
         return (
             self.cameras("Front").height
             + int(
@@ -637,15 +656,13 @@ class Cross(FullScreen):
             )
         ) * self.cameras("Right").include
 
-    @property
-    def rear_xpos(self):
+    def _rear_xpos(self):
         return (
             int(max(0, self.center_xpos - (self.cameras("Rear").width / 2)))
             * self.cameras("Rear").include
         )
 
-    @property
-    def rear_ypos(self):
+    def _rear_ypos(self):
         return int(max(0, self.video_height - self.cameras("Rear").height))
 
 
@@ -661,11 +678,10 @@ class Diamond(Cross):
         super().__init__()
         self.scale = 1 / 2
 
-        self._font_valign = VALIGN["MIDDLE"]
+        self._font.valign = "MIDDLE"
 
-    @property
-    def font_halign(self):
-        if self._font_halign == HALIGN["CENTER"]:
+    def _font_halign(self):
+        if self._font._halign == "CENTER":
             # Change alignment to left or right if one of the left/right cameras is excluded.
             if (self.cameras("Left").include and not self.cameras("Right").include) or (
                 self.cameras("Right").include and not self.cameras("Left").include
@@ -678,30 +694,20 @@ class Diamond(Cross):
                 )
                 return f"({x_pos} - text_w / 2)"
 
-        return self._font_halign
+        return HALIGN.get(self._font._halign, self._font._halign)
 
-    @font_halign.setter
-    def font_halign(self, alignment):
-        super(Diamond, self.__class__).font_halign.fset(self, alignment)
-
-    @property
-    def font_valign(self):
-        if self._font_valign == VALIGN["MIDDLE"]:
-            if self.cameras("Front").include and not self.cameras("Rear").include:
+    def _font_valign(self):
+        if self._font._valign == "MIDDLE":
+            if self.cameras("Front").include:
                 return (
                     f'({self.cameras("Front").ypos + self.cameras("Front").height} + 5)'
                 )
-            elif self.cameras("Rear").include and not self.cameras("Front").include:
+            elif self.cameras("Rear").include:
                 return f'({self.cameras("Rear").ypos} - 5 - text_h)'
 
-        return self._font_valign
+        return VALIGN.get(self._font._valign, self._font._valign)
 
-    @font_valign.setter
-    def font_valign(self, alignment):
-        super(Diamond, self.__class__).font_valign.fset(self, alignment)
-
-    @property
-    def font_size(self):
+    def _font_size(self):
         # For this layout the video height has to include font size. But default for calculating
         # font size is based on video height.
         # Thus overriding font size to get video height without font size to figure our scaling.
@@ -739,8 +745,7 @@ class Diamond(Cross):
     def video_height(self):
         return self._video_height(include_fontsize=True)
 
-    @property
-    def front_xpos(self):
+    def _front_xpos(self):
         return (
             self.cameras("Left").width
             + int(
@@ -752,27 +757,22 @@ class Diamond(Cross):
             )
         ) * self.cameras("Front").include
 
-    @property
-    def left_xpos(self):
+    def _left_xpos(self):
         return 0
 
-    @property
-    def left_ypos(self):
+    def _left_ypos(self):
         return max(0, self.center_ypos - int(self.cameras("Left").height / 2))
 
-    @property
-    def right_xpos(self):
+    def _right_xpos(self):
         return max(
             self.cameras("Front").xpos + self.cameras("Front").width,
             self.cameras("Rear").xpos + self.cameras("Rear").width,
         )
 
-    @property
-    def right_ypos(self):
+    def _right_ypos(self):
         return max(0, self.center_ypos - int(self.cameras("Right").height / 2))
 
-    @property
-    def rear_xpos(self):
+    def _rear_xpos(self):
         return (
             self.cameras("Left").width
             + int(
@@ -1178,6 +1178,12 @@ def create_intermediate_movie(
         and rear_camera is None
     ):
         return None, 0, True
+
+    if video_settings["video_layout"].swap_left_right:
+        left_camera, right_camera = right_camera, left_camera
+
+    if video_settings["video_layout"].swap_front_rear:
+        front_camera, rear_camera = rear_camera, front_camera
 
     # Determine if this clip is to be included based on potential start and end timestamp/offsets that were provided.
     # Clip starting time is between the start&end times we're looking for
@@ -2207,7 +2213,7 @@ def main() -> None:
     scaling_group.add_argument(
         "--scale",
         dest="clip_scale",
-        type=float,
+        type=str,
         help="R|Set camera clip scale for all clips, scale of 1 is 1280x960 camera clip.\n"
         "Defaults:\n"
         "    WIDESCREEN: 1/2 (front 1280x960, others 640x480, video is "
@@ -2223,28 +2229,28 @@ def main() -> None:
     scaling_group.add_argument(
         "--front_scale",
         dest="front_clip_scale",
-        type=float,
+        type=str,
         help="R|Set camera clip scale for front camera.\n",
     )
 
     scaling_group.add_argument(
         "--left_scale",
         dest="left_clip_scale",
-        type=float,
+        type=str,
         help="R|Set camera clip scale for left camera.\n",
     )
 
     scaling_group.add_argument(
         "--right_scale",
         dest="right_clip_scale",
-        type=float,
+        type=str,
         help="R|Set camera clip scale for right camera.\n",
     )
 
     scaling_group.add_argument(
         "--rear_scale",
         dest="rear_clip_scale",
-        type=float,
+        type=str,
         help="R|Set camera clip scale for rear camera.\n",
     )
 
@@ -2724,11 +2730,11 @@ def main() -> None:
     if args.rear_clip_scale:
         layout_settings.cameras("Rear").scale = args.rear_clip_scale
 
-    layout_settings.font_halign = (
-        args.halign if args.halign is not None else layout_settings.font_halign
+    layout_settings.font.halign = (
+        args.halign if args.halign is not None else layout_settings.font.halign
     )
-    layout_settings.font_valign = (
-        args.valign if args.valign is not None else layout_settings.font_valign
+    layout_settings.font.valign = (
+        args.valign if args.valign is not None else layout_settings.font.valign
     )
 
     # Determine if left and right cameras should be swapped or not.
@@ -2888,7 +2894,7 @@ def main() -> None:
             ffmpeg_timestamp + f"drawtext=fontfile={layout_settings.font.font}:"
             f"fontcolor={layout_settings.font.color}:fontsize={layout_settings.font.size}:"
             "borderw=2:bordercolor=black@1.0:"
-            f"x={layout_settings.font_halign}:y={layout_settings.font_valign}:"
+            f"x={layout_settings.font.halign}:y={layout_settings.font.valign}:"
             "text='%{{pts\:localtime\:{epoch_time}\:%x %X}}'"
         )
 
