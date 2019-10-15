@@ -6,18 +6,18 @@ import argparse
 import os
 import sys
 from datetime import datetime, timedelta, timezone
-from dateutil.parser import isoparse
 from fnmatch import fnmatch
 from glob import glob
 from pathlib import Path
 from re import search
-from subprocess import CalledProcessError, run
 from shlex import split as shlex_split
 from shutil import which
+from subprocess import CalledProcessError, run
 from tempfile import mkstemp
 from time import sleep, time as timestamp
 
 import requests
+from dateutil.parser import isoparse
 from psutil import disk_partitions
 from tzlocal import get_localzone
 
@@ -53,6 +53,7 @@ FFMPEG = {
     "linux": "ffmpeg",
 }
 
+# noinspection PyPep8
 MOVIE_HOMEDIR = {
     "darwin": "Movies/Tesla_Dashcam",
     "win32": "Videos\Tesla_Dashcam",
@@ -527,6 +528,7 @@ class FullScreen(MovieLayout):
         ) * self.cameras("Right").include
 
 
+# noinspection PyProtectedMember
 class WideScreen(FullScreen):
     """ WideScreen Movie Layout
 
@@ -667,6 +669,7 @@ class Cross(FullScreen):
         return int(max(0, self.video_height - self.cameras("Rear").height))
 
 
+# noinspection PyProtectedMember
 class Diamond(Cross):
     """ Diamond Movie Layout
 
@@ -1073,6 +1076,7 @@ def get_metadata(ffmpeg, filenames):
 
     video_timestamp = None
     wait_for_input_line = True
+    metadata_item = {}
     for line in command_result.stderr.splitlines():
         if search("^Input #", line) is not None:
             # If filename was not yet appended then it means it is a corrupt file, in that case just add to list for
@@ -1550,12 +1554,14 @@ def create_movie(clips_list, movie_filename, video_settings, chapter_offset):
         duration = metadata[0]["duration"] if metadata else total_videoduration
 
     # Remove temp join file.
+    # noinspection PyBroadException,PyPep8
     try:
         os.remove(ffmpeg_join_filename)
     except:
         pass
 
     # Remove temp join file.
+    # noinspection PyBroadException,PyPep8
     try:
         os.remove(ffmpeg_meta_filename)
     except:
@@ -1580,7 +1586,7 @@ def make_folder(parameter, folder):
 
         try:
             os.mkdir(folder)
-        except OSError as exc:
+        except OSError:
             print(
                 f"Error creating folder {add_folder} at location {current_path} for parameter {parameter}"
             )
@@ -1601,6 +1607,7 @@ def delete_intermediate(movie_files):
             elif os.path.isdir(file):
                 # This is more specific for Mac but won't hurt on other platforms.
                 if os.path.exists(os.path.join(file, ".DS_Store")):
+                    # noinspection PyBroadException,PyPep8
                     try:
                         os.remove(os.path.join(file, ".DS_Store"))
                     except:
@@ -1820,6 +1827,7 @@ def process_folders(folders, video_settings, delete_source):
         # All clips in folder have been processed, merge those clips
         # together now.
         movie_name = None
+        movie_duration = 0
         if folder_clips:
             print("\t\tCreating movie {}, please be patient.".format(movie_filename))
 
@@ -1867,6 +1875,7 @@ def process_folders(folders, video_settings, delete_source):
     # We only do this if merge is enabled OR if we only have 1 clip and for
     # output a specific filename was provided.
     movie_name = None
+    movie_duration = 0
     if dashcam_clips:
         if video_settings["merge_subdirs"] or (
             len(folders) == 1 and video_settings["target_filename"] is not None
@@ -1987,8 +1996,11 @@ def notify_windows(title, subtitle, message):
     #    from platform import win32_ver
     #    if win32_ver()[0] != 10:
     #        return
+    global TOASTER_INSTANCE
 
+    # noinspection PyBroadException
     try:
+        # noinspection PyUnresolvedReferences,PyPackageRequirements
         from win10toast import ToastNotifier
 
         if TOASTER_INSTANCE is None:
@@ -2191,7 +2203,8 @@ def main() -> None:
         "    WIDESCREEN: Front camera on top with side and rear cameras smaller underneath it.\n"
         "    PERSPECTIVE: Similar to FULLSCREEN but then with side cameras in perspective.\n"
         "    CROSS: Front camera center top, side cameras underneath, and rear camera center bottom.\n"
-        "    DIAMOND: Front camera center top, side cameras below front camera left and right of front, and rear camera center bottom.\n",
+        "    DIAMOND: Front camera center top, side cameras below front camera left and right of front, "
+        "and rear camera center bottom.\n",
     )
     parser.add_argument(
         "--perspective",
@@ -2406,7 +2419,8 @@ def main() -> None:
         "--no-faststart",
         dest="faststart",
         action="store_true",
-        help="Do not enable flag faststart on the resulting video files. Use this when using a network share and errors occur during encoding.",
+        help="Do not enable flag faststart on the resulting video files. Use this when using a network share and "
+        "errors occur during encoding.",
     )
 
     timestamp_group = parser.add_argument_group(
@@ -2698,7 +2712,7 @@ def main() -> None:
         elif args.layout == "DIAMOND":
             layout_settings = Diamond()
         else:
-            layout_settings = Diagonal()
+            layout_settings = FullScreen()
 
         layout_settings.perspective = args.perspective
 
@@ -2716,7 +2730,8 @@ def main() -> None:
     )
     mirror_sides = ", hflip" if side_camera_as_mirror else ""
 
-    # For scale first set the main clip one if provided, this than allows camera specific ones to override for that camera.
+    # For scale first set the main clip one if provided, this than allows camera specific ones to override for
+    # that camera.
     if args.clip_scale:
         layout_settings.scale = args.clip_scale
 
@@ -2880,6 +2895,7 @@ def main() -> None:
             )
             return
 
+        # noinspection PyPep8
         temp_font_file = (
             f"c:\{layout_settings.font.font}"
             if sys.platform == "win32"
@@ -2892,6 +2908,7 @@ def main() -> None:
             )
             return
 
+        # noinspection PyPep8,PyPep8,PyPep8
         ffmpeg_timestamp = (
             ffmpeg_timestamp + f"drawtext=fontfile={layout_settings.font.font}:"
             f"fontcolor={layout_settings.font.color}:fontsize={layout_settings.font.size}:"
@@ -3213,7 +3230,6 @@ def main() -> None:
                                         monitor_file, exc
                                     )
                                 )
-                            trigger_exist = False
 
                     print("Exiting monitoring as asked process once.")
                     break
