@@ -2522,6 +2522,15 @@ def main() -> None:
         "much time is used to compress it.",
     )
 
+    quality_group.add_argument(
+        "--fps",
+        required=False,
+        type=int,
+        default=24,
+        help="Frames per second for resulting video. Tesla records at about 33fps hence going higher wouldn't do "
+        "much as frames would just be duplicated. Default is 24fps which is the standard for movies and TV shows",
+    )
+
     if internal_ffmpeg:
         parser.add_argument(
             "--ffmpeg",
@@ -2772,7 +2781,7 @@ def main() -> None:
         layout_settings.font.size = args.fontsize
 
     black_base = "color=duration={duration}:"
-    black_size = f"s={{width}}x{{height}}:c={args.background} "
+    black_size = f"s={{width}}x{{height}}:c={args.background}, fps={args.fps} "
 
     ffmpeg_base = (
         black_base

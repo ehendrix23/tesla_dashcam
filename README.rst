@@ -877,9 +877,10 @@ Release Notes
     - Fixed: Missing fonts in Docker Image (thanks to moorecp for providing fix)
     - Fixed: Only the 1st source was processed When using MONITOR or MONITOR_ONCE, or with V10 only SavedClips was processed when not providing a source
 0.1.16:
-    - New: Options --front_scale, --rear_scale, --left_scale, and --right_scale to set the scale of each clip individually (value of 1 is existing size of 1280x960 for the clip)
+    - New: Options --front_scale, --rear_scale, --left_scale, and --right_scale to set the scale of each clip individually (value of 1 is 1280x960 for the clip)
     - New: Option --swap_frontrear to swap front&rear cameras in output.
-    - New: Option --background to provide background color (default is black).
+    - New: Option --background to specify background color (default is black).
+    - New: Option --fps to set the frame rate for resulting video. Default is set to 24 (Tesla records at about 33 fps). `Issue #85 <https://github.com/ehendrix23/tesla_dashcam/issues/85>`_
     - New: Parameter file (provided using @) can now include comments (specify using #)
     - Changed: --speedup and --slowdown now accepts a float allowing for example to speed video up by 1.5
     - Changed: Option scale (and clip scale options) also accept fixed resolution (i.e. 640x480) for the clip.
