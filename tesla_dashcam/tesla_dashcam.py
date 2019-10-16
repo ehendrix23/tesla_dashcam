@@ -15,6 +15,7 @@ from shutil import which
 from subprocess import CalledProcessError, run
 from tempfile import mkstemp
 from time import sleep, time as timestamp
+from typing import List, Optional
 
 import requests
 from dateutil.parser import isoparse
@@ -794,6 +795,30 @@ class MyArgumentParser(argparse.ArgumentParser):
         # Remove comments.
         return shlex_split(arg_line, comments=True)
 
+    def args_to_dict(self, arguments, default):
+        argument_list = []
+
+        if arguments is None:
+            return argument_list
+
+        for argument in arguments:
+            argument_dict = {}
+            for argument_value in argument:
+                if "=" in argument_value:
+                    key = argument_value.split("=")[0].lower()
+                    value = (
+                        argument_value.split("=")[1].strip()
+                        if argument_value.split("=")[1].strip() != ""
+                        else None
+                    )
+                else:
+                    key = default
+                    value = argument_value
+                argument_dict.update({key: value})
+
+            argument_list.append(argument_dict)
+        return argument_list
+
 
 # noinspection PyCallByClass,PyProtectedMember,PyProtectedMember
 class SmartFormatter(argparse.HelpFormatter):
@@ -809,6 +834,35 @@ class SmartFormatter(argparse.HelpFormatter):
     def _get_help_string(self, action):
         """ Call default help string """
         return argparse.ArgumentDefaultsHelpFormatter._get_help_string(self, action)
+
+
+def search_dict(
+    match_value: object = None, key: str = None, search_list: List[dict] = None
+) -> Optional[dict]:
+    """
+    Returns the 1st element in a list containing dictionaries
+    where the value of key provided matches the value provided.
+
+    :param match_value: value to match upon (search for)
+    :type match_value: object
+    :param key: dictionary key to use for the match
+    :type key: str
+    :param search_list: List containing dictionary objects in which to search
+    :type search_list: List[dict]
+    :return: Dictionary object that matches
+    :rtype: dict
+    """
+    if key is None or search_list is None:
+        return None
+
+    if match_value is None:
+        return next(
+            (element for element in search_list if element.get(key) is None), None
+        )
+
+    return next(
+        (element for element in search_list if element.get(key) == match_value), None
+    )
 
 
 def check_latest_release(include_beta):
@@ -2229,44 +2283,21 @@ def main() -> None:
         "--scale",
         dest="clip_scale",
         type=str,
+        nargs="+",
+        action="append",
         help="R|Set camera clip scale for all clips, scale of 1 is 1280x960 camera clip.\n"
+        "If provided with value then it is default for all cameras, to set the scale for a specific "
+        "camera provide camera=<front, left, right,rear> <scale>\n"
+        "for example:\n"
+        "  --scale 0.5                                             all are 640x480\n"
+        "  --scale 640x480                                         all are 640x480\n"
+        "  --scale 0.5 --scale camera=front 1                      all are 640x480 except front at 1280x960\n"
+        "  --scale camera=left .25 --scale camera=right 320x240    left and right are set to 320x240\n"
         "Defaults:\n"
-        "    WIDESCREEN: 1/2 (front 1280x960, others 640x480, video is "
-        "1920x1920)\n"
-        "    FULLSCREEN: 1/2 (640x480, video is "
-        "1920x960)\n"
-        "    CROSS: 1/2 (640x480, video is "
-        "1280x1440)\n"
-        "    DIAMOND: 1/2 (640x480, video is "
-        "1920x976)\n",
-    )
-
-    scaling_group.add_argument(
-        "--front_scale",
-        dest="front_clip_scale",
-        type=str,
-        help="R|Set camera clip scale for front camera.\n",
-    )
-
-    scaling_group.add_argument(
-        "--left_scale",
-        dest="left_clip_scale",
-        type=str,
-        help="R|Set camera clip scale for left camera.\n",
-    )
-
-    scaling_group.add_argument(
-        "--right_scale",
-        dest="right_clip_scale",
-        type=str,
-        help="R|Set camera clip scale for right camera.\n",
-    )
-
-    scaling_group.add_argument(
-        "--rear_scale",
-        dest="rear_clip_scale",
-        type=str,
-        help="R|Set camera clip scale for rear camera.\n",
+        "    WIDESCREEN: 1/2 (front 1280x960, others 640x480, video is 1920x1920)\n"
+        "    FULLSCREEN: 1/2 (640x480, video is 1920x960)\n"
+        "    CROSS: 1/2 (640x480, video is 1280x1440)\n"
+        "    DIAMOND: 1/2 (640x480, video is 1920x976)\n",
     )
 
     parser.add_argument(
@@ -2741,20 +2772,19 @@ def main() -> None:
 
     # For scale first set the main clip one if provided, this than allows camera specific ones to override for
     # that camera.
-    if args.clip_scale:
-        layout_settings.scale = args.clip_scale
+    scaling = parser.args_to_dict(args.clip_scale, "scale")
+    main_scale = search_dict(None, "camera", scaling)
 
-    if args.front_clip_scale:
-        layout_settings.cameras("Front").scale = args.front_clip_scale
+    if main_scale is not None:
+        layout_settings.scale = main_scale.get("scale", layout_settings.scale)
 
-    if args.left_clip_scale:
-        layout_settings.cameras("Left").scale = args.left_clip_scale
-
-    if args.right_clip_scale:
-        layout_settings.cameras("Right").scale = args.right_clip_scale
-
-    if args.rear_clip_scale:
-        layout_settings.cameras("Rear").scale = args.rear_clip_scale
+    for scale in scaling:
+        if scale.get("camera", "").lower() in ["front", "left", "right", "rear"]:
+            camera_scale = scale.get("scale")
+            if camera_scale is not None:
+                layout_settings.cameras(
+                    scale["camera"].lower().capitalize()
+                ).scale = camera_scale
 
     layout_settings.font.halign = (
         args.halign if args.halign is not None else layout_settings.font.halign
