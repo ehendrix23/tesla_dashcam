@@ -3,6 +3,7 @@ Merges the 3 Tesla Dashcam and Sentry camera video files into 1 video. If
 then further concatenates the files together to make 1 movie.
 """
 import argparse
+import logging
 import os
 import sys
 from datetime import datetime, timedelta, timezone
@@ -21,6 +22,8 @@ import requests
 from dateutil.parser import isoparse
 from psutil import disk_partitions
 from tzlocal import get_localzone
+
+_LOGGER = logging.getLogger(__name__)
 
 # TODO: Move everything into classes and separate files. For example,
 #  update class, font class (for timestamp), folder class, clip class (
@@ -820,7 +823,7 @@ class MyArgumentParser(argparse.ArgumentParser):
         return argument_list
 
 
-# noinspection PyCallByClass,PyProtectedMember,PyProtectedMember
+# noinspection PyCallByClass,PyProtectedMember
 class SmartFormatter(argparse.HelpFormatter):
     """ Formatter for argument help. """
 
@@ -955,6 +958,9 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
                 # Already processed this timestamp, moving on.
                 continue
 
+            _LOGGER.debug(
+                f"Checking camera files in folder {movie_folder} with timestamp {filename_timestamp}"
+            )
             video_info = {
                 "front_camera": {
                     "filename": None,
@@ -1237,6 +1243,9 @@ def create_intermediate_movie(
         and right_camera is None
         and rear_camera is None
     ):
+        _LOGGER.debug(
+            f'No front, left, right, and rear camera clip exist for {video["timestamp"]}'
+        )
         return None, 0, True
 
     if video_settings["video_layout"].swap_left_right:
@@ -1259,6 +1268,10 @@ def create_intermediate_movie(
         or starting_timestmp <= folder_timestamps[1] <= ending_timestmp
     ):
         # This clip is not in-between the timestamps we want, skip it.
+        _LOGGER.debug(
+            f"Clip timestamp from {starting_timestmp} to {ending_timestmp} not "
+            f"between {folder_timestamps[0]} and {folder_timestamps[1]}"
+        )
         return None, 0, True
 
     # Determine if we need to do an offset of the starting timestamp
@@ -1447,7 +1460,7 @@ def create_intermediate_movie(
     )
 
     ffmpeg_command = ffmpeg_command + ["-y", temp_movie_name]
-    # print(ffmpeg_command)
+    _LOGGER.debug(f"FFMPEG Command: {ffmpeg_command}")
     # Run the command.
     try:
         run(ffmpeg_command, capture_output=True, check=True)
@@ -1475,6 +1488,7 @@ def create_movie(clips_list, movie_filename, video_settings, chapter_offset):
     """ Concatenate provided movie files into 1."""
     # Just return if there are no clips.
     if not clips_list:
+        _LOGGER.debug("Clip list is empty")
         return None, None
 
     # Go through the list of clips to create the command and content for chapter meta file.
@@ -1586,7 +1600,7 @@ def create_movie(clips_list, movie_filename, video_settings, chapter_offset):
         + ["-y", movie_filename]
     )
 
-    # print(ffmpeg_command)
+    _LOGGER.debug(f"FFMPEG Command: {ffmpeg_command}")
     try:
         run(ffmpeg_command, capture_output=True, check=True)
     except CalledProcessError as exc:
@@ -1612,6 +1626,7 @@ def create_movie(clips_list, movie_filename, video_settings, chapter_offset):
     try:
         os.remove(ffmpeg_join_filename)
     except:
+        _LOGGER.debug(f"Failed to remove {ffmpeg_join_filename}")
         pass
 
     # Remove temp join file.
@@ -1619,6 +1634,7 @@ def create_movie(clips_list, movie_filename, video_settings, chapter_offset):
     try:
         os.remove(ffmpeg_meta_filename)
     except:
+        _LOGGER.debug(f"Failed to remove {ffmpeg_meta_filename}")
         pass
 
     return movie_filename, duration
@@ -1665,6 +1681,7 @@ def delete_intermediate(movie_files):
                     try:
                         os.remove(os.path.join(file, ".DS_Store"))
                     except:
+                        _LOGGER.debug(f"Failed to remove .DS_Store from {file}")
                         pass
 
                 try:
@@ -1707,6 +1724,10 @@ def process_folders(folders, video_settings, delete_source):
             and last_clip_tmstp < video_settings["start_timestamp"]
         ):
             # Clips from this folder are from before start timestamp requested.
+            _LOGGER.debug(
+                f"Clips in folder end at {last_clip_tmstp} which is still before "
+                f'start timestamp {video_settings["start_timestamp"]}'
+            )
             continue
 
         if (
@@ -1714,6 +1735,10 @@ def process_folders(folders, video_settings, delete_source):
             and first_clip_tmstp > video_settings["end_timestamp"]
         ):
             # Clips from this folder are from after end timestamp requested.
+            _LOGGER.debug(
+                f"Clips in folder start at {first_clip_tmstp} which is after "
+                f'end timestamp {video_settings["end_timestamp"]}'
+            )
             continue
 
         # Determine the starting and ending timestamps for the clips in this folder based on start/end timestamps
@@ -2106,6 +2131,10 @@ def notify(title, subtitle, message):
 def main() -> None:
     """ Main function """
 
+    loglevels = dict(
+        (logging.getLevelName(level), level) for level in [10, 20, 30, 40, 50]
+    )
+
     internal_ffmpeg = getattr(sys, "frozen", None) is not None
     ffmpeg_default = resource_path(FFMPEG.get(sys.platform, "ffmpeg"))
 
@@ -2118,12 +2147,9 @@ def main() -> None:
         ffmpeg_default = FFMPEG.get(sys.platform, "ffmpeg")
 
     epilog = (
-        "This program leverages ffmpeg which is included. See "
-        "https://ffmpeg.org/ for more information on ffmpeg"
+        "This program leverages ffmpeg which is included. See https://ffmpeg.org/ for more information on ffmpeg"
         if internal_ffmpeg
-        else "This program requires ffmpeg which can be "
-        "downloaded from: "
-        "https://ffmpeg.org/download.html"
+        else "This program requires ffmpeg which can be downloaded from: https://ffmpeg.org/download.html"
     )
 
     parser = MyArgumentParser(
@@ -2134,111 +2160,25 @@ def main() -> None:
     )
 
     parser.add_argument(
-        "--version", action="version", version=" %(prog)s " + VERSION_STR
-    )
-
-    parser.add_argument(
         "source",
         type=str,
         nargs="*",
-        help="Folder(s) containing the saved camera "
-        "files. Filenames can be provided as well to "
-        "manage individual clips.",
-    )
-
-    sub_dirs = parser.add_mutually_exclusive_group()
-    sub_dirs.add_argument(
-        "--exclude_subdirs",
-        dest="exclude_subdirs",
-        action="store_true",
-        help="Do not search sub folders for video files to process.",
-    )
-
-    sub_dirs.add_argument(
-        "--merge",
-        dest="merge_subdirs",
-        action="store_true",
-        help="Merge the video files from different " "folders into 1 big video file.",
-    )
-
-    filter_group = parser.add_argument_group(
-        title="Timestamp Restriction",
-        description="Restrict video to be between start and/or end timestamps. Timestamp to be provided in a ISO-8601"
-        "format (see https://fits.gsfc.nasa.gov/iso-time.html for examples)",
-    )
-
-    filter_group.add_argument(
-        "--start_timestamp", dest="start_timestamp", type=str, help="Starting timestamp"
-    )
-
-    filter_group.add_argument(
-        "--end_timestamp",
-        dest="end_timestamp",
-        type=str,
-        # type=lambda d: datetime.strptime(d, "%Y-%m-%d_%H-%M-%S").datetime(),
-        help="Ending timestamp",
-    )
-
-    offset_group = parser.add_argument_group(
-        title="Clip offsets", description="Start and/or end offsets"
-    )
-
-    offset_group.add_argument(
-        "--start_offset",
-        dest="start_offset",
-        type=int,
-        help="Starting offset in seconds. ",
-    )
-
-    offset_group.add_argument(
-        "--end_offset", dest="end_offset", type=int, help="Ending offset in seconds."
+        help="Folder(s) (events) containing the saved camera files. Filenames can be provided as well to manage "
+        "individual clips.",
     )
 
     parser.add_argument(
-        "--chapter_offset",
-        dest="chapter_offset",
-        type=int,
-        default=0,
-        help="Offset in seconds for chapters in merged video. Negative offset is # of seconds before the end of the "
-        "subdir video, positive offset if # of seconds after the start of the subdir video.",
+        "--version", action="version", version=" %(prog)s " + VERSION_STR
     )
-
     parser.add_argument(
-        "--output",
-        required=False,
-        default=movie_folder,
-        type=str,
-        help="R|Path/Filename for the new movie file. "
-        "Intermediate files will be stored in same "
-        "folder." + os.linesep,
+        "--loglevel",
+        default="INFO",
+        choices=list(loglevels.keys()),
+        help="Logging level.",
     )
-
-    parser.add_argument(
-        "--keep-intermediate",
-        dest="keep_intermediate",
-        action="store_true",
-        help="Do not remove the intermediate video files that are created",
-    )
-
-    parser.add_argument(
-        "--skip_existing",
-        dest="skip_existing",
-        action="store_true",
-        help="Skip creating encoded video file if it already exist. Note that only existence is checked, not if "
-        "layout etc. are the same.",
-    )
-
-    parser.add_argument(
-        "--delete_source",
-        dest="delete_source",
-        action="store_true",
-        help="Delete the processed files on the " "TeslaCam drive.",
-    )
-
     parser.add_argument(
         "--temp_dir", required=False, type=str, help="R|Path to store temporary files."
     )
-
     parser.add_argument(
         "--no-notification",
         dest="system_notification",
@@ -2246,7 +2186,60 @@ def main() -> None:
         help="Do not create a notification upon " "completion.",
     )
 
-    parser.add_argument(
+    input_group = parser.add_argument_group(
+        title="Video Input",
+        description="Options related to what clips and events to process.",
+    )
+    input_group.add_argument(
+        "--skip_existing",
+        dest="skip_existing",
+        action="store_true",
+        help="Skip creating encoded video file if it already exist. Note that only existence is checked, not if "
+        "layout etc. are the same.",
+    )
+    input_group.add_argument(
+        "--delete_source",
+        dest="delete_source",
+        action="store_true",
+        help="Delete the processed files upon completion.",
+    )
+    input_group.add_argument(
+        "--exclude_subdirs",
+        dest="exclude_subdirs",
+        action="store_true",
+        help="Do not search sub folders (events) for video files to process.",
+    )
+
+    monitor_group = parser.add_argument_group(
+        title="Trigger Monitor",
+        description="Parameters for monitoring of insertion of TeslaCam drive, folder, or file existence.",
+    )
+    monitor_group.add_argument(
+        "--monitor",
+        dest="monitor",
+        action="store_true",
+        help="Enable monitoring for drive to be attached with TeslaCam folder.",
+    )
+    monitor_group.add_argument(
+        "--monitor_once",
+        dest="monitor_once",
+        action="store_true",
+        help="Enable monitoring and exit once drive with TeslaCam folder has been attached and files processed.",
+    )
+    monitor_group.add_argument(
+        "--monitor_trigger",
+        required=False,
+        type=str,
+        help="Trigger file to look for instead of waiting for drive to be attached. Once file is discovered then "
+        "processing will start, file will be deleted when processing has been completed. If source is not "
+        "provided then folder where file is located will be used as source.",
+    )
+
+    layout_group = parser.add_argument_group(
+        title="Video Layout",
+        description="Set what the layout of the resulting video should be",
+    )
+    layout_group.add_argument(
         "--layout",
         required=False,
         choices=["WIDESCREEN", "FULLSCREEN", "PERSPECTIVE", "CROSS", "DIAMOND"],
@@ -2260,26 +2253,14 @@ def main() -> None:
         "    DIAMOND: Front camera center top, side cameras below front camera left and right of front, "
         "and rear camera center bottom.\n",
     )
-    parser.add_argument(
+    layout_group.add_argument(
         "--perspective",
         dest="perspective",
         action="store_true",
         help="Show side cameras in perspective.",
     )
-    parser.set_defaults(perspective=False)
-
-    parser.add_argument(
-        "--background",
-        dest="background",
-        default="black",
-        help="Background color for video. Can be a color string or RGB value. Also see --fontcolor.",
-    )
-
-    scaling_group = parser.add_argument_group(
-        title="Video scaling", description="Set what clips should be scaled to based."
-    )
-
-    scaling_group.add_argument(
+    layout_group.set_defaults(perspective=False)
+    layout_group.add_argument(
         "--scale",
         dest="clip_scale",
         type=str,
@@ -2299,37 +2280,23 @@ def main() -> None:
         "    CROSS: 1/2 (640x480, video is 1280x1440)\n"
         "    DIAMOND: 1/2 (640x480, video is 1920x976)\n",
     )
-
-    parser.add_argument(
-        "--motion_only",
-        dest="motion_only",
-        action="store_true",
-        help="Fast-forward through video when there is no motion.",
-    )
-
-    mirror_or_rear = parser.add_mutually_exclusive_group()
-
-    mirror_or_rear.add_argument(
+    layout_group.add_argument(
         "--mirror",
-        dest="mirror",
-        action="store_true",
-        default=argparse.SUPPRESS,
-        help="Video from side and rear cameras as if being "
-        "viewed through the mirror. Default when not providing parameter --no-front. Cannot "
-        "be used in combination with --rear.",
+        dest="rear_or_mirror",
+        action="store_const",
+        const=1,
+        help="Video from side and rear cameras as if being viewed through the mirror. Default when not providing "
+        "parameter --no-front. Cannot be used in combination with --rear.",
     )
-    mirror_or_rear.add_argument(
+    layout_group.add_argument(
         "--rear",
-        dest="rear",
-        action="store_true",
-        default=argparse.SUPPRESS,
-        help="Video from side and rear cameras as if looking "
-        "backwards. Default when providing parameter --no-front. Cannot be used in "
-        "combination with --mirror.",
+        dest="rear_or_mirror",
+        action="store_const",
+        const=0,
+        help="Video from side and rear cameras as if looking backwards. Default when providing parameter --no-front. "
+        "Cannot be used in combination with --mirror.",
     )
-
-    swap_leftright_cameras = parser.add_mutually_exclusive_group()
-    swap_leftright_cameras.add_argument(
+    layout_group.add_argument(
         "--swap",
         dest="swap_leftright",
         action="store_const",
@@ -2337,7 +2304,7 @@ def main() -> None:
         help="Swap left and right cameras in output, default when side and rear cameras are as if looking backwards. "
         "See --rear parameter.",
     )
-    swap_leftright_cameras.add_argument(
+    layout_group.add_argument(
         "--no-swap",
         dest="swap_leftright",
         action="store_const",
@@ -2345,12 +2312,17 @@ def main() -> None:
         help="Do not swap left and right cameras, default when side and rear cameras are as if looking through a "
         "mirror. Also see --mirror parameter",
     )
-
-    parser.add_argument(
+    layout_group.add_argument(
         "--swap_frontrear",
         dest="swap_frontrear",
         action="store_true",
         help="Swap front and rear cameras in output.",
+    )
+    layout_group.add_argument(
+        "--background",
+        dest="background",
+        default="black",
+        help="Background color for video. Can be a color string or RGB value. Also see --fontcolor.",
     )
 
     camera_group = parser.add_argument_group(
@@ -2381,72 +2353,168 @@ def main() -> None:
         help="Exclude rear camera from video.",
     )
 
-    speed_group = parser.add_mutually_exclusive_group()
-    speed_group.add_argument(
+    timestamp_group = parser.add_argument_group(
+        title="Timestamp",
+        description="Options on how to show date/time in resulting video:",
+    )
+    timestamp_group.add_argument(
+        "--no-timestamp",
+        dest="no_timestamp",
+        action="store_true",
+        help="Do not show timestamp in video",
+    )
+    timestamp_group.add_argument(
+        "--halign",
+        required=False,
+        choices=["LEFT", "CENTER", "RIGHT"],
+        help="Horizontal alignment for timestamp",
+    )
+    timestamp_group.add_argument(
+        "--valign",
+        required=False,
+        choices=["TOP", "MIDDLE", "BOTTOM"],
+        help="Vertical Alignment for timestamp",
+    )
+    timestamp_group.add_argument(
+        "--font",
+        required=False,
+        type=str,
+        default=DEFAULT_FONT.get(sys.platform, None),
+        help="Fully qualified filename (.ttf) to the font to be chosen for timestamp.",
+    )
+    timestamp_group.add_argument(
+        "--fontsize",
+        required=False,
+        type=int,
+        help="Font size for timestamp. Default is scaled based on resulting video size.",
+    )
+    timestamp_group.add_argument(
+        "--fontcolor",
+        required=False,
+        type=str,
+        default="white",
+        help="R|Font color for timestamp. Any color is accepted as a color string or RGB value.\n"
+        "Some potential values are:\n"
+        "    white\n"
+        "    yellowgreen\n"
+        "    yellowgreen@0.9\n"
+        "    Red\n:"
+        "    0x2E8B57\n"
+        "For more information on this see ffmpeg documentation for color: https://ffmpeg.org/ffmpeg-utils.html#Color",
+    )
+
+    filter_group = parser.add_argument_group(
+        title="Timestamp Restriction",
+        description="Restrict video to be between start and/or end timestamps. Timestamp to be provided in a ISO-8601 "
+        "format (see https://fits.gsfc.nasa.gov/iso-time.html for examples)",
+    )
+    filter_group.add_argument(
+        "--start_timestamp", dest="start_timestamp", type=str, help="Starting timestamp"
+    )
+    filter_group.add_argument(
+        "--end_timestamp",
+        dest="end_timestamp",
+        type=str,
+        # type=lambda d: datetime.strptime(d, "%Y-%m-%d_%H-%M-%S").datetime(),
+        help="Ending timestamp",
+    )
+
+    offset_group = parser.add_argument_group(
+        title="Event offsets", description="Start and/or end offsets for events"
+    )
+    offset_group.add_argument(
+        "--start_offset",
+        dest="start_offset",
+        type=int,
+        help="Skip x number of seconds from start of event for resulting video.",
+    )
+    offset_group.add_argument(
+        "--end_offset",
+        dest="end_offset",
+        type=int,
+        help="Ignore the last x seconds of the event for resulting video",
+    )
+
+    output_group = parser.add_argument_group(
+        title="Video Output", description="Options related to resulting video creation."
+    )
+    output_group.add_argument(
+        "--output",
+        required=False,
+        default=movie_folder,
+        type=str,
+        help="R|Path/Filename for the new movie file. Event files will be stored in same folder."
+        + os.linesep,
+    )
+    output_group.add_argument(
+        "--motion_only",
+        dest="motion_only",
+        action="store_true",
+        help="Fast-forward through video when there is no motion.",
+    )
+    output_group.add_argument(
         "--slowdown",
         dest="slow_down",
         type=float,
-        help="Slow down video output. Accepts a number "
-        "that is then used as multiplier, "
-        "providing 2 means half the speed.",
+        help="Slow down video output. Accepts a number that is then used as multiplier, providing 2 means half the "
+        "speed.",
     )
-    speed_group.add_argument(
+    output_group.add_argument(
         "--speedup",
         dest="speed_up",
         type=float,
-        help="Speed up the video. Accepts a number "
-        "that is then used as a multiplier, "
-        "providing 2 means twice the speed.",
+        help="Speed up the video. Accepts a number that is then used as a multiplier, providing 2 means "
+        "twice the speed.",
+    )
+    output_group.add_argument(
+        "--chapter_offset",
+        dest="chapter_offset",
+        type=int,
+        default=0,
+        help="Offset in seconds for chapters in merged video. Negative offset is # of seconds before the end of the "
+        "subdir video, positive offset if # of seconds after the start of the subdir video.",
+    )
+    output_group.add_argument(
+        "--merge",
+        dest="merge_subdirs",
+        action="store_true",
+        help="Merge the video files from different folders (events) into 1 big video file.",
+    )
+    output_group.add_argument(
+        "--keep-intermediate",
+        dest="keep_intermediate",
+        action="store_true",
+        help="Do not remove the clip video files that are created",
     )
 
-    encoding_group = parser.add_mutually_exclusive_group()
-    encoding_group.add_argument(
-        "--encoding",
-        required=False,
-        choices=["x264", "x265"],
-        default="x264",
-        help="R|Encoding to use for video creation.\n"
-        "    x264: standard encoding, can be "
-        "viewed on most devices but results in "
-        "bigger file.\n"
-        "    x265: newer encoding standard but "
-        "not all devices support this yet.\n",
-    )
-    encoding_group.add_argument(
-        "--enc",
-        required=False,
-        type=str,
-        help="R|Provide a custom encoding for video "
-        "creation.\n"
-        "Note: when using this option the --gpu "
-        "option is ignored. To use GPU hardware "
-        "acceleration specify a encoding that "
-        "provides this.",
+    advancedencoding_group = parser.add_argument_group(
+        title="Advanced encoding settings", description="Advanced options for encoding"
     )
 
     gpu_help = (
-        "R|Use GPU acceleration, only enable if "
-        "supported by hardware.\n"
-        " MAC: All MACs with Haswell CPU or later  "
-        "support this (Macs after 2013).\n"
+        "R|Use GPU acceleration, only enable if supported by hardware.\n"
+        " MAC: All MACs with Haswell CPU or later support this (Macs after 2013).\n"
         "      See following link as well: \n"
-        "         https://en.wikipedia.org/wiki/List_of_"
-        "Macintosh_models_grouped_by_CPU_type#Haswell\n"
+        "         https://en.wikipedia.org/wiki/List_of_Macintosh_models_grouped_by_CPU_type#Haswell\n"
     )
 
     if sys.platform == "darwin":
-        parser.add_argument("--no-gpu", dest="gpu", action="store_true", help=gpu_help)
+        advancedencoding_group.add_argument(
+            "--no-gpu", dest="gpu", action="store_true", help=gpu_help
+        )
     else:
-        parser.add_argument("--gpu", dest="gpu", action="store_true", help=gpu_help)
+        advancedencoding_group.add_argument(
+            "--gpu", dest="gpu", action="store_true", help=gpu_help
+        )
 
-        parser.add_argument(
+        advancedencoding_group.add_argument(
             "--gpu_type",
             choices=["nvidia", "intel", "RPi"],
             help="Type of graphics card (GPU) in the system. This determines the encoder that will be used."
             "This parameter is mandatory if --gpu is provided.",
         )
 
-    parser.add_argument(
+    advancedencoding_group.add_argument(
         "--no-faststart",
         dest="faststart",
         action="store_true",
@@ -2454,84 +2522,16 @@ def main() -> None:
         "errors occur during encoding.",
     )
 
-    timestamp_group = parser.add_argument_group(
-        title="Timestamp", description="Options for " "timestamp:"
-    )
-    timestamp_group.add_argument(
-        "--no-timestamp",
-        dest="no_timestamp",
-        action="store_true",
-        help="Include timestamp in video",
-    )
-
-    timestamp_group.add_argument(
-        "--halign",
-        required=False,
-        choices=["LEFT", "CENTER", "RIGHT"],
-        help="Horizontal alignment for timestamp",
-    )
-
-    timestamp_group.add_argument(
-        "--valign",
-        required=False,
-        choices=["TOP", "MIDDLE", "BOTTOM"],
-        help="Vertical Alignment for timestamp",
-    )
-
-    timestamp_group.add_argument(
-        "--font",
-        required=False,
-        type=str,
-        default=DEFAULT_FONT.get(sys.platform, None),
-        help="Fully qualified filename (.ttf) to the "
-        "font to be chosen for timestamp.",
-    )
-
-    timestamp_group.add_argument(
-        "--fontsize",
-        required=False,
-        type=int,
-        help="Font size for timestamp. Default is scaled based on video scaling.",
-    )
-
-    timestamp_group.add_argument(
-        "--fontcolor",
-        required=False,
-        type=str,
-        default="white",
-        help="R|Font color for timestamp. Any color "
-        "is "
-        "accepted as a color string or RGB "
-        "value.\n"
-        "Some potential values are:\n"
-        "    white\n"
-        "    yellowgreen\n"
-        "    yellowgreen@0.9\n"
-        "    Red\n:"
-        "    0x2E8B57\n"
-        "For more information on this see "
-        "ffmpeg "
-        "documentation for color: "
-        "https://ffmpeg.org/ffmpeg-utils.html#"
-        "Color",
-    )
-
-    quality_group = parser.add_argument_group(
-        title="Video Quality",
-        description="Options for " "resulting video " "quality and size:",
-    )
-
-    quality_group.add_argument(
+    advancedencoding_group.add_argument(
         "--quality",
         required=False,
         choices=["LOWEST", "LOWER", "LOW", "MEDIUM", "HIGH"],
         default="LOWER",
-        help="Define the quality setting for the "
-        "video, higher quality means bigger file "
-        "size but might not be noticeable.",
+        help="Define the quality setting for the video, higher quality means bigger file size but might "
+        "not be noticeable.",
     )
 
-    quality_group.add_argument(
+    advancedencoding_group.add_argument(
         "--compression",
         required=False,
         choices=[
@@ -2546,14 +2546,11 @@ def main() -> None:
             "veryslow",
         ],
         default="medium",
-        help="Speed to optimize video. Faster speed "
-        "results in a bigger file. This does not "
-        "impact the quality of the video, "
-        "just how "
-        "much time is used to compress it.",
+        help="Speed to optimize video. Faster speed results in a bigger file. This does not impact the quality of "
+        "the video, just how much time is used to compress it.",
     )
 
-    quality_group.add_argument(
+    advancedencoding_group.add_argument(
         "--fps",
         required=False,
         type=int,
@@ -2563,81 +2560,82 @@ def main() -> None:
     )
 
     if internal_ffmpeg:
-        parser.add_argument(
+        advancedencoding_group.add_argument(
             "--ffmpeg",
             required=False,
             type=str,
             help="Full path and filename for alternative " "ffmpeg.",
         )
     else:
-        parser.add_argument(
+        advancedencoding_group.add_argument(
             "--ffmpeg",
             required=False,
             type=str,
             default=ffmpeg_default,
-            help="Path and filename for ffmpeg. Specify if "
-            "ffmpeg is not within path.",
+            help="Path and filename for ffmpeg. Specify if ffmpeg is not within path.",
         )
 
-    monitor_group = parser.add_argument_group(
-        title="Monitor for TeslaDash Cam drive",
-        description="Parameters to monitor for a drive to be attached with "
-        "folder TeslaCam in the root.",
+    advancedencoding_group.add_argument(
+        "--encoding",
+        required=False,
+        choices=["x264", "x265"],
+        default="x264",
+        help="R|Encoding to use for video creation.\n"
+        "    x264: standard encoding, can be viewed on most devices but results in bigger file.\n"
+        "    x265: newer encoding standard but not all devices support this yet.\n",
     )
-
-    monitor_group.add_argument(
-        "--monitor",
-        dest="monitor",
-        action="store_true",
-        help="Enable monitoring for drive to be attached with TeslaCam folder.",
-    )
-
-    monitor_group.add_argument(
-        "--monitor_once",
-        dest="monitor_once",
-        action="store_true",
-        help="Enable monitoring and exit once drive "
-        "with TeslaCam folder has been attached "
-        "and files processed.",
-    )
-
-    monitor_group.add_argument(
-        "--monitor_trigger",
+    advancedencoding_group.add_argument(
+        "--enc",
         required=False,
         type=str,
-        help="Trigger file to look for instead of waiting for drive to be attached. Once file is discovered then "
-        "processing will start, file will be deleted when processing has been completed. If source is not "
-        "provided then folder where file is located will be used as source.",
+        help="R|Provide a custom encoder for video creation. Cannot be used in combination with --encoding.\n"
+        "Note: when using this option the --gpu option is ignored. To use GPU hardware acceleration specify an "
+        "encoding that provides this.",
     )
 
     update_check_group = parser.add_argument_group(
         title="Update Check", description="Check for updates"
     )
-
     update_check_group.add_argument(
         "--check_for_update",
         dest="check_for_updates",
         action="store_true",
-        help="Check for updates, do not do " "anything else.",
+        help="Check for update and exit.",
     )
-
     update_check_group.add_argument(
         "--no-check_for_update",
         dest="no_check_for_updates",
         action="store_true",
-        help="A check for new updates is "
-        "performed every time. With this "
-        "parameter that can be disabled",
+        help="A check for new updates is performed every time. With this parameter that can be disabled",
     )
-
     update_check_group.add_argument(
         "--include_test",
         dest="include_beta",
         action="store_true",
-        help="Include test (beta) releases " "when checking for updates.",
+        help="Include test (beta) releases when checking for updates.",
     )
 
     args = parser.parse_args()
+
+    logging.basicConfig(
+        level=loglevels[args.loglevel],
+        format="%(asctime)s:%(levelname)s:\t%(name)s\t%(message)s",
+    )
+
+    _LOGGER.debug(f"Arguments : {args}")
+
+    # Check that any mutual exclusive items are not both provided.
+    if "speed_up" in args and "slow_down" in args:
+        print(
+            "Option --speed_up and option --slow_down cannot be used together, only use one of them."
+        )
+        return 1
+
+    if "enc" in args and "encoding" in args:
+        print(
+            "Option --enc and option --encoding cannot be used together, only use one of them."
+        )
+        return 1
 
     if not args.no_check_for_updates or args.check_for_updates:
         release_info = check_latest_release(args.include_beta)
@@ -2765,8 +2763,8 @@ def main() -> None:
     # If front camera then default to mirror, if no front camera then default to rear.
     side_camera_as_mirror = (
         layout_settings.cameras("Front").include
-        if not ("rear" in args or "mirror" in args)
-        else "mirror" in args
+        if args.rear_or_mirror is None
+        else args.rear_or_mirror
     )
     mirror_sides = ", hflip" if side_camera_as_mirror else ""
 
@@ -3125,6 +3123,8 @@ def main() -> None:
         "end_offset": end_offset,
         "skip_existing": args.skip_existing,
     }
+    _LOGGER.debug(f"Video Settings {video_settings}")
+    _LOGGER.debug(f"Layout Settings {layout_settings}")
 
     # If we constantly run and monitor for drive added or not.
     if video_settings["run_type"] in ["MONITOR", "MONITOR_ONCE"]:
@@ -3161,6 +3161,7 @@ def main() -> None:
                     # As long as TeslaCam drive is still attached we're going to
                     # keep on waiting.
                     if trigger_exist:
+                        _LOGGER.debug(f"TeslaCam Drive still attached")
                         sleep(MONITOR_SLEEP_TIME)
                         continue
 
@@ -3181,6 +3182,7 @@ def main() -> None:
                 else:
                     # Wait till trigger file exist (can also be folder).
                     if not os.path.exists(monitor_file):
+                        _LOGGER.debug(f"Trigger file {monitor_file} does not exist.")
                         sleep(MONITOR_SLEEP_TIME)
                         trigger_exist = False
                         continue
