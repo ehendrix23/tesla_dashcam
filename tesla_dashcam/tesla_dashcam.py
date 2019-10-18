@@ -90,7 +90,7 @@ MOVIE_ENCODING = {
 }
 
 DEFAULT_FONT = {
-    "darwin": "/Library/Fonts/Arial.ttf",
+    "darwin": "/Library/Fonts/Arial Unicode.ttf",
     "win32": "/Windows/Fonts/arial.ttf",
     "cygwin": "/cygdrive/c/Windows/Fonts/arial.ttf",
     "linux": "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
