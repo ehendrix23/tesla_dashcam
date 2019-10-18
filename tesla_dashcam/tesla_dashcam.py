@@ -2456,6 +2456,7 @@ def main() -> None:
         "--slowdown",
         dest="slow_down",
         type=float,
+        default=argparse.SUPPRESS,
         help="Slow down video output. Accepts a number that is then used as multiplier, providing 2 means half the "
         "speed.",
     )
@@ -2463,6 +2464,7 @@ def main() -> None:
         "--speedup",
         dest="speed_up",
         type=float,
+        default=argparse.SUPPRESS,
         help="Speed up the video. Accepts a number that is then used as a multiplier, providing 2 means "
         "twice the speed.",
     )
@@ -2579,7 +2581,7 @@ def main() -> None:
         "--encoding",
         required=False,
         choices=["x264", "x265"],
-        default="x264",
+        default=argparse.SUPPRESS,
         help="R|Encoding to use for video creation.\n"
         "    x264: standard encoding, can be viewed on most devices but results in bigger file.\n"
         "    x265: newer encoding standard but not all devices support this yet.\n",
@@ -2588,6 +2590,7 @@ def main() -> None:
         "--enc",
         required=False,
         type=str,
+        default=argparse.SUPPRESS,
         help="R|Provide a custom encoder for video creation. Cannot be used in combination with --encoding.\n"
         "Note: when using this option the --gpu option is ignored. To use GPU hardware acceleration specify an "
         "encoding that provides this.",
@@ -2962,8 +2965,8 @@ def main() -> None:
         input_clip = f"tmp{filter_counter}"
         filter_counter += 1
 
-    speed = args.slow_down if args.slow_down is not None else ""
-    speed = round(1 / args.speed_up, 4) if args.speed_up is not None else speed
+    speed = args.slow_down if "slow_down" in args else ""
+    speed = round(1 / args.speed_up, 4) if "speed_up" in args else speed
     ffmpeg_speed = ""
     if speed != "":
         ffmpeg_speed = filter_string.format(
@@ -2989,8 +2992,8 @@ def main() -> None:
     use_gpu = not args.gpu if sys.platform == "darwin" else args.gpu
 
     video_encoding = []
-    if args.enc is None:
-        encoding = args.encoding
+    if not "enc" in args:
+        encoding = args.encoding if "encoding" in args else "x264"
         # GPU acceleration enabled
         if use_gpu:
             print("GPU acceleration is enabled")
@@ -3099,7 +3102,7 @@ def main() -> None:
         "movie_layout": args.layout,
         "movie_speed": speed,
         "video_encoding": video_encoding,
-        "movie_encoding": args.encoding,
+        "movie_encoding": args.encoding if "encoding" in args else "x264",
         "movie_compression": args.compression,
         "movie_quality": args.quality,
         "background": ffmpeg_black_video,
