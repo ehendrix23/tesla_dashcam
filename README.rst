@@ -889,8 +889,9 @@ Release Notes
     - Changed: For all layouts default is to show mirror for rear&side if front camera is shown, otherwise show as rear viewing.
     - Changed: Swap left&right cameras when showing rear&side as rear viewing, and not to swap them when showing rear&side as mirror view.
     - Changed: Re-organized help (-h) for all parameters by grouping them.
+    - Changed: Added message to install fonts using apt-get install ttf-freefont on Linux if font file is not found.
     - Fixed: Providing paths with spaces did not work in parameter files even although it worked from command line. `Issue #89 <https://github.com/ehendrix23/tesla_dashcam/issues/89>`_
-    - Fixed: Changed Arial font on MacOS to Arial Unicode (from Arial) as it seems Arial is not available anymore on MacOS 10.15 (Catalina).
+    - Fixed: Changed Arial font on MacOS to Arial Unicode (from Arial) as it seems Arial is not available anymore on MacOS 10.15 (Catalina). `Issue #64 <https://github.com/ehendrix23/tesla_dashcam/issues/64>`_
 
 TODO
 ----

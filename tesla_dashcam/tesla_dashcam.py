@@ -2946,6 +2946,10 @@ def main() -> None:
                 f"Font file {temp_font_file} does not exist. Provide a valid font file using --font or"
                 f" disable timestamp using --no-timestamp"
             )
+            if sys.platform == "linux":
+                print(
+                    "You can also install the fonts using for example: apt-get install ttf-freefont"
+                )
             return
 
         # noinspection PyPep8,PyPep8,PyPep8
