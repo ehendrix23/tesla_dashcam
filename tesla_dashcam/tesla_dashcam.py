@@ -3338,4 +3338,5 @@ if sys.version_info < (3, 7):
     )
     sys.exit(1)
 
-sys.exit(main())
+if __name__ == "__main__":
+    sys.exit(main())
