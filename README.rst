@@ -40,6 +40,12 @@ So to make a run one could do the following
     /root/Import                # You need to enter the container Import directory here
                                 # not your local computer one (it should be entered above)
 
+Docker Container Updating
+-------------------------
+
+Docker containers do not update themselves automatically.  If you want to have something run and do this.
+please take a look at the watchtower project - https://github.com/containrrr/watchtower
+
 tesla_dashcam overview
 ======================
 
