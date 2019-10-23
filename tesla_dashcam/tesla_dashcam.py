@@ -900,8 +900,9 @@ def get_tesladashcam_folder():
 
         teslacamfolder = os.path.join(partition.mountpoint, "TeslaCam")
         if os.path.isdir(teslacamfolder):
+            _LOGGER.debug(f"Folder TeslaCam found on partition {partition.mountpoint}.")
             return teslacamfolder, partition.mountpoint
-
+        _LOGGER.debug(f"No TeslaCam folder on partition {partition.mountpoint}.")
     return None, None
 
 
@@ -1123,6 +1124,8 @@ def get_metadata(ffmpeg, filenames):
                     "include": False,
                 }
             )
+        else:
+            _LOGGER.debug(f"File {camera_file} does not exist, skipping.")
 
     # Don't run ffmpeg if nothing to check for.
     if not metadata:
