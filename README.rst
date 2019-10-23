@@ -11,14 +11,14 @@ To run this as a container you will pass flags on docker run
 
 .. code:: bash
 
-    docker run --rm magicalyak/tesla_dashcam -h
+    docker run --rm -e TZ=America/New_York magicalyak/tesla_dashcam -h
 
 The container uses a default output directory of /root/Videos/Tesla_Dashcam/ you may want to pass this as a mapped volume
 So to make a run one could do the following
 
 .. code:: bash
 
-    docker run --name tesla_dashcam -v ~/Movies:/root/Videos -d magicalyak/tesla_dashcam --monitor /Volumes/CAM/SavedClips
+    docker run --name tesla_dashcam -e TZ=America/New_York -v ~/Movies:/root/Videos -d magicalyak/tesla_dashcam --monitor /Volumes/CAM/SavedClips
 
 tesla_dashcam overview
 ======================
@@ -396,7 +396,7 @@ To show help:
 
 .. code:: bash
 
-    docker run --rm magicalyak/tesla_dashcam -h
+    docker run --rm -e TZ=America/New_York magicalyak/tesla_dashcam -h
 
 
 Using defaults:
@@ -405,13 +405,13 @@ Using defaults:
 
 .. code:: bash
 
-    docker run --rm -v "$(pwd)":/root/Videos magicalyak/tesla_dashcam /Users/$USER/Desktop/Tesla/2019-02-27_14-02-03
+    docker run --rm -e TZ=America/New_York -v "$(pwd)":/root/Videos magicalyak/tesla_dashcam /Users/$USER/Desktop/Tesla/2019-02-27_14-02-03
 
 * Linux:
 
 .. code:: bash
 
-    docker run --rm -v "$(pwd)":/root/Videos magicalyak/tesla_dashcam $HOME/Tesla/2019-02-27_14-02-03
+    docker run --rm -e TZ=America/New_York -v "$(pwd)":/root/Videos magicalyak/tesla_dashcam $HOME/Tesla/2019-02-27_14-02-03
 
 
 Using defaults but not knowing what to provide for source path. Goal to only process the SavedClips and only do this once.
@@ -422,13 +422,13 @@ USB (or SD) when processed.
 
 .. code:: bash
 
-    docker run --rm --name tesla_dashcam -v /Users/me/Desktop/Tesla:/root/Videos magicalyak/tesla_dashcam --monitor_once --delete_source SavedClips
+    docker run --rm -e TZ=America/New_York --name tesla_dashcam -v /Users/me/Desktop/Tesla:/root/Videos magicalyak/tesla_dashcam --monitor_once --delete_source SavedClips
 
 * Linux:
 
 .. code:: bash
 
-    docker run --rm --name tesla_dashcam -v /home/me/Tesla:/root/Videos magicalyak/tesla_dashcam --monitor_once --delete_source SavedClips
+    docker run --rm -e TZ=America/New_York --name tesla_dashcam -v /home/me/Tesla:/root/Videos magicalyak/tesla_dashcam --monitor_once --delete_source SavedClips
 
 Specify video file and location:
 
@@ -436,13 +436,13 @@ Specify video file and location:
 
 .. code:: bash
 
-    docker run --rm -v /Users/me/Desktop/Tesla:/root/Videos magicalyak/tesla_dashcam --output /root/Videos/My_Video_trip.mp4 /Users/me/Desktop/Tesla/2019-02-27_14-02-03
+    docker run --rm -e TZ=America/New_York -v /Users/me/Desktop/Tesla:/root/Videos magicalyak/tesla_dashcam --output /root/Videos/My_Video_trip.mp4 /Users/me/Desktop/Tesla/2019-02-27_14-02-03
 
 * Linux:
 
 .. code:: bash
 
-    docker run --rm -v /home/me/Tesla:/root/Videos magicalyak/tesla_dashcam --output /root/Videos/My_Video_trip.mp4 /home/me/Tesla/2019-02-27_14-02-03
+    docker run --rm -e TZ=America/New_York -v /home/me/Tesla:/root/Videos magicalyak/tesla_dashcam --output /root/Videos/My_Video_trip.mp4 /home/me/Tesla/2019-02-27_14-02-03
 
 Without timestamp:
 
@@ -450,13 +450,13 @@ Without timestamp:
 
 .. code:: bash
 
-    docker run --rm -v /Users/me/Desktop/Tesla:/root/Videos magicalyak/tesla_dashcam --no-timestamp /Users/me/Desktop/Tesla/2019-02-27_14-02-03
+    docker run --rm -e TZ=America/New_York -v /Users/me/Desktop/Tesla:/root/Videos magicalyak/tesla_dashcam --no-timestamp /Users/me/Desktop/Tesla/2019-02-27_14-02-03
     
 * Linux:
 
 .. code:: bash
 
-    docker run --rm -v /home/me/Tesla:/root/Videos magicalyak/tesla_dashcam --no-timestamp /home/me/Tesla/2019-02-27_14-02-03
+    docker run --rm -e TZ=America/New_York -v /home/me/Tesla:/root/Videos magicalyak/tesla_dashcam --no-timestamp /home/me/Tesla/2019-02-27_14-02-03
     
 Put timestamp center top in yellowgreen:
 
@@ -464,13 +464,13 @@ Put timestamp center top in yellowgreen:
 
 .. code:: bash
 
-    docker run --rm -v /Users/me/Desktop/Tesla:/root/Videos magicalyak/tesla_dashcam --fontcolor yellowgreen@0.9 -halign CENTER -valign TOP /Users/me/Desktop/Tesla/2019-02-27_14-02-03
+    docker run --rm -e TZ=America/New_York -v /Users/me/Desktop/Tesla:/root/Videos magicalyak/tesla_dashcam --fontcolor yellowgreen@0.9 -halign CENTER -valign TOP /Users/me/Desktop/Tesla/2019-02-27_14-02-03
 
 * Linux:
 
 .. code:: bash
 
-    docker run --rm -v /home/me/Tesla:/root/Videos magicalyak/tesla_dashcam --fontcolor yellowgreen@0.9 -halign CENTER -valign TOP /home/me/Tesla/2019-02-27_14-02-03
+    docker run --rm -e TZ=America/New_York -v /home/me/Tesla:/root/Videos magicalyak/tesla_dashcam --fontcolor yellowgreen@0.9 -halign CENTER -valign TOP /home/me/Tesla/2019-02-27_14-02-03
 
 Layout so front is shown top middle with side cameras below it and font size of 24 (FULLSCREEN):
 
@@ -478,13 +478,13 @@ Layout so front is shown top middle with side cameras below it and font size of 
 
 .. code:: bash
 
-    docker run --rm -v /Users/me/Desktop/Tesla:/root/Videos magicalyak/tesla_dashcam --layout FULLSCREEN --fontsize 24 /Users/me/Desktop/Tesla/2019-02-27_14-02-03
+    docker run --rm -e TZ=America/New_York -v /Users/me/Desktop/Tesla:/root/Videos magicalyak/tesla_dashcam --layout FULLSCREEN --fontsize 24 /Users/me/Desktop/Tesla/2019-02-27_14-02-03
 
 * Linux:
 
 .. code:: bash
 
-    docker run --rm -v /home/me/Tesla:/root/Videos magicalyak/tesla_dashcam ---layout FULLSCREEN --fontsize 24 /home/me/Tesla/2019-02-27_14-02-03
+    docker run --rm -e TZ=America/New_York -v /home/me/Tesla:/root/Videos magicalyak/tesla_dashcam ---layout FULLSCREEN --fontsize 24 /home/me/Tesla/2019-02-27_14-02-03
 
 Enable monitoring for the Tesla Dashcam USB (or SD) to be inserted and then process all the files (both RecentClips and SavedClips).
 Increase speed of resulting videos tenfold and store all videos in folder specified by output.
@@ -512,13 +512,13 @@ Also create a movie file that has them all merged together.
 
 .. code:: bash
 
-    docker run --rm --name tesla_dashcam -v /Users/me/Desktop/Tesla:/root/Videos magicalyak/tesla_dashcam --slowdown 2 --rear --merge --monitor_once SavedClips
+    docker run --rm -e TZ=America/New_York --name tesla_dashcam -v /Users/me/Desktop/Tesla:/root/Videos magicalyak/tesla_dashcam --slowdown 2 --rear --merge --monitor_once SavedClips
 
 * Linux:
 
 .. code:: bash
 
-    docker run --rm --name tesla_dashcam -v /home/me/Tesla:/root/Videos magicalyak/tesla_dashcam --slowdown 2 --rear --merge --monitor_once SavedClips
+    docker run --rm -e TZ=America/New_York --name tesla_dashcam -v /home/me/Tesla:/root/Videos magicalyak/tesla_dashcam --slowdown 2 --rear --merge --monitor_once SavedClips
 
 Enable monitoring using a trigger file (or folder) to start processing all the files from SavedClips.
 Note that for source we provide the folder name (SavedClips), the complete path will be created by the program using the
@@ -530,13 +530,13 @@ added automatically). Chapter offset is set to be 2 minutes (120 seconds) before
 
 .. code:: bash
 
-    docker run --rm --name tesla_dashcam -v /Users/me/Desktop/Tesla:/root/Videos magicalyak/tesla_dashcam --merge --chapter_offset -120 --monitor --monitor_trigger /Users/me/TeslaCam/start_processing.txt SavedClips
+    docker run --rm -e TZ=America/New_York --name tesla_dashcam -v /Users/me/Desktop/Tesla:/root/Videos magicalyak/tesla_dashcam --merge --chapter_offset -120 --monitor --monitor_trigger /Users/me/TeslaCam/start_processing.txt SavedClips
 
 * Linux:
 
 .. code:: bash
 
-    docker run --rm --name tesla_dashcam -v /home/me/Tesla:/root/Videos magicalyak/tesla_dashcam --merge --chapter_offset -120 --monitor --monitor_trigger /home/me/TeslaCam/start_processing.txt SavedClips
+    docker run --rm -e TZ=America/New_York --name tesla_dashcam -v /home/me/Tesla:/root/Videos magicalyak/tesla_dashcam --merge --chapter_offset -120 --monitor --monitor_trigger /home/me/TeslaCam/start_processing.txt SavedClips
 
 
 Start and End Timestamps
@@ -594,13 +594,13 @@ And then executing tesla_dashcam as follows:
 
 .. code:: bash
 
-    docker run --rm --name tesla_dashcam -v /Users/me/Desktop/Tesla:/root/Videos magicalyak/tesla_dashcam @my_preference.txt
+    docker run --rm -e TZ=America/New_York --name tesla_dashcam -v /Users/me/Desktop/Tesla:/root/Videos magicalyak/tesla_dashcam @my_preference.txt
 
 * Linux:
 
 .. code:: bash
 
-    docker run --rm --name tesla_dashcam -v /home/me/Tesla:/root/Videos magicalyak/tesla_dashcam @my_preference.txt
+    docker run --rm -e TZ=America/New_York --name tesla_dashcam -v /home/me/Tesla:/root/Videos magicalyak/tesla_dashcam @my_preference.txt
 
 Would result in the same as if those parameters were provided on the command itself. One can also combine a parameter file with parameters on the command line.
 Preference is given to what occurs first. For example, if providing the following arguments:
