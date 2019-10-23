@@ -1,5 +1,27 @@
-tesla_dashcam
-=============
+Docker version for tesla_dashcam
+================================
+
+This project is almost completely based off the ehendrix23/tesla_dashcam project and only modifies the DockerFile
+
+The Dockerfile uses the following build images
+denismakogon/ffmpeg-alpine:4.0-buildstage
+python:3-alpine
+
+To run this as a container you will pass flags on docker run
+
+.. code:: bash
+
+    docker run --rm magicalyak/tesla_dashcam -h
+
+The container uses a default output directory of /root/Videos/Tesla_Dashcam/ you may want to pass this as a mapped volume
+So to make a run one could do the following
+
+.. code :: bash
+
+    docker run --name tesla_dashcam -v ~/Movies:/root/Videos -d magicalyak/tesla_dashcam --monitor /Volumes/CAM/SavedClips
+
+tesla_dashcam overview
+======================
 
 Python program that provides an easy method to merge saved Tesla Dashcam footage into a single video.
 
@@ -62,22 +84,13 @@ start processing all the folders within the SavedClips folder. Once processing o
 
 
 
-Binaries
---------
-
-Stand-alone binaries can be retrieved from:
-
-- Windows: https://github.com/ehendrix23/tesla_dashcam/releases/latest/download/tesla_dashcam.zip
-- MacOS (OSX): https://github.com/ehendrix23/tesla_dashcam/releases/latest/download/tesla_dashcam.dmg
+ffmpeg information
+------------------
 
 `ffmpeg <https://www.ffmpeg.org/legal.html>`_ is included within the respective package.
 ffmpeg is a separately licensed product under the `GNU Lesser General Public License (LGPL) version 2.1 or later <http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html>`_.
 FFmpeg incorporates several optional parts and optimizations that are covered by the GNU General Public License (GPL) version 2 or later. If those parts get used the GPL applies to all of FFmpeg.
 For more information on ffmpeg license please see: https://www.ffmpeg.org/legal.html
-
-Windows binary of ffmpeg was downloaded from: https://ffmpeg.zeranoe.com/builds/
-
-MacOS binary of ffmpeg was downloaded from: https://evermeet.cx/ffmpeg/
 
 
 Notes
@@ -94,33 +107,6 @@ Tesla embeds the date and time within the video file, and that is what will be d
 not start exactly at 0 seconds. In the provided video examples one can see that it starts at 16:42:35 and not 16:42:00.
 
 Current caveat however is that the order for concatenating all the videos together is based on filename. (See TODO)
-
-Requirements
--------------
-
-This package relies on `ffmpeg <https://ffmpeg.org>`__ to be installed, this is a free, open source cross-platform
-solution to convert video. The created executables for Windows and MacOS include an ffmpeg version.
-
-If not using the executables (Windows and MacOS) then `Python <https://www.python.org>`__ 3.7 or higher is required.
-
-
-Installation
--------------
-
-Downloading the respective bundle (ZIP for Windows, DMG for MacOS) and unpacking this in a location of your choosing is
-sufficient to install this.
-
-If downloading the source files (i.e. for Linux) then Python has to be installed as well. I recommend in that case to
-install the package from pypi using pip to ensure all package requirements (except for ffmpeg) are met.
-
-This package is available from `pypi <https://pypi.org/project/tesla-dashcam/>`__.
-
-Install from pypi is done through:
-
-.. code:: bash
-
-    pip install tesla_dashcam
-
 
 
 Usage
@@ -408,207 +394,113 @@ Examples
 
 To show help:
 
-* Windows:
-
 .. code:: bash
 
-    tesla_dashcam.exe -h
-
-* Mac:
-
-.. code:: bash
-
-    tesla_dashcam -h
-
-* Linux:
-
-.. code:: bash
-
-    python3 tesla_dashcam.py -h
+    docker run --rm magicalyak/tesla_dashcam -h
 
 
 Using defaults:
 
-* Windows:
-
-.. code:: bash
-
-    tesla_dashcam.exe c:\Tesla\2019-02-27_14-02-03
-
 * Mac:
 
 .. code:: bash
 
-    tesla_dashcam /Users/me/Desktop/Tesla/2019-02-27_14-02-03
+    docker run --rm -v "$(pwd)":/root/Videos magicalyak/tesla_dashcam /Users/$USER/Desktop/Tesla/2019-02-27_14-02-03
 
 * Linux:
 
 .. code:: bash
 
-    python3 tesla_dashcam.py /home/me/Tesla/2019-02-27_14-02-03
+    docker run --rm -v "$(pwd)":/root/Videos magicalyak/tesla_dashcam $HOME/Tesla/2019-02-27_14-02-03
+
 
 Using defaults but not knowing what to provide for source path. Goal to only process the SavedClips and only do this once.
-Store the resulting video files in c:\Tesla (Windows) or /Users/me/Desktop/Tesla (MacOS). Delete the files from the
+Store the resulting video files in /Users/me/Desktop/Tesla (MacOS). Delete the files from the
 USB (or SD) when processed.
-
-* Windows:
-
-.. code:: bash
-
-    tesla_dashcam.exe --monitor_once --delete_source --output c:\Tesla SavedClips
 
 * Mac:
 
 .. code:: bash
 
-    tesla_dashcam --monitor_once --delete_source --output /Users/me/Desktop/Tesla SavedClips
+    docker run --rm --name tesla_dashcam -v /Users/me/Desktop/Tesla:/root/Videos magicalyak/tesla_dashcam --monitor_once --delete_source SavedClips
 
 * Linux:
 
 .. code:: bash
 
-    python3 tesla_dashcam.py --monitor_once --delete_source --output /home/me/Tesla SavedClips
+    docker run --rm --name tesla_dashcam -v /home/me/Tesla:/root/Videos magicalyak/tesla_dashcam --monitor_once --delete_source SavedClips
 
 Specify video file and location:
 
-* Windows:
-
-.. code:: bash
-
-    tesla_dashcam.exe --output c:\Tesla\My_Video_Trip.mp4 c:\Tesla\2019-02-27_14-02-03
-
 * Mac:
 
 .. code:: bash
 
-    tesla_dashcam --output /Users/me/Desktop/Tesla/My_Video_Trip.mp4 /Users/me/Desktop/Tesla/2019-02-27_14-02-03
+    docker run --rm -v /Users/me/Desktop/Tesla:/root/Videos magicalyak/tesla_dashcam --output /root/Videos/My_Video_trip.mp4 /Users/me/Desktop/Tesla/2019-02-27_14-02-03
 
 * Linux:
 
 .. code:: bash
 
-    python3 tesla_dashcam.py --output /home/me/Tesla/My_Video_Trip.mp4 /home/me/Tesla/2019-02-27_14-02-03
+    docker run --rm -v /home/me/Tesla:/root/Videos magicalyak/tesla_dashcam --output /root/Videos/My_Video_trip.mp4 /home/me/Tesla/2019-02-27_14-02-03
 
 Without timestamp:
 
-* Windows:
-
-.. code:: bash
-
-    tesla_dashcam.exe --no-timestamp c:\Tesla\2019-02-27_14-02-03
-
 * Mac:
 
 .. code:: bash
 
-    tesla_dashcam --no-timestamp /Users/me/Desktop/Tesla/2019-02-27_14-02-03
-
+    docker run --rm -v /Users/me/Desktop/Tesla:/root/Videos magicalyak/tesla_dashcam --no-timestamp /Users/me/Desktop/Tesla/2019-02-27_14-02-03
+    
 * Linux:
 
 .. code:: bash
 
-    python3 tesla_dashcam.py --no-timestamp /home/me/Tesla/2019-02-27_14-02-03
-
+    docker run --rm -v /home/me/Tesla:/root/Videos magicalyak/tesla_dashcam --no-timestamp /home/me/Tesla/2019-02-27_14-02-03
+    
 Put timestamp center top in yellowgreen:
 
-* Windows:
-
-.. code:: bash
-
-    tesla_dashcam.exe --fontcolor yellowgreen@0.9 -halign CENTER -valign TOP c:\Tesla\2019-02-27_14-02-03
-
 * Mac:
 
 .. code:: bash
 
-    tesla_dashcam --fontcolor yellowgreen@0.9 -halign CENTER -valign TOP /Users/me/Desktop/Tesla/2019-02-27_14-02-03
+    docker run --rm -v /Users/me/Desktop/Tesla:/root/Videos magicalyak/tesla_dashcam --fontcolor yellowgreen@0.9 -halign CENTER -valign TOP /Users/me/Desktop/Tesla/2019-02-27_14-02-03
 
 * Linux:
 
 .. code:: bash
 
-    python3 tesla_dashcam.py --fontcolor yellowgreen@0.9 -halign CENTER -valign TOP /home/me/Tesla/2019-02-27_14-02-03
+    docker run --rm -v /home/me/Tesla:/root/Videos magicalyak/tesla_dashcam --fontcolor yellowgreen@0.9 -halign CENTER -valign TOP /home/me/Tesla/2019-02-27_14-02-03
 
 Layout so front is shown top middle with side cameras below it and font size of 24 (FULLSCREEN):
 
-* Windows:
-
-.. code:: bash
-
-    tesla_dashcam.exe --layout FULLSCREEN --fontsize 24 c:\Tesla\2019-02-27_14-02-03
-
 * Mac:
 
 .. code:: bash
 
-    tesla_dashcam --layout FULLSCREEN --fontsize 24 /Users/me/Desktop/Tesla/2019-02-27_14-02-03
+    docker run --rm -v /Users/me/Desktop/Tesla:/root/Videos magicalyak/tesla_dashcam --layout FULLSCREEN --fontsize 24 /Users/me/Desktop/Tesla/2019-02-27_14-02-03
 
 * Linux:
 
 .. code:: bash
 
-    python3 tesla_dashcam.py --layout FULLSCREEN --fontsize 24 /home/me/Tesla/2019-02-27_14-02-03
-
-Specify location of ffmpeg binay (in case ffmpeg is not in path):
-
-* Windows:
-
-.. code:: bash
-
-    tesla_dashcam.exe --ffmpeg c:\ffmpeg\ffmpeg.exe c:\Tesla\2019-02-27_14-02-03
-
-* Mac:
-
-.. code:: bash
-
-    tesla_dashcam --ffmpeg /Applications/ffmpeg /Users/me/Desktop/Tesla/2019-02-27_14-02-03
-
-* Linux:
-
-.. code:: bash
-
-    python3 tesla_dashcam.py --ffmpeg /home/me/ffmpeg /home/me/Tesla/2019-02-27_14-02-03
-
-Layout of PERSPECTIVE with a different font for timestamp and path for ffmpeg:
-
-* Windows: Note how to specify the path, : and \ needs to be escaped by putting a \ in front of them.
-
-.. code:: bash
-
-    tesla_dashcam.exe --layout PERSPECTIVE --ffmpeg c:\ffmpeg\ffmpeg.exe --font "C\:\\Windows\\Fonts\\Courier New.ttf" c:\Tesla\2019-02-27_14-02-03
-
-* Mac:
-
-.. code:: bash
-
-    tesla_dashcam --layout PERSPECTIVE --ffmpeg /Applications/ffmpeg --font '/Library/Fonts/Courier New.ttf' /Users/me/Desktop/Tesla/2019-02-27_14-02-03
-
-* Linux:
-
-.. code:: bash
-
-    python3 tesla_dashcam.py --layout PERSPECTIVE --ffmpeg /Applications/ffmpeg --font '/usr/share/fonts/truetype/freefont/Courier New.ttf' /home/me/Tesla/2019-02-27_14-02-03
+    docker run --rm -v /home/me/Tesla:/root/Videos magicalyak/tesla_dashcam ---layout FULLSCREEN --fontsize 24 /home/me/Tesla/2019-02-27_14-02-03
 
 Enable monitoring for the Tesla Dashcam USB (or SD) to be inserted and then process all the files (both RecentClips and SavedClips).
 Increase speed of resulting videos tenfold and store all videos in folder specified by output.
 Delete the source files afterwards:
 
-
-.. code:: bash
-
-    tesla_dashcam.exe --speed 10 --output c:\Tesla\ --monitor .
-
 * Mac:
 
 .. code:: bash
 
-    tesla_dashcam /Users/me/Desktop/Tesla --monitor .
+    docker run --name tesla_dashcam -v /Users/me/Desktop/Tesla:/root/Videos -d magicalyak/tesla_dashcam --monitor .
 
 * Linux:
 
 .. code:: bash
 
-    python3 tesla_dashcam.py /home/me/Desktop/Tesla --monitor .
+    docker run --name tesla_dashcam -v /home/me/Tesla:/root/Videos -d magicalyak/tesla_dashcam --monitor .
 
 
 Enable one-time monitoring for the Tesla Dashcam USB (or SD) to be inserted and then process all the files from SavedClips.
@@ -616,23 +508,17 @@ Note that for source we provide the folder name (SavedClips), the complete path 
 Slowdown speed of resulting videos to half, show left/right cameras as if looking backwards, store all videos in folder specified by output.
 Also create a movie file that has them all merged together.
 
-* Windows:
-
-.. code:: bash
-
-    tesla_dashcam.exe --slowdown 2 --rear --merge --output c:\Tesla\ --monitor_once SavedClips
-
 * Mac:
 
 .. code:: bash
 
-    tesla_dashcam --slowdown 2 --rear --merge --output /Users/me/Desktop/Tesla --monitor_once SavedClips
+    docker run --rm --name tesla_dashcam -v /Users/me/Desktop/Tesla:/root/Videos magicalyak/tesla_dashcam --slowdown 2 --rear --merge --monitor_once SavedClips
 
 * Linux:
 
 .. code:: bash
 
-    python3 tesla_dashcam.py --slowdown 2 --rear --merge --output /home/me/Tesla --monitor_once SavedClips
+    docker run --rm --name tesla_dashcam -v /home/me/Tesla:/root/Videos magicalyak/tesla_dashcam --slowdown 2 --rear --merge --monitor_once SavedClips
 
 Enable monitoring using a trigger file (or folder) to start processing all the files from SavedClips.
 Note that for source we provide the folder name (SavedClips), the complete path will be created by the program using the
@@ -640,23 +526,17 @@ path of the trigger file (if it is a file) or folder. Videos are stored in folde
 the folders are then merged into 1 folder with name TeslaDashcam followed by timestamp of processing (timestamp is
 added automatically). Chapter offset is set to be 2 minutes (120 seconds) before the end of the respective folder clips.
 
-* Windows:
-
-.. code:: bash
-
-    tesla_dashcam.exe --merge --chapter_offset -120 --output c:\Tesla\TeslaDashcam.mp4 --monitor --monitor_trigger x:\TeslaCam\start_processing.txt SavedClips
-
 * Mac:
 
 .. code:: bash
 
-    tesla_dashcam --merge --chapter_offset -120 --output /Users/me/Desktop/Tesla --monitor --monitor_trigger /Users/me/TeslaCam/start_processing.txt SavedClips
+    docker run --rm --name tesla_dashcam -v /Users/me/Desktop/Tesla:/root/Videos magicalyak/tesla_dashcam --merge --chapter_offset -120 --monitor --monitor_trigger /Users/me/TeslaCam/start_processing.txt SavedClips
 
 * Linux:
 
 .. code:: bash
 
-    python3 tesla_dashcam.py --merge --chapter_offset -120 --output /home/me/Tesla --monitor --monitor_trigger /home/me/TeslaCam/start_processing.txt SavedClips
+    docker run --rm --name tesla_dashcam -v /home/me/Tesla:/root/Videos magicalyak/tesla_dashcam --merge --chapter_offset -120 --monitor --monitor_trigger /home/me/TeslaCam/start_processing.txt SavedClips
 
 
 Start and End Timestamps
@@ -710,23 +590,17 @@ Having a text file (i.e. my_preference.txt) with the following contents:
 
 And then executing tesla_dashcam as follows:
 
-* Windows:
-
-.. code:: bash
-
-    tesla_dashcam.exe @my_preference.txt
-
 * Mac:
 
 .. code:: bash
 
-    tesla_dashcam @my_preference.txt
+    docker run --rm --name tesla_dashcam -v /Users/me/Desktop/Tesla:/root/Videos magicalyak/tesla_dashcam @my_preference.txt
 
 * Linux:
 
 .. code:: bash
 
-    python3 tesla_dashcam.py @my_preference.txt
+    docker run --rm --name tesla_dashcam -v /home/me/Tesla:/root/Videos magicalyak/tesla_dashcam @my_preference.txt
 
 Would result in the same as if those parameters were provided on the command itself. One can also combine a parameter file with parameters on the command line.
 Preference is given to what occurs first. For example, if providing the following arguments:

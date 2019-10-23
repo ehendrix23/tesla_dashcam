@@ -108,3 +108,9 @@ venv.bak/
 .DS_Store
 tesla_dashcam/ffmpeg
 tesla_dashcam/ffmpeg.exe
+
+# extra
+*.old
+*.bak
+*.scratch
+/.vscode
