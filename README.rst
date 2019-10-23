@@ -16,7 +16,7 @@ To run this as a container you will pass flags on docker run
 The container uses a default output directory of /root/Videos/Tesla_Dashcam/ you may want to pass this as a mapped volume
 So to make a run one could do the following
 
-.. code :: bash
+.. code:: bash
 
     docker run --name tesla_dashcam -v ~/Movies:/root/Videos -d magicalyak/tesla_dashcam --monitor /Volumes/CAM/SavedClips
 
