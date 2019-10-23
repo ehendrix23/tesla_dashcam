@@ -16,6 +16,9 @@ RUN apk add --no-cache --update gcc libc-dev linux-headers \
 COPY . /usr/src/app/tesla_dashcam
 RUN pip install -r requirements.txt
 
-ENTRYPOINT [ "python3", "tesla_dashcam/tesla_dashcam.py" ]
+# Enable Logs to show on run
+ENV PYTHONUNBUFFERED=true 
+# Provide a default timezone
+ENV TZ=America/New_York
 
-# docker run -rm tesla_dashcam -h
+ENTRYPOINT [ "python3", "tesla_dashcam/tesla_dashcam.py" ]
