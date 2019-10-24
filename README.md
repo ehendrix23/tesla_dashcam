@@ -350,7 +350,7 @@ Current caveat however is that the order for concatenating all the videos togeth
     +---------------+----------------+----------------+
 ```
 
-<iframe width="560" height="315" src="https://www.youtube.com/embed/P5k9PXPGKWQ" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+[![FULLSCREEN Video Example](http://img.youtube.com/vi/P5k9PXPGKWQ/0.jpg)](http://www.youtube.com/watch?v=P5k9PXPGKWQ)
 
 ### `PERSPECTIVE:` Resolution: 1944x1204
 
@@ -364,7 +364,7 @@ Current caveat however is that the order for concatenating all the videos togeth
     +---------------+----------------+---------------+
 ```
 
-<iframe width="560" height="315" src="https://www.youtube.com/embed/fTUZQ-Ej5AY" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+[![PERSPECTIVE Video Example](http://img.youtube.com/vi/fTUZQ-Ej5AY/0.jpg)](http://www.youtube.com/watch?v=YfTUZQ-Ej5AY)
 
 ### `WIDESCREEN:` Resolution: 1920x1920
 
@@ -376,7 +376,7 @@ Current caveat however is that the order for concatenating all the videos togeth
     +---------------+----------------+----------------+
 ```
 
-<iframe width="560" height="315" src="https://www.youtube.com/embed/nPleIhVxyhQ" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+[![WIDESCREEN Video Example](http://img.youtube.com/vi/nPleIhVxyhQ/0.jpg)](http://www.youtube.com/watch?v=nPleIhVxyhQ)
 
 ### `CROSS:` Resolution: 1280x1440
 
