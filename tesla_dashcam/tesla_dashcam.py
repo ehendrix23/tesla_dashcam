@@ -85,7 +85,7 @@ MOVIE_ENCODING = {
     "x265": "libx265",
     "x265_nvidia": "hevc_nvenc",
     "x265_mac": "hevc_videotoolbox",
-    "x265_intel": "h265_qsv",
+    "x265_intel": "hevc_qsv",
     "x265_RPi": "h265",
 }
 
