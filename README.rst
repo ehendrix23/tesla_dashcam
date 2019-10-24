@@ -893,6 +893,7 @@ Release Notes
     - Changed: Only execute if we're main allowing to be imported into other scripts. `Issue #94 <https://github.com/ehendrix23/tesla_dashcam/issues/94>`_
     - Fixed: Providing paths with spaces did not work in parameter files even although it worked from command line. `Issue #89 <https://github.com/ehendrix23/tesla_dashcam/issues/89>`_
     - Fixed: Changed Arial font on MacOS to Arial Unicode (from Arial) as it seems Arial is not available anymore on MacOS 10.15 (Catalina). `Issue #64 <https://github.com/ehendrix23/tesla_dashcam/issues/64>`_
+    - Fixed: Incorrect encoder for x265 with Intel GPU hardware encoding - mbaileys
 
 TODO
 ----
