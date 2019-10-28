@@ -37,7 +37,7 @@ for dirsource in ${sourceroot}/!(archive|processing)/; do
 			echo "Creating $processpath"
 			mkdir $processpath;
 		fi
-		echo "Moving $disource to processing director $processpath"
+		echo "Moving $disource to processing directory $processpath"
 		mv $dirsource $processpath
 	fi
 done
