@@ -41,6 +41,8 @@ for dirsource in ${sourceroot}/!(archive|processing)/; do
 			echo "Moving $disource to processing directory $processpath"
 			mv $dirsource $processpath
 		fi
+	else
+		echo "No directories found to process!"
 	fi
 done
 
@@ -65,6 +67,8 @@ for dirprocess in ${sourceroot}/processing/*/; do
 				rm -f $file
 			fi
 		done
+	else
+		echo "No directories found to convert!"
 	fi
 done
 
