@@ -865,46 +865,46 @@ This project is under the Apache 2 license but many components used have their o
   - Fixed: Will now handle it much better if a video file from a camera is corrupt (i.e. zero-byte file).
   - Fixed: combining clips to movie would not use GPU or provided encoding.
   - Fixed: Added additional check that video file exist before merging into movie.
-0.1.10:
+- 0.1.10:
   - New: Added scale option to set the scale of the clips and thus resulting video. (--scale)
-  - New: Added option to specify a parameter file using @<filename> where parameters can be located in. (@<filename>)
+  - New: Added option to specify a parameter file using ```@<filename>``` where parameters can be located in. (```@<filename>```)
   - New: One can now specify multiple sources instead of just 1.
   - New: Individual file(s) can now be provided as a source as well (only 1 camera filename has to be provided to get all 3)
   - New: Source is now optional, if not provided then it will be same as --monitor_once with as source SavedClips.
   - Changed: Timestamp within video will now be used for concatenation of the clips at folder level and all (--merge option) instead of filename. This will ensure that even when crossing timezones the order of the video is still accurate.
-  - Changed: --delete_source will delete source files when specified even when --monitor or --monitor_once is not specified `Issue #28 <https://github.com/ehendrix23/tesla_dashcam/issues/28>`_
+  - Changed: --delete_source will delete source files when specified even when --monitor or --monitor_once is not specified [Issue #28](https://github.com/ehendrix23/tesla_dashcam/issues/28)
   - Changed: output will default to Videos\Tesla_Dashcam (Windows) Movies/Tesla_Dashcam (MacOS), or Videos\Tesla_Dashcam (Linux) if not output folder specified.
-  - Changed: Filename for the folder video files will not have start and end timestamp in local timezone instead of just folder name. `Issue #30 <https://github.com/ehendrix23/tesla_dashcam/issues/30>`_ and `Issue #33 <https://github.com/ehendrix23/tesla_dashcam/issues/33>`_
+  - Changed: Filename for the folder video files will not have start and end timestamp in local timezone instead of just folder name. [Issue #30](https://github.com/ehendrix23/tesla_dashcam/issues/30) and [Issue #33](https://github.com/ehendrix23/tesla_dashcam/issues/33)
   - Changed: Updated release notes for each release better identifying what is new, changed, and fixed.
   - Fixed: issue where sometimes encoding with GPU would fail by also allowing software based encoding
   - Fixed: traceback when unable to retrieve latest release from GitHub
-  - Fixed: running tesla_dashcam when installed using pip. `Issue #23 <https://github.com/ehendrix23/tesla_dashcam/issues/23>`_ and `Issue #31 <https://github.com/ehendrix23/tesla_dashcam/issues/31>`_
+  - Fixed: running tesla_dashcam when installed using pip. [Issue #23](https://github.com/ehendrix23/tesla_dashcam/issues/23) and [Issue #31](https://github.com/ehendrix23/tesla_dashcam/issues/31)
   - Fixed: Folder clip would be removed if only 1 set in folder with same name as folder name if keep_intermediate not specified
-  - Fixed: Font issue in Windows (hopefully final fix) `Issue #29 <https://github.com/ehendrix23/tesla_dashcam/issues/29>`_
-  - Fixed: Python version has to be 3.7 or higher due to use of capture_output `Issue #19 <https://github.com/ehendrix23/tesla_dashcam/issues/19>`_
-0.1.11:
-  - Fixed: Traceback when getting ffmpeg path in Linux `Issue #39 <https://github.com/ehendrix23/tesla_dashcam/issues/39>`_
-  - Fixed: Running tesla_dashcam when installed using pip. `Issue #38 <https://github.com/ehendrix23/tesla_dashcam/issues/38>`_
+  - Fixed: Font issue in Windows (hopefully final fix) [Issue #29](https://github.com/ehendrix23/tesla_dashcam/issues/29)
+  - Fixed: Python version has to be 3.7 or higher due to use of capture_output [Issue #19](https://github.com/ehendrix23/tesla_dashcam/issues/19)
+- 0.1.11:
+  - Fixed: Traceback when getting ffmpeg path in Linux [Issue #39](https://github.com/ehendrix23/tesla_dashcam/issues/39)
+  - Fixed: Running tesla_dashcam when installed using pip. [Issue #38](https://github.com/ehendrix23/tesla_dashcam/issues/38)
   - Fixed: Just providing a filename for output would result in traceback.
   - Fixed: When providing a folder as output it would be possible that the last folder name was stripped potentially resulting in error.
-0.1.12:
+- 0.1.12:
   - New: Added chapter markers in the concatenated movies. Folder ones will have a chapter marker for each intermediate clip, merged one has a chapter marker for each folder.
   - New: Option --chapter_offset for use with --merge to offset the chapter marker in relation to the folder clip.
   - New: Added flag -movstart +faststart for video files better suited with browsers etc. (i.e. YouTube). Thanks to sf302 for suggestion.
   - New: Option to add trigger (--monitor_trigger_file) to use existence of a file/folder/link for starting processing instead of USB/SD being inserted.
   - Changed: Method for concatenating the clips together has been changed resulting in massive performance improvement (less then 1 second to do concatenation). Big thanks to sf302!
-  - Fixed: Folders will now be deleted if there are 0-byte or corrupt video files within the folder `Issue #40 <https://github.com/ehendrix23/tesla_dashcam/issues/40>`_
-  - Fixed: Providing a filename for --output would create a folder instead and not setting resulting file to filename provided `Issue #52 <https://github.com/ehendrix23/tesla_dashcam/issues/52>`_
-  - Fixed: Thread exception in Windows that ToastNotifier does not have an attribute classAtom (potential fix). `Issue #54 <https://github.com/ehendrix23/tesla_dashcam/issues/54>`_
+  - Fixed: Folders will now be deleted if there are 0-byte or corrupt video files within the folder [Issue #40](https://github.com/ehendrix23/tesla_dashcam/issues/40)
+  - Fixed: Providing a filename for --output would create a folder instead and not setting resulting file to filename provided [Issue #52](https://github.com/ehendrix23/tesla_dashcam/issues/52)
+  - Fixed: Thread exception in Windows that ToastNotifier does not have an attribute classAtom (potential fix). [Issue #54](https://github.com/ehendrix23/tesla_dashcam/issues/54)
   - Fixed: Traceback when invalid output path (none-existing) is provided or when unable to create target folder in given path.
   - Fixed: Including sub dirs did not work correctly, it would only grab the 1st folder.
   - Fixed: When using monitor, if . was provided as source then nothing would be processed. Now it will process everything as intended.
   - Fixed: File created when providing a filename with --output and --monitor option did not put timestamp in filename to ensure unique filenames
   - Fixed: Argument to get release notes was provided incorrectly when checking for updates. Thank you to demonbane for fixing.
-0.1.13:
-  - New: Support for rear camera (introduced in V10). This also results in layouts having been modified to allow inclusion of rear camera. `Issue #71 <https://github.com/ehendrix23/tesla_dashcam/issues/71>`_
+- 0.1.13:
+  - New: Support for rear camera (introduced in V10). This also results in layouts having been modified to allow inclusion of rear camera. [Issue #71](https://github.com/ehendrix23/tesla_dashcam/issues/71)
   - New: Support for hardware encoding for systems with supported Intel GPUs.
-  - New: Support for hardware encoding on Raspberry Pi (RPi) (H.264 only) `Issue #66 <https://github.com/ehendrix23/tesla_dashcam/issues/66>`_
+  - New: Support for hardware encoding on Raspberry Pi (RPi) (H.264 only) [Issue #66](https://github.com/ehendrix23/tesla_dashcam/issues/66)
   - New: Layout CROSS with front camera top centered, side camera underneath it, and rear camera then underneath side cameras centered.
   - New: Layout DIAMOND with front camera top centered, rear camera under front and side camera centered at the left and right of front&rear.
   - New: Option --motion_only to fast-forward through the portions in the video that does not have anything motion (done through removal of duplicate frames). Thanks to supRy for providing this
@@ -914,8 +914,8 @@ This project is under the Apache 2 license but many components used have their o
   - New: Options --start_timestamp and --end_timestamp can be used to restrict resulting video (and processing) to specific timestamps. This can be used in combination with --start_offset and/or --end_offset
   - New: Options --no-front, --no-left, --no-right, and --no-rear to exclude camera(s) from the videos
   - New: Option --gpu_type to provide GPU installed in the system for Windows/Linux. Current supported options are nvidia, intel, and RPi.
-  - New: Option  --no-faststart for not setting the faststart flag in the video files as doing this can result in encoding failures on network shares `Issue #62 <https://github.com/ehendrix23/tesla_dashcam/issues/62>`_
-  - New: Option --temp_dir to provide a different path to store the temporary video files that are created `Issue #67 <https://github.com/ehendrix23/tesla_dashcam/issues/67>`_
+  - New: Option  --no-faststart for not setting the faststart flag in the video files as doing this can result in encoding failures on network shares [Issue #62](https://github.com/ehendrix23/tesla_dashcam/issues/62)
+  - New: Option --temp_dir to provide a different path to store the temporary video files that are created [Issue #67](https://github.com/ehendrix23/tesla_dashcam/issues/67)
   - New: Description metadata to include video was created by tesla_dashcam with version number.
   - Changed: WIDESCREEN layout will now by default show the front camera on top with higher resolution compared to others due to incorporation of rear camera
   - Changed: Include folder SentryClips in default source list if no source provided (SavedClips was already default).
@@ -923,23 +923,23 @@ This project is under the Apache 2 license but many components used have their o
   - Changed: Existence of font file (provided or default) will be checked and error returned if not existing.
   - Changed: Existence of ffmpeg will be checked and error returned if not existing.
   - Changed: If no filename provided for merged video then current date/time will be used for filename.
-  - Fixed: Merge of videos fails when a relative path instead of an absolute path is provided for --output `Issue #62 <https://github.com/ehendrix23/tesla_dashcam/issues/62>`_
+  - Fixed: Merge of videos fails when a relative path instead of an absolute path is provided for --output [Issue #62](https://github.com/ehendrix23/tesla_dashcam/issues/62)
   - Fixed: Issue during processing of metadata if files were missing
   - Fixed: Hidden files (files starting with period) on Mac/Linux were not ignored. This could cause issues as some programs might create these files when viewing the video.
-0.1.14:
+- 0.1.14:
   - Fixed: Checking if font path exist in Windows failed.
-0.1.15:
+- 0.1.15:
   - Changed: Reduced sensitivity for motion detection
   - Changed: Minor improvement for font path checking, mainly message provided.
-  - Fixed: Rear view camera filename was changed from -rear_view to -back in TeslaCam folders. `Issue #78 <https://github.com/ehendrix23/tesla_dashcam/issues/78>`_
-  - Fixed: Missing python-dateutil package when installing from PIP `Issue #77 <https://github.com/ehendrix23/tesla_dashcam/issues/77>`_
+  - Fixed: Rear view camera filename was changed from -rear_view to -back in TeslaCam folders. [Issue #78](https://github.com/ehendrix23/tesla_dashcam/issues/78)
+  - Fixed: Missing python-dateutil package when installing from PIP `[Issue #77](https://github.com/ehendrix23/tesla_dashcam/issues/77)
   - Fixed: Missing fonts in Docker Image (thanks to moorecp for providing fix)
   - Fixed: Only the 1st source was processed When using MONITOR or MONITOR_ONCE, or with V10 only SavedClips was processed when not providing a source
-0.1.16:
+- .1.16:
   - New: Options --front_scale, --rear_scale, --left_scale, and --right_scale to set the scale of each clip individually (value of 1 is 1280x960 for the clip)
   - New: Option --swap_frontrear to swap front&rear cameras in output.
   - New: Option --background to specify background color (default is black).
-  - New: Option --fps to set the frame rate for resulting video. Default is set to 24 (Tesla records at about 33 fps). `Issue #85 <https://github.com/ehendrix23/tesla_dashcam/issues/85>`_
+  - New: Option --fps to set the frame rate for resulting video. Default is set to 24 (Tesla records at about 33 fps). [Issue #85](https://github.com/ehendrix23/tesla_dashcam/issues/85)
   - New: Parameter file (provided using @) can now include comments (specify using #)
   - New: Option --loglevel to allow for debug information to be printed.
   - Changed: --speedup and --slowdown now accepts a float allowing for example to speed video up by 1.5
@@ -949,27 +949,25 @@ This project is under the Apache 2 license but many components used have their o
   - Changed: Swap left&right cameras when showing rear&side as rear viewing, and not to swap them when showing rear&side as mirror view.
   - Changed: Re-organized help (-h) for all parameters by grouping them.
   - Changed: Added message to install fonts using apt-get install ttf-freefont on Linux if font file is not found.
-  - Changed: Only execute if we're main allowing to be imported into other scripts. `Issue #94 <https://github.com/ehendrix23/tesla_dashcam/issues/94>`_
-  - Fixed: Providing paths with spaces did not work in parameter files even although it worked from command line. `Issue #89 <https://github.com/ehendrix23/tesla_dashcam/issues/89>`_
-  - Fixed: Changed Arial font on MacOS to Arial Unicode (from Arial) as it seems Arial is not available anymore on MacOS 10.15 (Catalina). `Issue #64 <https://github.com/ehendrix23/tesla_dashcam/issues/64>`_
+  - Changed: Only execute if we're main allowing to be imported into other scripts. [Issue #94](https://github.com/ehendrix23/tesla_dashcam/issues/94)
+  - Fixed: Providing paths with spaces did not work in parameter files even although it worked from command line. [Issue #89](https://github.com/ehendrix23/tesla_dashcam/issues/89)
+  - Fixed: Changed Arial font on MacOS to Arial Unicode (from Arial) as it seems Arial is not available anymore on MacOS 10.15 (Catalina). [Issue #64](https://github.com/ehendrix23/tesla_dashcam/issues/64)
   - Fixed: Incorrect encoder for x265 with Intel GPU hardware encoding - mbaileys
 0.1.17:
   - New: Added update checker to determine if there is a newer version, additional arguments to just perform check (--check_for_update), include test releases (--include_test), or disable always checking for updates (--no-check_for_update)
 
-TODO
-----
+## TODO
 
-* Implement option to crop individual camera output
-* Option for end-user layout
-* Monitor path for new folders/files as trigger option
-* Provide option to copy or move from source to output folder before starting to process
-* Develop method to run as a service with --monitor option
-* GUI Front-end
-* Support drag&drop of video folder (supported in Windows now, MacOS not yet)
-* Add object detection (i.e. people) and possible output when object was detected
-* Saving of options
-* Use timestamp in video to ensure full synchronization between the 4 cameras
-* Add option for source/output to be S3 bucket (with temp folder for creating temporary files)
-* Develop Web Front-End
-* Develop method to have run in AWS, allowing user to upload video files and interact using Web Front-End
-
+- Implement option to crop individual camera output
+- Option for end-user layout
+- Monitor path for new folders/files as trigger option
+- Provide option to copy or move from source to output folder before starting to process
+- Develop method to run as a service with --monitor option
+- GUI Front-end
+- Support drag&drop of video folder (supported in Windows now, MacOS not yet)
+- Add object detection (i.e. people) and possible output when object was detected
+- Saving of options
+- Use timestamp in video to ensure full synchronization between the 4 cameras
+- Add option for source/output to be S3 bucket (with temp folder for creating temporary files)
+- Develop Web Front-End
+- Develop method to have run in AWS, allowing user to upload video files and interact using Web Front-End
