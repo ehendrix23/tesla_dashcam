@@ -55,6 +55,7 @@ FFMPEG = {
     "win32": "ffmpeg.exe",
     "cygwin": "ffmpeg",
     "linux": "ffmpeg",
+    "freebsd11": "ffmpeg",
 }
 
 # noinspection PyPep8
@@ -63,6 +64,7 @@ MOVIE_HOMEDIR = {
     "win32": "Videos\Tesla_Dashcam",
     "cygwin": "Videos/Tesla_Dashcam",
     "linux": "Videos/Tesla_Dashcam",
+    "freebsd11": "Videos/Tesla_Dashcam",
 }
 
 DEFAULT_CLIP_HEIGHT = 960
@@ -94,6 +96,7 @@ DEFAULT_FONT = {
     "win32": "/Windows/Fonts/arial.ttf",
     "cygwin": "/cygdrive/c/Windows/Fonts/arial.ttf",
     "linux": "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+    "freebsd11": "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
 }
 
 HALIGN = {"LEFT": "10", "CENTER": "(w/2-text_w/2)", "RIGHT": "(w-text_w)"}
