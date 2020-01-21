@@ -3007,6 +3007,10 @@ def main() -> None:
             if sys.platform == "darwin":
                 video_encoding = video_encoding + ["-allow_sw", "1"]
                 encoding = encoding + "_mac"
+
+                # x265 + Quicktime compatibilty for macOS
+                if encoding == "x265_mac":
+                  video_encoding = video_encoding + ["-vtag", "hvc1"]
             else:
                 if args.gpu_type is None:
                     print(
