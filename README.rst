@@ -1402,6 +1402,11 @@ Release Notes
     - Fixed: Providing paths with spaces did not work in parameter files even although it worked from command line. `Issue #89 <https://github.com/ehendrix23/tesla_dashcam/issues/89>`_
     - Fixed: Changed Arial font on MacOS to Arial Unicode (from Arial) as it seems Arial is not available anymore on MacOS 10.15 (Catalina). `Issue #64 <https://github.com/ehendrix23/tesla_dashcam/issues/64>`_
     - Fixed: Incorrect encoder for x265 with Intel GPU hardware encoding - mbaileys
+0.1.17:
+    - New: Support for FreeBSD 11. Contributed by busbyjon
+    - Changed: Improvement for Docker file size and stability. Contributed by magicalyak
+    - Fixed: Added x265 compatibility tag for QuickTime on MacOS. Contributed by dburkland
+
 
 TODO
 ----
