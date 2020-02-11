@@ -1406,6 +1406,7 @@ Release Notes
     - New: Support for FreeBSD 11. Contributed by busbyjon
     - Changed: Improvement for Docker file size and stability. Contributed by magicalyak
     - Fixed: Added x265 compatibility tag for QuickTime on MacOS. Contributed by dburkland
+    - Fixed: Event file will now be removed when providing an output file and only 1 event is processed, leaving only 1 movie file.
 
 
 TODO

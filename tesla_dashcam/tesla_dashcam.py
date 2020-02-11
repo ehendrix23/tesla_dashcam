@@ -2001,6 +2001,13 @@ def process_folders(folders, video_settings, delete_source):
                     duration=str(timedelta(seconds=int(movie_duration))),
                 )
             )
+
+            # Delete the 1 event movie if we created the movie because there was only 1 folder.
+            if (
+                not video_settings["merge_subdirs"]
+                and dashcam_clips[0][video_filename] != movie_filename
+            ):
+                delete_intermediate(dashcam_clips[0]["video_filename"])
         else:
             print(
                 "All folders have been processed, resulting movie files are "
@@ -3013,7 +3020,7 @@ def main() -> None:
 
                 # x265 + Quicktime compatibilty for macOS
                 if encoding == "x265_mac":
-                  video_encoding = video_encoding + ["-vtag", "hvc1"]
+                    video_encoding = video_encoding + ["-vtag", "hvc1"]
             else:
                 if args.gpu_type is None:
                     print(
