@@ -15,7 +15,7 @@ from shlex import split as shlex_split
 from shutil import which
 from subprocess import CalledProcessError, run
 from tempfile import mkstemp
-from time import sleep, time as timestamp
+from time import sleep, time as timestamp, mktime
 from typing import List, Optional
 
 import requests
@@ -83,12 +83,12 @@ MOVIE_ENCODING = {
     "x264_nvidia": "h264_nvenc",
     "x264_mac": "h264_videotoolbox",
     "x264_intel": "h264_qsv",
-    "x264_RPi": "h264_omx",
+    "x264_rpi": "h264_omx",
     "x265": "libx265",
     "x265_nvidia": "hevc_nvenc",
     "x265_mac": "hevc_videotoolbox",
     "x265_intel": "hevc_qsv",
-    "x265_RPi": "h265",
+    "x265_rpi": "h265",
 }
 
 DEFAULT_FONT = {
@@ -1490,7 +1490,14 @@ def create_intermediate_movie(
     return temp_movie_name, duration, True
 
 
-def create_movie(clips_list, movie_filename, video_settings, chapter_offset):
+def create_movie(
+    clips_list,
+    movie_filename,
+    video_settings,
+    chapter_offset,
+    start_timestamp,
+    end_timestamp,
+):
     """ Concatenate provided movie files into 1."""
     # Just return if there are no clips.
     if not clips_list:
@@ -1564,6 +1571,24 @@ def create_movie(clips_list, movie_filename, video_settings, chapter_offset):
             )
             meta_start = meta_start + 1 + video_duration
 
+            if start_timestamp is None:
+                start_timestamp = video_clip.get("video_start_timestamp")
+            elif video_clip.get("video_start_timestamp") is not None:
+                start_timestamp = (
+                    video_clip.get("video_start_timestamp")
+                    if start_timestamp > video_clip.get("video_start_timestamp")
+                    else start_timestamp
+                )
+
+            if end_timestamp is None:
+                end_timestamp = video_clip.get("video_end_timestamp")
+            elif video_clip.get("video_end_timestamp") is not None:
+                end_timestamp = (
+                    video_clip.get("video_end_timestamp")
+                    if end_timestamp < video_clip.get("video_end_timestamp")
+                    else end_timestamp
+                )
+
     if total_clips == 0:
         print("\t\tError: No valid clips to merge found.")
         return None, None
@@ -1626,6 +1651,15 @@ def create_movie(clips_list, movie_filename, video_settings, chapter_offset):
         # Get actual duration of our new video, required for chapters when concatenating.
         metadata = get_metadata(video_settings["ffmpeg_exec"], [movie_filename])
         duration = metadata[0]["duration"] if metadata else total_videoduration
+
+        # Set the file timestamp if to be set based on timestamp event
+        if video_settings["set_moviefile_timestamp"] is not None:
+            moviefile_timestamp = (
+                mktime(start_timestamp.astimezone(get_localzone()).timetuple())
+                if video_settings["set_moviefile_timestamp"] == "START"
+                else mktime(end_timestamp.astimezone(get_localzone()).timetuple())
+            )
+            os.utime(movie_filename, (moviefile_timestamp, moviefile_timestamp))
 
     # Remove temp join file.
     # noinspection PyBroadException,PyPep8
@@ -1809,6 +1843,8 @@ def process_folders(folders, video_settings, delete_source):
                     "video_timestamp": first_clip_tmstp,
                     "video_filename": movie_filename,
                     "video_duration": movie_duration,
+                    "video_start_timestamp": folder_start_timestmp,
+                    "video_end_timestamp": folder_end_timestmp,
                 }
             )
             continue
@@ -1855,6 +1891,8 @@ def process_folders(folders, video_settings, delete_source):
                             "video_timestamp": video_timestamp_info["timestamp"],
                             "video_filename": clip_name,
                             "video_duration": clip_duration,
+                            "video_start_timestamp": folder_start_timestmp,
+                            "video_end_timestamp": folder_end_timestmp,
                         }
                     )
                 else:
@@ -1917,7 +1955,12 @@ def process_folders(folders, video_settings, delete_source):
             print("\t\tCreating movie {}, please be patient.".format(movie_filename))
 
             movie_name, movie_duration = create_movie(
-                folder_clips, movie_filename, video_settings, 0
+                folder_clips,
+                movie_filename,
+                video_settings,
+                0,
+                folder_start_timestmp,
+                folder_end_timestmp,
             )
 
         # Delete the source files if stated to delete.
@@ -1941,6 +1984,8 @@ def process_folders(folders, video_settings, delete_source):
                     "video_timestamp": folder_timestamp,
                     "video_filename": movie_name,
                     "video_duration": movie_duration,
+                    "video_start_timestamp": folder_start_timestmp,
+                    "video_end_timestamp": folder_end_timestmp,
                 }
             )
             # Delete the intermediate files we created.
@@ -1992,6 +2037,8 @@ def process_folders(folders, video_settings, delete_source):
                 movie_filename,
                 video_settings,
                 video_settings["chapter_offset"],
+                None,
+                None,
             )
 
         if movie_name is not None:
@@ -2005,9 +2052,9 @@ def process_folders(folders, video_settings, delete_source):
             # Delete the 1 event movie if we created the movie because there was only 1 folder.
             if (
                 not video_settings["merge_subdirs"]
-                and dashcam_clips[0][video_filename] != movie_filename
+                and dashcam_clips[0]["video_filename"] != movie_filename
             ):
-                delete_intermediate(dashcam_clips[0]["video_filename"])
+                delete_intermediate([dashcam_clips[0]["video_filename"]])
         else:
             print(
                 "All folders have been processed, resulting movie files are "
@@ -2187,6 +2234,7 @@ def main() -> None:
         "--loglevel",
         default="INFO",
         choices=list(loglevels.keys()),
+        type=str.upper,
         help="Logging level.",
     )
     parser.add_argument(
@@ -2257,6 +2305,7 @@ def main() -> None:
         required=False,
         choices=["WIDESCREEN", "FULLSCREEN", "PERSPECTIVE", "CROSS", "DIAMOND"],
         default="FULLSCREEN",
+        type=str.upper,
         help="R|Layout of the created video.\n"
         "    FULLSCREEN: Front camera center top, "
         "side cameras underneath it with rear camera between side camera.\n"
@@ -2276,7 +2325,7 @@ def main() -> None:
     layout_group.add_argument(
         "--scale",
         dest="clip_scale",
-        type=str,
+        type=str.lower,
         nargs="+",
         action="append",
         help="R|Set camera clip scale for all clips, scale of 1 is 1280x960 camera clip.\n"
@@ -2335,6 +2384,7 @@ def main() -> None:
         "--background",
         dest="background",
         default="black",
+        type=str.lower,
         help="Background color for video. Can be a color string or RGB value. Also see --fontcolor.",
     )
 
@@ -2380,12 +2430,14 @@ def main() -> None:
         "--halign",
         required=False,
         choices=["LEFT", "CENTER", "RIGHT"],
+        type=str.upper,
         help="Horizontal alignment for timestamp",
     )
     timestamp_group.add_argument(
         "--valign",
         required=False,
         choices=["TOP", "MIDDLE", "BOTTOM"],
+        type=str.upper,
         help="Vertical Alignment for timestamp",
     )
     timestamp_group.add_argument(
@@ -2404,7 +2456,7 @@ def main() -> None:
     timestamp_group.add_argument(
         "--fontcolor",
         required=False,
-        type=str,
+        type=str.lower,
         default="white",
         help="R|Font color for timestamp. Any color is accepted as a color string or RGB value.\n"
         "Some potential values are:\n"
@@ -2502,6 +2554,17 @@ def main() -> None:
         help="Do not remove the clip video files that are created",
     )
 
+    output_group.add_argument(
+        "--set_moviefile_timestamp",
+        dest="set_moviefile_timestamp",
+        required=False,
+        choices=["START", "STOP"],
+        type=str.upper,
+        default="START",
+        help="Match modification timestamp of resulting video files to event timestamp. Use START to match with when "
+        "the event started, STOP for end time of the event.",
+    )
+
     advancedencoding_group = parser.add_argument_group(
         title="Advanced encoding settings", description="Advanced options for encoding"
     )
@@ -2525,6 +2588,7 @@ def main() -> None:
         advancedencoding_group.add_argument(
             "--gpu_type",
             choices=["nvidia", "intel", "RPi"],
+            type=str.lower,
             help="Type of graphics card (GPU) in the system. This determines the encoder that will be used."
             "This parameter is mandatory if --gpu is provided.",
         )
@@ -2542,6 +2606,7 @@ def main() -> None:
         required=False,
         choices=["LOWEST", "LOWER", "LOW", "MEDIUM", "HIGH"],
         default="LOWER",
+        type=str.upper,
         help="Define the quality setting for the video, higher quality means bigger file size but might "
         "not be noticeable.",
     )
@@ -2561,6 +2626,7 @@ def main() -> None:
             "veryslow",
         ],
         default="medium",
+        type=str.lower,
         help="Speed to optimize video. Faster speed results in a bigger file. This does not impact the quality of "
         "the video, just how much time is used to compress it.",
     )
@@ -2594,6 +2660,7 @@ def main() -> None:
         "--encoding",
         required=False,
         choices=["x264", "x265"],
+        type=str.lower,
         default=argparse.SUPPRESS,
         help="R|Encoding to use for video creation.\n"
         "    x264: standard encoding, can be viewed on most devices but results in bigger file.\n"
@@ -3118,6 +3185,9 @@ def main() -> None:
         "merge_subdirs": args.merge_subdirs,
         "chapter_offset": args.chapter_offset,
         "movie_filename": None,
+        "set_moviefile_timestamp": args.set_moviefile_timestamp
+        if "set_moviefile_timestamp" in args
+        else None,
         "keep_intermediate": args.keep_intermediate,
         "notification": args.system_notification,
         "movie_layout": args.layout,

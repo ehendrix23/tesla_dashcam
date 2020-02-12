@@ -1404,7 +1404,9 @@ Release Notes
     - Fixed: Incorrect encoder for x265 with Intel GPU hardware encoding - mbaileys
 0.1.17:
     - New: Support for FreeBSD 11. Contributed by busbyjon
+    - New: Video file timestamp can now be set to timestamp of event (start or stop).
     - Changed: Improvement for Docker file size and stability. Contributed by magicalyak
+    - Changed: Choice values for parameters (i.e. FULLSCREEN, intel, black) are now case-insensitive.
     - Fixed: Added x265 compatibility tag for QuickTime on MacOS. Contributed by dburkland
     - Fixed: Event file will now be removed when providing an output file and only 1 event is processed, leaving only 1 movie file.
 
