@@ -1525,9 +1525,12 @@ def create_movie(
                 continue
 
             # Add this file in our join list.
+            # NOTE: Recent ffmpeg changes requires Windows paths in this file to look like
+            # file 'file:<actual path>'
+            # https://trac.ffmpeg.org/ticket/2702
             fp.write(
-                "file '"
-                + video_clip["video_filename"]
+                "file 'file:"
+                + video_clip["video_filename"].replace(os.sep, '/')
                 + "'{linesep}".format(linesep=os.linesep)
             )
             total_clips = total_clips + 1
