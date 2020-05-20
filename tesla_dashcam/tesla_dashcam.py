@@ -2559,8 +2559,7 @@ def main() -> None:
         "For more information on this see ffmpeg documentation for color: https://ffmpeg.org/ffmpeg-utils.html#Color",
     )
     text_overlay_group.add_argument(
-        "--text-overlay-fmt",
-        dest="text_overlay_fmt",
+        "--text_overlay_fmt",
         required=False,
         type=str,
         default="{local_timestamp_rolling}",
