@@ -2559,19 +2559,20 @@ def main() -> None:
         "For more information on this see ffmpeg documentation for color: https://ffmpeg.org/ffmpeg-utils.html#Color",
     )
     text_overlay_group.add_argument(
-        "--text_overlay_fmt",
+        "--text-overlay-fmt",
+        dest="text_overlay_fmt",
         required=False,
         type=str,
         default="{local_timestamp_rolling}",
         help="R|Format string for text overlay.\n"
         "Valid format variables:\n"
-        "    local_timestamp_rolling - Local time which continuously updates\n"
-        "    local_timestamp - Local time that does not continuously update\n"
-        "    event_timestamp - Timestamp from events.json (if provided)\n"
-        "    event_city - City name from events.json (if provided)\n"
-        "    event_reason - Recording reason from events.json (if provided)\n"
-        "    event_latitude - Estimated latitude from events.json (if provided)\n"
-        "    event_longitude - Estimated longitude from events.json (if provided)\n"
+        "    local_timestamp_rolling - Local time which continuously updates, string\n"
+        "    local_timestamp - Local time that does not continuously update, string\n"
+        "    event_timestamp - Timestamp from events.json (if provided), string\n"
+        "    event_city - City name from events.json (if provided), string\n"
+        "    event_reason - Recording reason from events.json (if provided), string\n"
+        "    event_latitude - Estimated latitude from events.json (if provided), float\n"
+        "    event_longitude - Estimated longitude from events.json (if provided), float\n"
     )
 
     filter_group = parser.add_argument_group(
