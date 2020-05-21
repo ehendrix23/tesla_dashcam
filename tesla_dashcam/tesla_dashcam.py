@@ -1142,17 +1142,54 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
             }
 
             with open(file) as f:
-                event_file_data = json.load(f)
+                try:
+                    event_file_data = json.load(f)
 
-            event_metadata["timestamp"] = event_file_data["timestamp"]
-            event_metadata["city"] = event_file_data["city"]
-            event_metadata["reason"] = event_file_data["reason"]
-            event_metadata["latitude"] = float(event_file_data["est_lat"])
-            event_metadata["longitude"] = float(event_file_data["est_lon"])
+                    event_timestamp = None
+                    # Parse timestamp as timestamp and not just string
+                    if "timestamp" in event_file_data:
+                        try:
+                            event_timestamp = datetime.strptime(
+                                event_file_data["timestamp"], "%Y-%m-%dT%H:%M:%S"
+                            )
+                        except ValueError as e:
+                            _LOGGER.warning(
+                                f"Event timestamp found in {file} (\"{event_file_data['timestamp']}\")could not be parsed as a timestamp"
+                            )
+                        
 
-            movie_entry = movies_list.get(movie_folder, {})
-            movie_entry["event_metadata"] = event_metadata
-            movies_list.update({movie_folder: movie_entry})
+                    event_metadata["timestamp"] = event_timestamp
+
+                    if "city" in event_file_data:
+                        event_metadata["city"] = event_file_data["city"]
+                    
+                    if "reason" in event_file_data:
+                        event_metadata["reason"] = event_file_data["reason"]
+    
+                    if "est_lat" in event_file_data:
+                        try:
+                            event_metadata["latitude"] = float(event_file_data["est_lat"])
+                        except ValueError as e:
+                            _LOGGER.warning(
+                                f"Event latitude found in {file} (\"{event_file_data['est_lat']}\") could not be parsed as a timestamp"
+                            )
+
+                    if "est_lon" in event_file_data:
+                        try:
+                            event_metadata["longitude"] = float(event_file_data["est_lon"])
+                        except ValueError as e:
+                            _LOGGER.warning(
+                                f"Event longitude found in {file} (\"{event_file_data['est_lon']}\") could not be parsed as a timestamp"
+                            )
+
+                    movie_entry = movies_list.get(movie_folder, {})
+                    movie_entry["event_metadata"] = event_metadata
+                    movies_list.update({movie_folder: movie_entry})
+
+                except json.JSONDecodeError as e:
+                    _LOGGER.warning(
+                        f"Event JSON found in {file} failed to parse with JSON error: {str(e)}"
+                    )
 
     return movies_list
 
@@ -1486,7 +1523,7 @@ def create_intermediate_movie(
         )
     )
 
-    epoch_timestamp = int(starting_timestmp.timestamp())
+    starting_epoch_timestamp = int(starting_timestmp.timestamp())
 
     
     ffmpeg_text = video_settings["ffmpeg_text_overlay"];
@@ -1494,8 +1531,10 @@ def create_intermediate_movie(
 
     # Replace variables in user provided text overlay
     replacement_strings = {
-        "local_timestamp": epoch_timestamp,
-        "local_timestamp_rolling": "%{{pts:localtime:{local_timestamp}:%x %X}}",
+        "local_timestamp": starting_epoch_timestamp,
+        "local_timestamp_rolling": "%{{pts:localtime:{local_timestamp}:%x %X}}".format(local_timestamp = starting_epoch_timestamp),
+        "event_timestamp_countdown": "n/a",
+        "event_timestamp_countdown_rolling": "n/a",
         "event_timestamp": "n/a",
         "event_city": "n/a",
         "event_reason": "n/a",
@@ -1504,15 +1543,21 @@ def create_intermediate_movie(
     }
 
     if event_metadata is not None:
-        replacement_strings["event_timestamp"] = event_metadata["timestamp"]
-        replacement_strings["event_city"] = event_metadata["city"]
-        replacement_strings["event_reason"] = event_metadata["reason"]
-        replacement_strings["event_latitude"] = event_metadata["latitude"]
-        replacement_strings["event_longitude"] = event_metadata["longitude"]
+        if event_metadata["timestamp"] is not None:
+            event_epoch_timestamp = int(event_metadata["timestamp"].timestamp())
+            replacement_strings["event_timestamp"] = event_epoch_timestamp
+           
+            # Calculate the time until the event
+            replacement_strings["event_timestamp_countdown"] = starting_epoch_timestamp - event_epoch_timestamp
+            replacement_strings["event_timestamp_countdown_rolling"] = "%{{pts:hms:{event_timestamp_countdown}}}".format(event_timestamp_countdown = replacement_strings["event_timestamp_countdown"])
+
+        replacement_strings["event_city"] = event_metadata["city"] or "n/a"
+        replacement_strings["event_reason"] = event_metadata["reason"] or "n/a"
+        replacement_strings["event_latitude"] = event_metadata["latitude"] or 0.0
+        replacement_strings["event_longitude"] = event_metadata["longitude"] or 0.0
   
     try:
-        # Do two passes of formatting to allow rolling timestamp to be replaced
-        user_formatted_text = user_formatted_text.format(**replacement_strings)
+        # Try to replace strings!
         user_formatted_text = user_formatted_text.format(**replacement_strings)
     except KeyError as e:
         user_formatted_text = "Bad string format: Invalid variable {stderr}".format(stderr=str(e))
@@ -2565,13 +2610,17 @@ def main() -> None:
         default="{local_timestamp_rolling}",
         help="R|Format string for text overlay.\n"
         "Valid format variables:\n"
-        "    local_timestamp_rolling - Local time which continuously updates, string\n"
-        "    local_timestamp - Local time that does not continuously update, string\n"
+        "    local_timestamp - Local time that the clip starts at, string\n"
+        "    local_timestamp_rolling - Local time which continuously updates (shorthand for '%%{{pts:localtime:{local_timestamp}:%%x %%X}}'), string\n"
         "    event_timestamp - Timestamp from events.json (if provided), string\n"
+        "    event_timestamp_countdown_rolling - Local time which continuously updates (shorthand for '%%{{hms:localtime:{event_timestamp}}}'), string\n"
         "    event_city - City name from events.json (if provided), string\n"
         "    event_reason - Recording reason from events.json (if provided), string\n"
         "    event_latitude - Estimated latitude from events.json (if provided), float\n"
         "    event_longitude - Estimated longitude from events.json (if provided), float\n"
+        "    \n"
+        "    All valid ffmpeg 'text expansion' syntax is accepted here.\n"
+        "    More info: http://ffmpeg.org/ffmpeg-filters.html#Text-expansion\n"
     )
 
     filter_group = parser.add_argument_group(
