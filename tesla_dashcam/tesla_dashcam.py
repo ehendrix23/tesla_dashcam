@@ -1164,7 +1164,7 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
                             )
                         except ValueError as e:
                             _LOGGER.warning(
-                                f"Event timestamp found in {file} (\"{event_file_data['timestamp']}\")could not be parsed as a timestamp"
+                                f"{get_current_timestamp()}Event timestamp found in {file} (\"{event_file_data['timestamp']}\")could not be parsed as a timestamp"
                             )
                         
 
@@ -1181,7 +1181,7 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
                             event_metadata["latitude"] = float(event_file_data["est_lat"])
                         except ValueError as e:
                             _LOGGER.warning(
-                                f"Event latitude found in {file} (\"{event_file_data['est_lat']}\") could not be parsed as a timestamp"
+                                f"{get_current_timestamp()}Event latitude found in {file} (\"{event_file_data['est_lat']}\") could not be parsed as a timestamp"
                             )
 
                     if "est_lon" in event_file_data:
@@ -1189,7 +1189,7 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
                             event_metadata["longitude"] = float(event_file_data["est_lon"])
                         except ValueError as e:
                             _LOGGER.warning(
-                                f"Event longitude found in {file} (\"{event_file_data['est_lon']}\") could not be parsed as a timestamp"
+                                f"{get_current_timestamp()}Event longitude found in {file} (\"{event_file_data['est_lon']}\") could not be parsed as a timestamp"
                             )
 
                     movie_entry = movies_list.get(movie_folder, {})
@@ -1198,7 +1198,7 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
 
                 except json.JSONDecodeError as e:
                     _LOGGER.warning(
-                        f"Event JSON found in {file} failed to parse with JSON error: {str(e)}"
+                        f"{get_current_timestamp()}Event JSON found in {file} failed to parse with JSON error: {str(e)}"
                     )
 
     return movies_list
@@ -1346,7 +1346,7 @@ def create_intermediate_movie(
         and rear_camera is None
     ):
         _LOGGER.debug(
-            f'No front, left, right, and rear camera clip exist for {video["timestamp"]}'
+            f'{get_current_timestamp()}No front, left, right, and rear camera clip exist for {video["timestamp"]}'
         )
         return None, 0, True
 
@@ -1640,7 +1640,7 @@ def create_movie(
     """ Concatenate provided movie files into 1."""
     # Just return if there are no clips.
     if not clips_list:
-        _LOGGER.debug("Clip list is empty")
+        _LOGGER.debug(f"{get_current_timestamp()}Clip list is empty")
         return None, None
 
     # Go through the list of clips to create the command and content for chapter meta file.
