@@ -140,6 +140,7 @@ Usage
                             Logging level. (default: INFO)
       --temp_dir TEMP_DIR   Path to store temporary files. (default: None)
       --no-notification     Do not create a notification upon completion. (default: True)
+      --display_ts          Display timestamps on tesla_dashcam text output. DOES NOT AFFECT VIDEO OUTPUT. (default: False)
 
     Video Input:
       Options related to what clips and events to process.
