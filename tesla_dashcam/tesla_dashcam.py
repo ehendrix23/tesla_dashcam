@@ -1285,7 +1285,7 @@ def create_intermediate_movie(
         # This clip is not in-between the timestamps we want, skip it.
         _LOGGER.debug(
             f"{get_current_timestamp()}Clip timestamp from {starting_timestmp} to {ending_timestmp} not "
-            f"{get_current_timestamp()}between {folder_timestamps[0]} and {folder_timestamps[1]}"
+            f"between {folder_timestamps[0]} and {folder_timestamps[1]}"
         )
         return None, 0, True
 
