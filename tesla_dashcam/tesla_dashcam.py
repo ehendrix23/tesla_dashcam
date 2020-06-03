@@ -106,6 +106,7 @@ VALIGN = {"TOP": "10", "MIDDLE": "(h/2-(text_h/2))", "BOTTOM": "(h-(text_h*2))"}
 
 TOASTER_INSTANCE = None
 
+display_ts = False
 
 class Font(object):
     """ Font Class
@@ -871,6 +872,14 @@ def search_dict(
         (element for element in search_list if element.get(key) == match_value), None
     )
 
+def get_current_timestamp():
+    """Returns the current timestamp"""
+    """Uses ugly global variable, this should die a quick death..."""
+    """Preferably, a text output class should be created and the value stored there."""
+    if display_ts:
+        return datetime.now().strftime('%Y-%m-%d %H:%M:%S - ')
+    else:
+        return ''
 
 def check_latest_release(include_beta):
     """ Checks GitHub for latest release """
@@ -884,7 +893,7 @@ def check_latest_release(include_beta):
     try:
         releases = requests.get(url)
     except requests.exceptions.RequestException as exc:
-        print("Unable to check for latest release: {exc}".format(exc=exc))
+        print(get_current_timestamp() + "Unable to check for latest release: {exc}".format(exc=exc))
         return None
 
     release_data = releases.json()
@@ -904,9 +913,9 @@ def get_tesladashcam_folder():
 
         teslacamfolder = os.path.join(partition.mountpoint, "TeslaCam")
         if os.path.isdir(teslacamfolder):
-            _LOGGER.debug(f"Folder TeslaCam found on partition {partition.mountpoint}.")
+            _LOGGER.debug(f"{get_current_timestamp()}Folder TeslaCam found on partition {partition.mountpoint}.")
             return teslacamfolder, partition.mountpoint
-        _LOGGER.debug(f"No TeslaCam folder on partition {partition.mountpoint}.")
+        _LOGGER.debug(f"{get_current_timestamp()}No TeslaCam folder on partition {partition.mountpoint}.")
     return None, None
 
 
@@ -927,7 +936,8 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
                     for filename in glob(search_path)
                     if not os.path.basename(filename).startswith(".")
                 ]
-                print(f"Discovered {len(video_files)} video files in {pathname}")
+
+                print(f"{get_current_timestamp()}Discovered {len(video_files)} video files in {pathname}")
 
                 # Retrieve all the event metadata files in current path:
                 search_path = os.path.join(pathname, "*.json")
@@ -936,7 +946,7 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
                     for filename in glob(search_path)
                     if os.path.basename(filename) == "event.json"
                 ]
-                print(f"Discovered {len(event_metadata_files)} event metadata files in {pathname}")
+                print(f"{get_current_timestamp()}Discovered {len(event_metadata_files)} event metadata files in {pathname}")
             else:
                 # Search all sub folder.
                 video_files = []
@@ -960,7 +970,7 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
                         event_metadata_files.append(os.path.join(folder, filename))
 
                 print(
-                    f"Discovered {total_movies} folders containing total of {len(video_files)} video files and {len(event_metadata_files)} event metadata files in {pathname}"
+                    f"{get_current_timestamp()}Discovered {total_movies} folders containing total of {len(video_files)} video files and {len(event_metadata_files)} event metadata files in {pathname}"
                 )
         else:
             video_files = [pathname]
@@ -983,7 +993,7 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
                 continue
 
             _LOGGER.debug(
-                f"Checking camera files in folder {movie_folder} with timestamp {filename_timestamp}"
+                f"{get_current_timestamp()}Checking camera files in folder {movie_folder} with timestamp {filename_timestamp}"
             )
             video_info = {
                 "front_camera": {
@@ -1213,7 +1223,7 @@ def get_metadata(ffmpeg, filenames):
                 }
             )
         else:
-            _LOGGER.debug(f"File {camera_file} does not exist, skipping.")
+            _LOGGER.debug(f"{get_current_timestamp()}File {camera_file} does not exist, skipping.")
 
     # Don't run ffmpeg if nothing to check for.
     if not metadata:
@@ -1361,7 +1371,7 @@ def create_intermediate_movie(
     ):
         # This clip is not in-between the timestamps we want, skip it.
         _LOGGER.debug(
-            f"Clip timestamp from {starting_timestmp} to {ending_timestmp} not "
+            f"{get_current_timestamp()}Clip timestamp from {starting_timestmp} to {ending_timestmp} not "
             f"between {folder_timestamps[0]} and {folder_timestamps[1]}"
         )
         return None, 0, True
@@ -1491,7 +1501,7 @@ def create_intermediate_movie(
 
         if file_already_exist:
             print(
-                "\t\tSkipping clip {clip_number}/{total_clips} from {timestamp} "
+                get_current_timestamp() + "\t\tSkipping clip {clip_number}/{total_clips} from {timestamp} "
                 "and {duration} seconds as it already exist.".format(
                     clip_number=clip_number + 1,
                     total_clips=total_clips,
@@ -1514,7 +1524,7 @@ def create_intermediate_movie(
         temp_movie_name = os.path.join(target_folder, filename_timestamp) + ".mp4"
 
     print(
-        "\t\tProcessing clip {clip_number}/{total_clips} from {timestamp} "
+        get_current_timestamp() + "\t\tProcessing clip {clip_number}/{total_clips} from {timestamp} "
         "and {duration} seconds long.".format(
             clip_number=clip_number + 1,
             total_clips=total_clips,
@@ -1594,15 +1604,15 @@ def create_intermediate_movie(
     )
 
     ffmpeg_command = ffmpeg_command + ["-y", temp_movie_name]
-    _LOGGER.debug(f"FFMPEG Command: {ffmpeg_command}")
+    _LOGGER.debug(f"{get_current_timestamp()}FFMPEG Command: {ffmpeg_command}")
     # Run the command.
     try:
         run(ffmpeg_command, capture_output=True, check=True)
     except CalledProcessError as exc:
         print(
-            "\t\t\tError trying to create clip for {base_name}. RC: {rc}\n"
-            "\t\t\tCommand: {command}\n"
-            "\t\t\tError: {stderr}\n\n".format(
+            get_current_timestamp() + "\t\t\tError trying to create clip for {base_name}. RC: {rc}\n" +
+            get_current_timestamp() + "\t\t\tCommand: {command}\n" +
+            get_current_timestamp() + "\t\t\tError: {stderr}\n\n".format(
                 base_name=os.path.join(video["movie_folder"], filename_timestamp),
                 rc=exc.returncode,
                 command=exc.cmd,
@@ -1647,7 +1657,7 @@ def create_movie(
         ):
             if not os.path.isfile(video_clip["video_filename"]):
                 print(
-                    "\t\tFile {} does not exist anymore, skipping.".format(
+                    get_current_timestamp() + "\t\tFile {} does not exist anymore, skipping.".format(
                         video_clip["video_filename"]
                     )
                 )
@@ -1722,7 +1732,7 @@ def create_movie(
                 )
 
     if total_clips == 0:
-        print("\t\tError: No valid clips to merge found.")
+        print(get_current_timestamp() + "\t\tError: No valid clips to merge found.")
         return None, None
 
     # Write out the meta data file.
@@ -1763,14 +1773,14 @@ def create_movie(
         + ["-y", movie_filename]
     )
 
-    _LOGGER.debug(f"FFMPEG Command: {ffmpeg_command}")
+    _LOGGER.debug(f"{get_current_timestamp()}FFMPEG Command: {ffmpeg_command}")
     try:
         run(ffmpeg_command, capture_output=True, check=True)
     except CalledProcessError as exc:
         print(
-            "\t\tError trying to create movie {base_name}. RC: {rc}\n"
-            "\t\tCommand: {command}\n"
-            "\t\tError: {stderr}\n\n".format(
+            get_current_timestamp() + "\t\tError trying to create movie {base_name}. RC: {rc}\n" +
+            get_current_timestamp() + "\t\tCommand: {command}\n" +
+            get_current_timestamp() + "\t\tError: {stderr}\n\n".format(
                 base_name=movie_filename,
                 rc=exc.returncode,
                 command=exc.cmd,
@@ -1798,7 +1808,7 @@ def create_movie(
     try:
         os.remove(ffmpeg_join_filename)
     except:
-        _LOGGER.debug(f"Failed to remove {ffmpeg_join_filename}")
+        _LOGGER.debug(f"{get_current_timestamp()}Failed to remove {ffmpeg_join_filename}")
         pass
 
     # Remove temp join file.
@@ -1806,7 +1816,7 @@ def create_movie(
     try:
         os.remove(ffmpeg_meta_filename)
     except:
-        _LOGGER.debug(f"Failed to remove {ffmpeg_meta_filename}")
+        _LOGGER.debug(f"{get_current_timestamp()}Failed to remove {ffmpeg_meta_filename}")
         pass
 
     return movie_filename, duration
@@ -1822,7 +1832,7 @@ def make_folder(parameter, folder):
         # If path does not exist in which to create folder then exit.
         if not os.path.isdir(current_path):
             print(
-                f"Path {current_path} for parameter {parameter} does not exist, please provide a valid path."
+                f"{get_current_timestamp()}Path {current_path} for parameter {parameter} does not exist, please provide a valid path."
             )
             return False
 
@@ -1830,7 +1840,7 @@ def make_folder(parameter, folder):
             os.mkdir(folder)
         except OSError:
             print(
-                f"Error creating folder {add_folder} at location {current_path} for parameter {parameter}"
+                f"{get_current_timestamp()}Error creating folder {add_folder} at location {current_path} for parameter {parameter}"
             )
             return False
 
@@ -1845,7 +1855,7 @@ def delete_intermediate(movie_files):
                 try:
                     os.remove(file)
                 except OSError as exc:
-                    print("\t\tError trying to remove file {}: {}".format(file, exc))
+                    print(get_current_timestamp() + "\t\tError trying to remove file {}: {}".format(file, exc))
             elif os.path.isdir(file):
                 # This is more specific for Mac but won't hurt on other platforms.
                 if os.path.exists(os.path.join(file, ".DS_Store")):
@@ -1853,14 +1863,14 @@ def delete_intermediate(movie_files):
                     try:
                         os.remove(os.path.join(file, ".DS_Store"))
                     except:
-                        _LOGGER.debug(f"Failed to remove .DS_Store from {file}")
+                        _LOGGER.debug(f"{get_current_timestamp()}Failed to remove .DS_Store from {file}")
                         pass
 
                 try:
 
                     os.rmdir(file)
                 except OSError as exc:
-                    print("\t\tError trying to remove folder {}: {}".format(file, exc))
+                    print(get_current_timestamp() + "\t\tError trying to remove folder {}: {}".format(file, exc))
 
 
 def process_folders(folders, video_settings, delete_source):
@@ -1871,7 +1881,7 @@ def process_folders(folders, video_settings, delete_source):
     for folder_number, folder_name in enumerate(sorted(folders)):
         total_clips = total_clips + len(folders[folder_name])
     print(
-        "There are {total_folders} folders with {total_clips} clips to "
+        get_current_timestamp() + "There are {total_folders} folders with {total_clips} clips to "
         "process.".format(total_folders=len(folders), total_clips=total_clips)
     )
 
@@ -1898,7 +1908,7 @@ def process_folders(folders, video_settings, delete_source):
         ):
             # Clips from this folder are from before start timestamp requested.
             _LOGGER.debug(
-                f"Clips in folder end at {last_clip_tmstp} which is still before "
+                f"{get_current_timestamp()}Clips in folder end at {last_clip_tmstp} which is still before "
                 f'start timestamp {video_settings["start_timestamp"]}'
             )
             continue
@@ -1909,7 +1919,7 @@ def process_folders(folders, video_settings, delete_source):
         ):
             # Clips from this folder are from after end timestamp requested.
             _LOGGER.debug(
-                f"Clips in folder start at {first_clip_tmstp} which is after "
+                f"{get_current_timestamp()}Clips in folder start at {first_clip_tmstp} which is after "
                 f'end timestamp {video_settings["end_timestamp"]}'
             )
             continue
@@ -1959,7 +1969,7 @@ def process_folders(folders, video_settings, delete_source):
         # the target movie file already exist.
         if video_settings["skip_existing"] and os.path.isfile(movie_filename):
             print(
-                "\tSkipping folder {folder} as {filename} is already "
+                get_current_timestamp() + "\tSkipping folder {folder} as {filename} is already "
                 "created ({folder_number}/{total_folders})".format(
                     folder=folder_name,
                     filename=movie_filename,
@@ -1983,7 +1993,7 @@ def process_folders(folders, video_settings, delete_source):
             continue
 
         print(
-            "\tProcessing {total_clips} clips in folder {folder} "
+            get_current_timestamp() + "\tProcessing {total_clips} clips in folder {folder} "
             "({folder_number}/{total_folders})".format(
                 total_clips=len(video_files),
                 folder=folder_name,
@@ -2086,7 +2096,7 @@ def process_folders(folders, video_settings, delete_source):
         movie_name = None
         movie_duration = 0
         if folder_clips:
-            print("\t\tCreating movie {}, please be patient.".format(movie_filename))
+            print(get_current_timestamp() + "\t\tCreating movie {}, please be patient.".format(movie_filename))
 
             movie_name, movie_duration = create_movie(
                 folder_clips,
@@ -2104,7 +2114,7 @@ def process_folders(folders, video_settings, delete_source):
             (folder_clips and movie_name is not None) or not folder_clips
         ):
             print(
-                "\t\tDeleting files and folder {folder_name}".format(
+                get_current_timestamp() + "\t\tDeleting files and folder {folder_name}".format(
                     folder_name=folder_name
                 )
             )
@@ -2128,7 +2138,7 @@ def process_folders(folders, video_settings, delete_source):
                 delete_intermediate(delete_folder_clips)
 
             print(
-                "\tMovie {base_name} for folder {folder_name} with duration {duration} is "
+                get_current_timestamp() + "\tMovie {base_name} for folder {folder_name} with duration {duration} is "
                 "ready.".format(
                     base_name=movie_name,
                     folder_name=folder_name,
@@ -2165,7 +2175,7 @@ def process_folders(folders, video_settings, delete_source):
             if os.path.splitext(movie_filename)[1] != ".mp4":
                 movie_filename = movie_filename + ".mp4"
 
-            print("\tCreating movie {}, please be patient.".format(movie_filename))
+            print(get_current_timestamp() + "\tCreating movie {}, please be patient.".format(movie_filename))
 
             movie_name, movie_duration = create_movie(
                 dashcam_clips,
@@ -2179,7 +2189,7 @@ def process_folders(folders, video_settings, delete_source):
 
         if movie_name is not None:
             print(
-                "Movie {base_name} with duration {duration} has been created, enjoy.".format(
+                get_current_timestamp() + "Movie {base_name} with duration {duration} has been created, enjoy.".format(
                     base_name=movie_name,
                     duration=str(timedelta(seconds=int(movie_duration))),
                 )
@@ -2193,18 +2203,18 @@ def process_folders(folders, video_settings, delete_source):
                 delete_intermediate([dashcam_clips[0]["video_filename"]])
         else:
             print(
-                "All folders have been processed, resulting movie files are "
+                get_current_timestamp() + "All folders have been processed, resulting movie files are "
                 "located in {target_folder}".format(
                     target_folder=video_settings["target_folder"]
                 )
             )
     else:
-        print("No clips found.")
+        print(get_current_timestamp() + "No clips found.")
 
     end_time = timestamp()
     real = int((end_time - start_time))
 
-    print("Total processing time: {real}".format(real=str(timedelta(seconds=real))))
+    print(get_current_timestamp() + "Total processing time: {real}".format(real=str(timedelta(seconds=real))))
     if video_settings["notification"]:
         if movie_name is not None:
             notify(
@@ -2260,7 +2270,7 @@ def notify_macos(title, subtitle, message):
             ]
         )
     except Exception as exc:
-        print("Failed in notifification: ", exc)
+        print(get_current_timestamp() + "Failed in notifification: ", exc)
 
 
 def notify_windows(title, subtitle, message):
@@ -2311,7 +2321,7 @@ def notify_linux(title, subtitle, message):
             ]
         )
     except Exception as exc:
-        print("Failed in notifification: ", exc)
+        print(get_current_timestamp() + "Failed in notifification: ", exc)
 
 
 def notify(title, subtitle, message):
@@ -2336,6 +2346,8 @@ def main() -> None:
 
     movie_folder = os.path.join(str(Path.home()), MOVIE_HOMEDIR.get(sys.platform), "")
 
+    global display_ts
+    
     # Check if ffmpeg exist, if not then hope it is in default path or
     # provided.
     if not os.path.isfile(ffmpeg_default):
@@ -2381,6 +2393,12 @@ def main() -> None:
         dest="system_notification",
         action="store_false",
         help="Do not create a notification upon " "completion.",
+    )
+
+    parser.add_argument(
+        "--display_ts",
+        action='store_true',
+        help="Display timestamps on tesla_dashcam text output. DOES NOT AFFECT VIDEO OUTPUT."
     )
 
     input_group = parser.add_argument_group(
@@ -2860,18 +2878,18 @@ def main() -> None:
         format="%(asctime)s:%(levelname)s:\t%(name)s\t%(message)s",
     )
 
-    _LOGGER.debug(f"Arguments : {args}")
+    _LOGGER.debug(f"{get_current_timestamp()}Arguments : {args}")
 
     # Check that any mutual exclusive items are not both provided.
     if "speed_up" in args and "slow_down" in args:
         print(
-            "Option --speed_up and option --slow_down cannot be used together, only use one of them."
+            get_current_timestamp() + "Option --speed_up and option --slow_down cannot be used together, only use one of them."
         )
         return 1
 
     if "enc" in args and "encoding" in args:
         print(
-            "Option --enc and option --encoding cannot be used together, only use one of them."
+            get_current_timestamp() + "Option --enc and option --encoding cannot be used together, only use one of them."
         )
         return 1
 
@@ -2935,7 +2953,7 @@ def main() -> None:
                     )
 
                 print(
-                    "New {beta}release {release} is available for download "
+                    get_current_timestamp() + "New {beta}release {release} is available for download "
                     "({url}). You are currently on {version}. {rel_note}".format(
                         beta=beta,
                         release=release_info.get("tag_name"),
@@ -2947,12 +2965,12 @@ def main() -> None:
 
                 if args.check_for_updates:
                     print(
-                        "You can download the new release from: {url}".format(
+                        get_current_timestamp() + "You can download the new release from: {url}".format(
                             url=release_info.get("html_url")
                         )
                     )
                     print(
-                        "Release Notes:\n {release_notes}".format(
+                        get_current_timestamp() + "Release Notes:\n {release_notes}".format(
                             release_notes=release_info.get("body")
                         )
                     )
@@ -2960,18 +2978,18 @@ def main() -> None:
             else:
                 if args.check_for_updates:
                     print(
-                        "{version} is the latest release available.".format(
+                        get_current_timestamp() + "{version} is the latest release available.".format(
                             version=VERSION_STR
                         )
                     )
                     return
         else:
-            print("Did not retrieve latest version info.")
+            print(get_current_timestamp() + "Did not retrieve latest version info.")
 
     ffmpeg = ffmpeg_default if getattr(args, "ffmpeg", None) is None else args.ffmpeg
     if which(ffmpeg) is None:
         print(
-            f"ffmpeg is a requirement, unable to find {ffmpeg} executable. Please ensure it exist and is located"
+            f"{get_current_timestamp()}ffmpeg is a requirement, unable to find {ffmpeg} executable. Please ensure it exist and is located"
             f"within PATH environment or provide full path using parameter --ffmpeg."
         )
 
@@ -3170,7 +3188,7 @@ def main() -> None:
     if not args.no_timestamp and text_overlay_format is not None:
         if layout_settings.font.font is None:
             print(
-                f"Unable to get a font file for platform {sys.platform}. Please provide valid font file using "
+                f"{get_current_timestamp()}Unable to get a font file for platform {sys.platform}. Please provide valid font file using "
                 f"--font or disable timestamp using --no-timestamp."
             )
             return
@@ -3183,12 +3201,12 @@ def main() -> None:
         )
         if not os.path.isfile(temp_font_file):
             print(
-                f"Font file {temp_font_file} does not exist. Provide a valid font file using --font or"
+                f"{get_current_timestamp()}Font file {temp_font_file} does not exist. Provide a valid font file using --font or"
                 f" disable timestamp using --no-timestamp"
             )
             if sys.platform == "linux":
                 print(
-                    "You can also install the fonts using for example: apt-get install ttf-freefont"
+                    get_current_timestamp() + "You can also install the fonts using for example: apt-get install ttf-freefont"
                 )
             return
 
@@ -3240,7 +3258,7 @@ def main() -> None:
         encoding = args.encoding if "encoding" in args else "x264"
         # GPU acceleration enabled
         if use_gpu:
-            print("GPU acceleration is enabled")
+            print(get_current_timestamp() + "GPU acceleration is enabled")
             if sys.platform == "darwin":
                 video_encoding = video_encoding + ["-allow_sw", "1"]
                 encoding = encoding + "_mac"
@@ -3251,7 +3269,7 @@ def main() -> None:
             else:
                 if args.gpu_type is None:
                     print(
-                        "Parameter --gpu_type is mandatory when parameter --use_gpu is used."
+                        get_current_timestamp() + "Parameter --gpu_type is mandatory when parameter --use_gpu is used."
                     )
                     return
 
@@ -3312,6 +3330,10 @@ def main() -> None:
         runtype = "MONITOR_ONCE"
     monitor_file = args.monitor_trigger
 
+    # Set the display timestamp boolean.
+    if args.display_ts:
+        display_ts = True
+    
     # If no source provided then set to MONITOR_ONCE and we're only going to
     # take SavedClips and SentryClips
     source_list = args.source
@@ -3378,8 +3400,8 @@ def main() -> None:
         "end_offset": end_offset,
         "skip_existing": args.skip_existing,
     }
-    _LOGGER.debug(f"Video Settings {video_settings}")
-    _LOGGER.debug(f"Layout Settings {layout_settings}")
+    _LOGGER.debug(f"{get_current_timestamp()}Video Settings {video_settings}")
+    _LOGGER.debug(f"{get_current_timestamp()}Layout Settings {layout_settings}")
 
     # If we constantly run and monitor for drive added or not.
     if video_settings["run_type"] in ["MONITOR", "MONITOR_ONCE"]:
@@ -3388,13 +3410,9 @@ def main() -> None:
 
         trigger_exist = False
         if monitor_file is None:
-            print("Monitoring for TeslaCam Drive to be inserted. Press CTRL-C to stop")
+            print(get_current_timestamp() + "Monitoring for TeslaCam Drive to be inserted. Press CTRL-C to stop")
         else:
-            print(
-                "Monitoring for trigger {} to exist. Press CTRL-C to stop".format(
-                    monitor_file
-                )
-            )
+            print(get_current_timestamp() + "Monitoring for trigger {} to exist. Press CTRL-C to stop".format(monitor_file))
         while True:
             try:
                 # Monitoring for disk to be inserted and not for a file.
@@ -3403,11 +3421,8 @@ def main() -> None:
                     if source_folder is None:
                         # Nothing found, sleep for 1 minute and check again.
                         if trigger_exist:
-                            print("TeslaCam drive has been ejected.")
-                            print(
-                                "Monitoring for TeslaCam Drive to be inserted. "
-                                "Press CTRL-C to stop"
-                            )
+                            print(get_current_timestamp() + "TeslaCam drive has been ejected.")
+                            print(get_current_timestamp() + "Monitoring for TeslaCam Drive to be inserted. Press CTRL-C to stop")
 
                         sleep(MONITOR_SLEEP_TIME)
                         trigger_exist = False
@@ -3416,7 +3431,7 @@ def main() -> None:
                     # As long as TeslaCam drive is still attached we're going to
                     # keep on waiting.
                     if trigger_exist:
-                        _LOGGER.debug(f"TeslaCam Drive still attached")
+                        _LOGGER.debug(f"{get_current_timestamp()}TeslaCam Drive still attached")
                         sleep(MONITOR_SLEEP_TIME)
                         continue
 
@@ -3437,7 +3452,7 @@ def main() -> None:
                 else:
                     # Wait till trigger file exist (can also be folder).
                     if not os.path.exists(monitor_file):
-                        _LOGGER.debug(f"Trigger file {monitor_file} does not exist.")
+                        _LOGGER.debug(f"{get_current_timestamp()}Trigger file {monitor_file} does not exist.")
                         sleep(MONITOR_SLEEP_TIME)
                         trigger_exist = False
                         continue
@@ -3469,16 +3484,16 @@ def main() -> None:
                                     os.path.join(monitor_path, folder)
                                 )
 
-                print(message)
+                print(get_current_timestamp() + message)
                 if args.system_notification:
                     notify("TeslaCam", "Started", message)
 
                 if len(source_folder_list) == 1:
-                    print(f"Retrieving all files from {source_folder_list[0]}")
+                    print(f"{get_current_timestamp()}Retrieving all files from {source_folder_list[0]}")
                 else:
-                    print(f"Retrieving all files from: ")
+                    print(f"{get_current_timestamp()}Retrieving all files from: ")
                     for folder in source_folder_list:
-                        print(f"                          {folder}")
+                        print(f"{get_current_timestamp()}                          {folder}")
 
                 folders = get_movie_files(
                     source_folder_list, args.exclude_subdirs, video_settings
@@ -3508,7 +3523,7 @@ def main() -> None:
 
                 process_folders(folders, video_settings, args.delete_source)
 
-                print("Processing of movies has completed.")
+                print(get_current_timestamp() + "Processing of movies has completed.")
                 if args.system_notification:
                     notify(
                         "TeslaCam", "Completed", "Processing of movies has completed."
@@ -3522,47 +3537,32 @@ def main() -> None:
                                 os.remove(monitor_file)
                             except OSError as exc:
                                 print(
-                                    "Error trying to remove trigger file {}: {}".format(
+                                    get_current_timestamp() + "Error trying to remove trigger file {}: {}".format(
                                         monitor_file, exc
                                     )
                                 )
 
-                    print("Exiting monitoring as asked process once.")
+                    print(get_current_timestamp() + "Exiting monitoring as asked process once.")
                     break
 
                 if monitor_file is None:
                     trigger_exist = True
-                    print(
-                        "Waiting for TeslaCam Drive to be ejected. Press "
-                        "CTRL-C to stop"
-                    )
+                    print(get_current_timestamp() +  "Waiting for TeslaCam Drive to be ejected. Press CTRL-C to stop")
                 else:
                     if os.path.isfile(monitor_file):
                         try:
                             os.remove(monitor_file)
                         except OSError as exc:
-                            print(
-                                "Error trying to remove trigger file {}: {}".format(
-                                    monitor_file, exc
-                                )
-                            )
+                            print(get_current_timestamp() + "Error trying to remove trigger file {}: {}".format(monitor_file, exc))
                             break
                         trigger_exist = False
 
-                        print(
-                            "Monitoring for trigger {}. Press CTRL-C to stop".format(
-                                monitor_file
-                            )
-                        )
+                        print(get_current_timestamp() + "Monitoring for trigger {}. Press CTRL-C to stop".format(monitor_file))
                     else:
-                        print(
-                            "Waiting for trigger {} to be removed. Press CTRL-C to stop".format(
-                                monitor_file
-                            )
-                        )
+                        print(get_current_timestamp() + "Waiting for trigger {} to be removed. Press CTRL-C to stop".format(monitor_file))
 
             except KeyboardInterrupt:
-                print("Monitoring stopped due to CTRL-C.")
+                print(get_current_timestamp() + "Monitoring stopped due to CTRL-C.")
                 break
     else:
         folders = get_movie_files(
@@ -3582,7 +3582,7 @@ def main() -> None:
 
 if sys.version_info < (3, 7):
     print(
-        f"Python version 3.7 or higher is required, you have: {sys.version}. Please update your Python version."
+        f"{get_current_timestamp()}Python version 3.7 or higher is required, you have: {sys.version}. Please update your Python version."
     )
     sys.exit(1)
 
