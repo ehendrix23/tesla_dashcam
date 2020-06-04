@@ -976,7 +976,7 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
             video_files = [pathname]
             isfile = True
 
-        
+
         # Now go through and get timestamps etc..
         for file in sorted(video_files):
             # Strip path so that we just have the filename.
@@ -1166,16 +1166,16 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
                             _LOGGER.warning(
                                 f"Event timestamp found in {file} (\"{event_file_data['timestamp']}\")could not be parsed as a timestamp"
                             )
-                        
+
 
                     event_metadata["timestamp"] = event_timestamp
 
                     if "city" in event_file_data:
                         event_metadata["city"] = event_file_data["city"]
-                    
+
                     if "reason" in event_file_data:
                         event_metadata["reason"] = event_file_data["reason"]
-    
+
                     if "est_lat" in event_file_data:
                         try:
                             event_metadata["latitude"] = float(event_file_data["est_lat"])
@@ -1535,7 +1535,7 @@ def create_intermediate_movie(
 
     starting_epoch_timestamp = int(starting_timestmp.timestamp())
 
-    
+
     ffmpeg_text = video_settings["ffmpeg_text_overlay"];
     user_formatted_text = video_settings["text_overlay_format"]
 
@@ -1556,7 +1556,7 @@ def create_intermediate_movie(
         if event_metadata["timestamp"] is not None:
             event_epoch_timestamp = int(event_metadata["timestamp"].timestamp())
             replacement_strings["event_timestamp"] = event_epoch_timestamp
-           
+
             # Calculate the time until the event
             replacement_strings["event_timestamp_countdown"] = starting_epoch_timestamp - event_epoch_timestamp
             replacement_strings["event_timestamp_countdown_rolling"] = "%{{pts:hms:{event_timestamp_countdown}}}".format(event_timestamp_countdown = replacement_strings["event_timestamp_countdown"])
@@ -1565,13 +1565,13 @@ def create_intermediate_movie(
         replacement_strings["event_reason"] = event_metadata["reason"] or "n/a"
         replacement_strings["event_latitude"] = event_metadata["latitude"] or 0.0
         replacement_strings["event_longitude"] = event_metadata["longitude"] or 0.0
-  
+
     try:
         # Try to replace strings!
         user_formatted_text = user_formatted_text.format(**replacement_strings)
     except KeyError as e:
         user_formatted_text = "Bad string format: Invalid variable {stderr}".format(stderr=str(e))
-    
+
     # Escape characters ffmpeg needs
     user_formatted_text = user_formatted_text.replace(":", "\:");
 
@@ -1598,7 +1598,7 @@ def create_intermediate_movie(
         + ffmpeg_front_command
         + ffmpeg_right_command
         + ffmpeg_rear_command
-        + ["-filter_complex", ffmpeg_filter]
+        + ["-filter_complex", ffmpeg_filter.replace("\\n", os.linesep)]
         + ["-map", f"[{video_settings['input_clip']}]"]
         + video_settings["other_params"]
     )
@@ -2347,7 +2347,7 @@ def main() -> None:
     movie_folder = os.path.join(str(Path.home()), MOVIE_HOMEDIR.get(sys.platform), "")
 
     global display_ts
-    
+
     # Check if ffmpeg exist, if not then hope it is in default path or
     # provided.
     if not os.path.isfile(ffmpeg_default):
@@ -3333,7 +3333,7 @@ def main() -> None:
     # Set the display timestamp boolean.
     if args.display_ts:
         display_ts = True
-    
+
     # If no source provided then set to MONITOR_ONCE and we're only going to
     # take SavedClips and SentryClips
     source_list = args.source
