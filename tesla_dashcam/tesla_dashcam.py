@@ -2633,14 +2633,14 @@ def main() -> int:
         default="{local_timestamp_rolling}",
         help="R|Format string for text overlay.\n"
         "Valid format variables:\n"
-        "    local_timestamp - Local time that the clip starts at, string\n"
-        "    local_timestamp_rolling - Local time which continuously updates (shorthand for '%%{{pts:localtime:{local_timestamp}:%%x %%X}}'), string\n"
-        "    event_timestamp - Timestamp from events.json (if provided), string\n"
-        "    event_timestamp_countdown_rolling - Local time which continuously updates (shorthand for '%%{{hms:localtime:{event_timestamp}}}'), string\n"
-        "    event_city - City name from events.json (if provided), string\n"
-        "    event_reason - Recording reason from events.json (if provided), string\n"
-        "    event_latitude - Estimated latitude from events.json (if provided), float\n"
-        "    event_longitude - Estimated longitude from events.json (if provided), float\n"
+        "    {local_timestamp} - Local time that the clip starts at, string\n"
+        "    {local_timestamp_rolling} - Local time which continuously updates (shorthand for '%%{{pts:localtime:{local_timestamp}:%%x %%X}}'), string\n"
+        "    {event_timestamp} - Timestamp from events.json (if provided), string\n"
+        "    {event_timestamp_countdown_rolling} - Local time which continuously updates (shorthand for '%%{{hms:localtime:{event_timestamp}}}'), string\n"
+        "    {event_city} - City name from events.json (if provided), string\n"
+        "    {event_reason} - Recording reason from events.json (if provided), string\n"
+        "    {event_latitude} - Estimated latitude from events.json (if provided), float\n"
+        "    {event_longitude} - Estimated longitude from events.json (if provided), float\n"
         "    \n"
         "    All valid ffmpeg 'text expansion' syntax is accepted here.\n"
         "    More info: http://ffmpeg.org/ffmpeg-filters.html#Text-expansion\n"
@@ -3261,6 +3261,11 @@ def main() -> int:
     video_encoding = []
     if not "enc" in args:
         encoding = args.encoding if "encoding" in args else "x264"
+
+        # For x265 add QuickTime compatibility
+        if encoding == "x265":
+            video_encoding = video_encoding + ["-vtag", "hvc1"]
+
         # GPU acceleration enabled
         if use_gpu:
             print(get_current_timestamp() + "GPU acceleration is enabled")
@@ -3268,9 +3273,6 @@ def main() -> int:
                 video_encoding = video_encoding + ["-allow_sw", "1"]
                 encoding = encoding + "_mac"
 
-                # x265 + Quicktime compatibilty for macOS
-                if encoding == "x265_mac":
-                    video_encoding = video_encoding + ["-vtag", "hvc1"]
             else:
                 if args.gpu_type is None:
                     print(
