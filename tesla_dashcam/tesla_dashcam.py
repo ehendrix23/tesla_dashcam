@@ -974,6 +974,7 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
                 )
         else:
             video_files = [pathname]
+            event_metadata_files = []
             isfile = True
 
         
@@ -1536,7 +1537,7 @@ def create_intermediate_movie(
     starting_epoch_timestamp = int(starting_timestmp.timestamp())
 
     
-    ffmpeg_text = video_settings["ffmpeg_text_overlay"];
+    ffmpeg_text = video_settings["ffmpeg_text_overlay"]
     user_formatted_text = video_settings["text_overlay_format"]
 
     # Replace variables in user provided text overlay
@@ -1573,7 +1574,8 @@ def create_intermediate_movie(
         user_formatted_text = "Bad string format: Invalid variable {stderr}".format(stderr=str(e))
     
     # Escape characters ffmpeg needs
-    user_formatted_text = user_formatted_text.replace(":", "\:");
+    user_formatted_text = user_formatted_text.replace(":", "\:")
+    user_formatted_text = user_formatted_text.replace("\\n", os.linesep)
 
     ffmpeg_text = ffmpeg_text.replace("__USERTEXT__", user_formatted_text)
 
@@ -2184,7 +2186,7 @@ def process_folders(folders, video_settings, delete_source):
                 video_settings["chapter_offset"],
                 None,
                 None,
-                event_metadata,
+                None,
             )
 
         if movie_name is not None:
@@ -2334,7 +2336,7 @@ def notify(title, subtitle, message):
         notify_linux(title, subtitle, message)
 
 
-def main() -> None:
+def main() -> int:
     """ Main function """
 
     loglevels = dict(
@@ -2974,7 +2976,7 @@ def main() -> None:
                             release_notes=release_info.get("body")
                         )
                     )
-                    return
+                    return 0
             else:
                 if args.check_for_updates:
                     print(
@@ -2982,7 +2984,7 @@ def main() -> None:
                             version=VERSION_STR
                         )
                     )
-                    return
+                    return 0
         else:
             print(get_current_timestamp() + "Did not retrieve latest version info.")
 
@@ -3191,7 +3193,7 @@ def main() -> None:
                 f"{get_current_timestamp()}Unable to get a font file for platform {sys.platform}. Please provide valid font file using "
                 f"--font or disable timestamp using --no-timestamp."
             )
-            return
+            return 0
 
         # noinspection PyPep8
         temp_font_file = (
@@ -3208,7 +3210,7 @@ def main() -> None:
                 print(
                     get_current_timestamp() + "You can also install the fonts using for example: apt-get install ttf-freefont"
                 )
-            return
+            return 0
 
         # noinspection PyPep8,PyPep8,PyPep8
         ffmpeg_timestamp = (
@@ -3271,7 +3273,7 @@ def main() -> None:
                     print(
                         get_current_timestamp() + "Parameter --gpu_type is mandatory when parameter --use_gpu is used."
                     )
-                    return
+                    return 0
 
                 encoding = encoding + "_" + args.gpu_type
 
@@ -3312,7 +3314,7 @@ def main() -> None:
 
     # Ensure folder if not already exist and if not can be created
     if not make_folder("--output", target_folder):
-        return
+        return 0
 
     temp_folder = args.temp_dir
     if temp_folder is not None:
@@ -3320,7 +3322,7 @@ def main() -> None:
         temp_folder = os.path.abspath(args.temp_dir)
 
         if not make_folder("--temp_dir", temp_folder):
-            return
+            return 0
 
     # Set the run type based on arguments.
     runtype = "RUN"
