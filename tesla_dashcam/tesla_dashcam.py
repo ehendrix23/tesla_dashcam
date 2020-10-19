@@ -1142,9 +1142,8 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
             # Strip path so that we just have the filename.
             movie_folder, event_filename = os.path.split(file)
 
-            movie_entry = movies_list.get(movie_folder, {})
-
             event_metadata = {
+                "event_filename": file,
                 "timestamp": None,
                 "city": None,
                 "latitude": None,
@@ -2026,7 +2025,7 @@ def process_folders(folders, video_settings, delete_source):
                 video_settings,
                 clip_number,
                 len(video_files),
-                event_metadata
+                event_metadata,
             )
             if clip_name is not None:
                 if video_timestamp_info["file_only"]:
@@ -2121,6 +2120,10 @@ def process_folders(folders, video_settings, delete_source):
                 )
             )
             delete_intermediate(delete_file_list)
+            if event_metadata is not None:
+                movie_folder, _ = os.path.split(event_metadata.get("event_filename"))
+                delete_intermediate([event_metadata.get("event_filename"), os.path.join(movie_folder, "thumb.png")])
+
             # And delete the folder
             delete_intermediate([folder_name])
 
