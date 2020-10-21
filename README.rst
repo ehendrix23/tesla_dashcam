@@ -231,14 +231,23 @@ Usage
       --text_overlay_fmt TEXT_OVERLAY_FMT
                             Format string for text overlay.
                             Valid format variables:
+                                {clip_start_timestamp} - Local time the clip starts at"
+                                {clip_end_timestamp} - Local time the clip ends at"
                                 {local_timestamp_rolling} - Local time which continuously updates
-                                {local_timestamp} - Local time that does not continuously update
-                                {event_timestamp} - Timestamp from events.json (if provided)
+                                {event_timestamp} - Event timestamp, for Sentry timestamp that resulted in Sentry event (if provided)
+                                {event_timestamp_countdown} -
+                                {event_timestamp_countdown_rolling} - Rolling
                                 {event_city} - City name from events.json (if provided)
                                 {event_reason} - Recording reason from events.json (if provided)
                                 {event_latitude} - Estimated latitude from events.json (if provided)
                                 {event_longitude} - Estimated longitude from events.json (if provided)
                             (default: {local_timestamp_rolling})
+      --timestamp_format TIMESTAMP_FORMAT
+                            Format for timestamps.
+                            Determines how timestamps should be represented. Any valid value from strftime is accepted.
+                            Default is set '%x %X' which is locale's appropriate date and time representation
+                            More info: https://strftime.org
+                            (default: "%x %x")
 
     Timestamp Restriction:
       Restrict video to be between start and/or end timestamps. Timestamp to be provided in a ISO-8601 format (see
@@ -1395,8 +1404,10 @@ Release Notes
     - Changed: Improvement for Docker file size and stability. Contributed by magicalyak
     - Changed: Choice values for parameters (i.e. FULLSCREEN, intel, black) are now case-insensitive.
     - Changed: Updated supporting libraries to latest available.
+    - Changed: When providing a invalid start or end timestamp will now result in a error instead of a traceback.
     - Fixed: Added x265 compatibility tag for QuickTime on MacOS. Contributed by dburkland
     - Fixed: Event file will now be removed when providing an output file and only 1 event is processed, leaving only 1 movie file.
+
 
 
 TODO
