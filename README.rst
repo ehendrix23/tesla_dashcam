@@ -231,13 +231,13 @@ Usage
       --text_overlay_fmt TEXT_OVERLAY_FMT
                             Format string for text overlay.
                             Valid format variables:
-                                local_timestamp_rolling - Local time which continuously updates
-                                local_timestamp - Local time that does not continuously update
-                                event_timestamp - Timestamp from events.json (if provided)
-                                event_city - City name from events.json (if provided)
-                                event_reason - Recording reason from events.json (if provided)
-                                event_latitude - Estimated latitude from events.json (if provided)
-                                event_longitude - Estimated longitude from events.json (if provided)
+                                {local_timestamp_rolling} - Local time which continuously updates
+                                {local_timestamp} - Local time that does not continuously update
+                                {event_timestamp} - Timestamp from events.json (if provided)
+                                {event_city} - City name from events.json (if provided)
+                                {event_reason} - Recording reason from events.json (if provided)
+                                {event_latitude} - Estimated latitude from events.json (if provided)
+                                {event_longitude} - Estimated longitude from events.json (if provided)
                             (default: {local_timestamp_rolling})
 
     Timestamp Restriction:
@@ -582,22 +582,22 @@ Following parameters are to change settings for the text that is being added to 
 
   Default: {local_timestamp_rolling}
 
-  Sets the format string for the text overlayed in the video.
+  Sets the format string for the text overlayed in the video. Use \n to specify a newline.
   Valid format specifiers:
   
-  `local_timestamp_rolling`: Local time which continuously updates, string
+  `{local_timestamp_rolling}`: Local time which continuously updates, string
 
-  `local_timestamp`: Local time that does not continuously update, string
+  `{local_timestamp}`: Local time that does not continuously update, string
 
-  `event_timestamp`: Timestamp from events.json (if provided), string
+  `{event_timestamp}`: Timestamp from events.json (if provided), string
 
-  `event_city`: City name from events.json (if provided), string
+  `{event_city}`: City name from events.json (if provided), string
 
-  `event_reason`: Recording reason from events.json (if provided), string
+  `{event_reason}`: Recording reason from events.json (if provided), string
 
-  `event_latitude`: Estimated latitude from events.json (if provided), float
+  `{event_latitude}`: Estimated latitude from events.json (if provided), float
 
-  `event_longitude`: Estimated longitude from events.json (if provided), float
+  `{event_longitude}`: Estimated longitude from events.json (if provided), float
 
 
 *--no-timestamp*
@@ -1391,8 +1391,10 @@ Release Notes
     - New: Support for FreeBSD 11. Contributed by busbyjon
     - New: Video file timestamp can now be set to timestamp of event (start or stop).
     - New: Added option to show current timestamp in output information. Contributed by croadfeldt
+    - New: Source can now include wildcards, shell variables, and will do user expansion (i.e. ~ on Unix, ~user on Windows).
     - Changed: Improvement for Docker file size and stability. Contributed by magicalyak
     - Changed: Choice values for parameters (i.e. FULLSCREEN, intel, black) are now case-insensitive.
+    - Changed: Updated supporting libraries to latest available.
     - Fixed: Added x265 compatibility tag for QuickTime on MacOS. Contributed by dburkland
     - Fixed: Event file will now be removed when providing an output file and only 1 event is processed, leaving only 1 movie file.
 
