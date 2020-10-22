@@ -103,6 +103,11 @@ HALIGN = {"LEFT": "10", "CENTER": "(w/2-text_w/2)", "RIGHT": "(w-text_w)"}
 
 VALIGN = {"TOP": "10", "MIDDLE": "(h/2-(text_h/2))", "BOTTOM": "(h-(text_h)-10)"}
 
+EVENT_REASON = {
+    "sentry_aware_object_detection": "SENTRY",
+    "user_interaction_dashcam_icon_tapped": "SAVED",
+}
+
 TOASTER_INSTANCE = None
 
 display_ts = False
@@ -1251,8 +1256,14 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
                                     )
                                     event_timestamp = None
 
-                            event_metadata = {"timestamp": event_timestamp, "city": event_file_data.get("city"),
-                                              "latitude": None, "longitude": None, "reason": event_file_data.get("reason")}
+                            event_metadata = {
+                                "timestamp": event_timestamp,
+                                "city": event_file_data.get("city"),
+                                "latitude": None,
+                                "longitude": None,
+                                "reason": EVENT_REASON.get(event_file_data.get("reason", "N/A")),
+                            }
+
                             event_latitude = event_file_data.get("est_lat")
                             if event_latitude is not None:
                                 try:
@@ -1666,6 +1677,24 @@ def create_intermediate_movie(
             + video_settings["ffmpeg_motiononly"]
     )
 
+    title_timestmp = (
+        event_info.metadata["timestamp"].astimezone(get_localzone()).strftime(user_timestamp_format)
+        if event_info.metadata['reason'] == "SENTRY" else
+        starting_timestmp.astimezone(get_localzone()).strftime(user_timestamp_format)
+    )
+    title = (
+        f"{event_info.metadata.get('reason')} : {title_timestmp}"
+        if event_info.metadata.get('reason') is not None
+        else title_timestmp
+    )
+
+    ffmpeg_metadata = [
+        "-metadata",
+        f"description=Created by tesla_dashcam {VERSION_STR}",
+        "-metadata",
+        f"title={title}",
+    ]
+
     ffmpeg_command = (
             [video_settings["ffmpeg_exec"]]
             + ["-loglevel", "error"]
@@ -1676,6 +1705,7 @@ def create_intermediate_movie(
             + ["-filter_complex", ffmpeg_filter]
             + ["-map", f"[{video_settings['input_clip']}]"]
             + video_settings["other_params"]
+            + ffmpeg_metadata
     )
 
     ffmpeg_command = ffmpeg_command + ["-y", temp_movie_name]
@@ -1685,7 +1715,8 @@ def create_intermediate_movie(
         run(ffmpeg_command, capture_output=True, check=True)
     except CalledProcessError as exc:
         print(f"{get_current_timestamp()}\t\t\tError trying to create clip for "
-              f"{os.path.join(event_info.folder, local_timestamp)}. RC: {exc.returncode}\n"
+              f"{os.path.join(event_info.folder, local_timestamp.strftime('%Y-%m-%dT%H-%M-%S') + '.mp4')}."
+              f"RC: {exc.returncode}\n"
               f"{get_current_timestamp()}\t\t\tCommand: {exc.cmd}\n"
               f"{get_current_timestamp()}\t\t\tError: {exc.stderr}\n\n"
               )
@@ -1700,11 +1731,13 @@ def create_intermediate_movie(
 
 def create_movie(
         clips_list,
+        event_info,
         movie_filename,
         video_settings,
         chapter_offset,
         start_timestamp,
         end_timestamp,
+        sentry_timestamp,
 ):
     """ Concatenate provided movie files into 1."""
     # Just return if there are no clips.
@@ -1829,16 +1862,34 @@ def create_movie(
         ffmpeg_params = ffmpeg_params + ["-movflags", "+faststart"]
 
     ffmpeg_params = ffmpeg_params + ["-c", "copy"]
+    user_timestamp_format = video_settings["timestamp_format"]
+    if event_info is not None:
+        title_timestmp = (
+            event_info.metadata["timestamp"].astimezone(get_localzone()).strftime(user_timestamp_format)
+            if event_info.metadata['reason'] == "SENTRY" else
+            start_timestmp.astimezone(get_localzone()).strftime(user_timestamp_format)
+        )
+        title = (
+            f"{event_info.metadata.get('reason')} : {title_timestmp}"
+            if event_info.metadata.get('reason') is not None
+            else title_timestmp
+        )
+    else:
+        title = f"{start_timestamp.astimezone(get_localzone()).strftime(user_timestamp_format)} - " \
+                f"{end_timestamp.astimezone(get_localzone()).strftime(user_timestamp_format)}"
 
-    ffmpeg_params = ffmpeg_params + [
+    ffmpeg_metadata = [
         "-metadata",
         f"description=Created by tesla_dashcam {VERSION_STR}",
+        "-metadata",
+        f"title={title}",
     ]
 
     ffmpeg_command = (
             [video_settings["ffmpeg_exec"]]
             + ["-loglevel", "error"]
             + ffmpeg_params
+            + ffmpeg_metadata
             + ["-y", movie_filename]
     )
 
@@ -1859,16 +1910,16 @@ def create_movie(
         duration = metadata[0]["duration"] if metadata else total_videoduration
 
         # Set the file timestamp if to be set based on timestamp event
-        if video_settings["set_moviefile_timestamp"] is not None:
-            moviefile_timestamp = (
-                start_timestamp.astimezone(get_localzone())
-                if video_settings["set_moviefile_timestamp"] == "START"
-                else end_timestamp.astimezone(get_localzone())
-            )
-            _LOGGER.debug(f"{get_current_timestamp()}Setting timestamp for movie file {movie_filename} to "
-                          f"{moviefile_timestamp.strftime('%Y-%m-%dT%H-%M-%S')}")
-            moviefile_timestamp = mktime(moviefile_timestamp.timetuple())
-            os.utime(movie_filename, (moviefile_timestamp, moviefile_timestamp))
+        moviefile_timestamp = start_timestamp.astimezone(get_localzone())
+        if video_settings["set_moviefile_timestamp"] == "STOP":
+            moviefile_timestamp = end_timestamp.astimezone(get_localzone())
+        elif video_settings["set_moviefile_timestamp"] == "SENTRY" and sentry_timestamp is not None:
+            moviefile_timestamp = sentry_timestamp.astimezone(get_localzone())
+
+        _LOGGER.debug(f"{get_current_timestamp()}Setting timestamp for movie file {movie_filename} to "
+                      f"{moviefile_timestamp.strftime('%Y-%m-%dT%H-%M-%S')}")
+        moviefile_timestamp = mktime(moviefile_timestamp.timetuple())
+        os.utime(movie_filename, (moviefile_timestamp, moviefile_timestamp))
 
     # Remove temp join file.
     # noinspection PyBroadException,PyPep8
@@ -2003,7 +2054,7 @@ def process_folders(event_list, video_settings, delete_source):
         event_start_timestmp = first_clip_tmstp
         event_end_timestmp = last_clip_tmstp
         if video_settings["sentry_offset"]:
-            if event_info.metadata["reason"] == "sentry_aware_object_detection" and \
+            if event_info.metadata["reason"] == "SENTRY" and \
                 event_info.metadata["timestamp"] is not None:
                 if video_settings["start_offset"] is not None:
                     # Recording reason is for Sentry so will use the event timestamp.
@@ -2160,11 +2211,13 @@ def process_folders(event_list, video_settings, delete_source):
 
             movie_name, movie_duration = create_movie(
                 folder_clips,
+                event_info,
                 event_movie_filename,
                 video_settings,
                 0,
                 event_start_timestmp,
                 event_end_timestmp,
+                event_info.metadata["timestamp"],
             )
 
         # Delete the source files if stated to delete.
@@ -2232,9 +2285,11 @@ def process_folders(event_list, video_settings, delete_source):
 
             movie_name, movie_duration = create_movie(
                 dashcam_clips,
+                None,
                 movie_filename,
                 video_settings,
                 video_settings["chapter_offset"],
+                None,
                 None,
                 None,
             )
@@ -2804,11 +2859,11 @@ def main() -> int:
         "--set_moviefile_timestamp",
         dest="set_moviefile_timestamp",
         required=False,
-        choices=["START", "STOP"],
+        choices=["START", "STOP", "SENTRY"],
         type=str.upper,
         default="START",
         help="Match modification timestamp of resulting video files to event timestamp. Use START to match with when "
-             "the event started, STOP for end time of the event.",
+             "the event started, STOP for end time of the event, SENTRY for Sentry event timestamp",
     )
 
     advancedencoding_group = parser.add_argument_group(
@@ -3360,12 +3415,6 @@ def main() -> int:
 
     ffmpeg_params = ffmpeg_params + video_encoding
 
-    # Set metadata
-    ffmpeg_params = ffmpeg_params + [
-        "-metadata",
-        f"description=Created by tesla_dashcam {VERSION_STR}",
-    ]
-
     # Determine the target folder and filename.
     # If no extension then assume it is a folder.
     if (
@@ -3453,9 +3502,7 @@ def main() -> int:
         "merge_subdirs": args.merge_subdirs,
         "chapter_offset": args.chapter_offset,
         "movie_filename": None,
-        "set_moviefile_timestamp": args.set_moviefile_timestamp
-        if "set_moviefile_timestamp" in args
-        else None,
+        "set_moviefile_timestamp": args.set_moviefile_timestamp,
         "keep_intermediate": args.keep_intermediate,
         "notification": args.system_notification,
         "movie_layout": args.layout,

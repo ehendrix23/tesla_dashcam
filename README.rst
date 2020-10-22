@@ -282,9 +282,9 @@ Usage
                             subdir video, positive offset if # of seconds after the start of the subdir video. (default: 0)        
       --merge               Merge the video files from different folders (events) into 1 big video file. (default: False)
       --keep-intermediate   Do not remove the clip video files that are created (default: False)
-      --set_moviefile_timestamp {START,STOP}
+      --set_moviefile_timestamp {START,STOP,SENTRY}
                             Match modification timestamp of resulting video files to event timestamp. Use START to match with      
-                            when the event started, STOP for end time of the event. (default: START)
+                            when the event started, STOP for end time of the event, SENTRY for timestamp Sentry was triggered. (default: START)
 
     Advanced encoding settings:
       Advanced options for encoding
@@ -1409,11 +1409,12 @@ Release Notes
     - New: Option --text_overlay_fmt to set the overlay text for the video. Contributed by JakeShirley
     - New: Option --timestamp_format for formatting timestamps.
     - New: Option --sentry_offset to set the start and end offset based on Sentry event timestamp.
+    - New: Option --set_moviefile_timestamp to set the video file timestamp on the OS to start, end, or time of Sentry event.
     - New: Added support for event information file and ability to display it in the overlay text. Contributed by JakeShirley
     - New: Support for FreeBSD 11. Contributed by busbyjon
-    - New: Video file timestamp can now be set to timestamp of event (start or stop).
     - New: Added option to show current timestamp in output information. Contributed by croadfeldt
     - New: Source can now include wildcards, shell variables, and will do user expansion (i.e. ~ on Unix, ~user on Windows).
+    - New: Metadata tag title in video file is now set to reason for event (if exist) and timestamp or start/end timestamp
     - Changed: Improvement for Docker file size and stability. Contributed by magicalyak
     - Changed: Choice values for parameters (i.e. FULLSCREEN, intel, black) are now case-insensitive.
     - Changed: Updated supporting libraries to latest available.
