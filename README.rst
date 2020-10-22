@@ -1401,11 +1401,12 @@ Release Notes
     - New: Video file timestamp can now be set to timestamp of event (start or stop).
     - New: Added option to show current timestamp in output information. Contributed by croadfeldt
     - New: Source can now include wildcards, shell variables, and will do user expansion (i.e. ~ on Unix, ~user on Windows).
+    - New: Added option for formatting timestamps.
     - Changed: Improvement for Docker file size and stability. Contributed by magicalyak
     - Changed: Choice values for parameters (i.e. FULLSCREEN, intel, black) are now case-insensitive.
     - Changed: Updated supporting libraries to latest available.
     - Changed: When providing a invalid start or end timestamp will now result in a error instead of a traceback.
-    - Fixed: Added x265 compatibility tag for QuickTime on MacOS. Contributed by dburkland
+    - Fixed: Added x265 compatibility tag for QuickTime. Contributed by dburkland
     - Fixed: Event file will now be removed when providing an output file and only 1 event is processed, leaving only 1 movie file.
 
 
