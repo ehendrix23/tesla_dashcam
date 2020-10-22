@@ -265,6 +265,7 @@ Usage
                             Skip x number of seconds from start of event for resulting video. (default: None)
       --end_offset END_OFFSET
                             Ignore the last x seconds of the event for resulting video (default: None)
+      --sentry_offset       Set offsets for Sentry clips based on when timestamp of object detection occurred (default: False)
 
     Video Output:
       Options related to resulting video creation.
@@ -740,6 +741,13 @@ then the resulting video will start 5 minutes in (and not 7 minutes into the eve
 the event, and the starting offset is set to 2 minutes then the resulting video will start at 3 minutes in. Same
 methodology is applied for ending offset and end timestamp.
 
+When enabling --sentry_offset then the offsets only operate on events that were recorded due to a Sentry event.
+The offsets are then based on the event timestamp (timestamp that triggered Sentry to save the event) and not the start/end timestamp of the event.
+For this it is possible to provide positive or negative values. When providing a negative value for start_offset then the clip
+will start before the event timestamp. When providing a positive value then it will be after the event start.
+Similar, when providing a negative value for end_offset the ending of the clip will be before the event, and with
+a positive value it will be after the event.
+
 *--start_offset <offset>*
 
   Starting offset within the event. <offset> is in seconds.
@@ -747,6 +755,8 @@ methodology is applied for ending offset and end timestamp.
 *--end_offset <offset>*
 
   Ending offset within the event. <offset> is in seconds.
+
+*--senty_offset
 
 Video Output
 ------------
@@ -1396,12 +1406,14 @@ Release Notes
     - Fixed: Changed Arial font on MacOS to Arial Unicode (from Arial) as it seems Arial is not available anymore on MacOS 10.15 (Catalina). `Issue #64 <https://github.com/ehendrix23/tesla_dashcam/issues/64>`_
     - Fixed: Incorrect encoder for x265 with Intel GPU hardware encoding - mbaileys
 0.1.17:
-    - New: Added support for new event information file showing for example city, latitude, longtitude, reason for recording, etc. Contributed by JakeShirley
+    - New: Option --text_overlay_fmt to set the overlay text for the video. Contributed by JakeShirley
+    - New: Option --timestamp_format for formatting timestamps.
+    - New: Option --sentry_offset to set the start and end offset based on Sentry event timestamp.
+    - New: Added support for event information file and ability to display it in the overlay text. Contributed by JakeShirley
     - New: Support for FreeBSD 11. Contributed by busbyjon
     - New: Video file timestamp can now be set to timestamp of event (start or stop).
     - New: Added option to show current timestamp in output information. Contributed by croadfeldt
     - New: Source can now include wildcards, shell variables, and will do user expansion (i.e. ~ on Unix, ~user on Windows).
-    - New: Added option for formatting timestamps.
     - Changed: Improvement for Docker file size and stability. Contributed by magicalyak
     - Changed: Choice values for parameters (i.e. FULLSCREEN, intel, black) are now case-insensitive.
     - Changed: Updated supporting libraries to latest available.
