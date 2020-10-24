@@ -1432,9 +1432,9 @@ Release Notes
     - New: Option --merge_template to allow merging of video files grouped based on this. Resulting movie filename be based on this template.
     - New: Option --set_moviefile_timestamp to set the video file timestamp on the OS to start, end, or time of Sentry event.
     - New: Option --keep-events
+    - New: Option --display_ts to show timestamps in the text output. This does not impact video output but is handy when using a monitor option. Contributed by croadfeldt
     - New: Added support for event information file and ability to display it in the overlay text. Contributed by JakeShirley
     - New: Support for FreeBSD 11. Contributed by busbyjon
-    - New: Added option to show current timestamp in output information. Contributed by croadfeldt
     - New: Source can now include wildcards, shell variables, and will do user expansion (i.e. ~ on Unix, ~user on Windows).
     - New: Metadata tag title in video file is now set to reason for event (if exist) and timestamp or start/end timestamp
     - New: Metadata tag creation_time in video files created is now set to start timestamp of that particular video.
