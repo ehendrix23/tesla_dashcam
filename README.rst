@@ -231,16 +231,16 @@ Usage
       --text_overlay_fmt TEXT_OVERLAY_FMT
                             Format string for text overlay.
                             Valid format variables:
-                                {clip_start_timestamp} - Local time the clip starts at"
-                                {clip_end_timestamp} - Local time the clip ends at"
-                                {local_timestamp_rolling} - Local time which continuously updates
+                                {start_timestamp} - Local time the clip starts at"
+                                {end_timestamp} - Local time the clip ends at"
+                                {timestamp_rolling} - Local time which continuously updates
                                 {event_timestamp} - Event timestamp, for Sentry timestamp that resulted in Sentry event (if provided)
                                 {event_timestamp_countdown} -
                                 {event_timestamp_countdown_rolling} - Rolling
-                                {event_city} - City name from events.json (if provided)
-                                {event_reason} - Recording reason from events.json (if provided)
-                                {event_latitude} - Estimated latitude from events.json (if provided)
-                                {event_longitude} - Estimated longitude from events.json (if provided)
+                                {city} - City name from events.json (if provided)
+                                {reason} - Recording reason from events.json (if provided)
+                                {latitude} - Estimated latitude from events.json (if provided)
+                                {longitude} - Estimated longitude from events.json (if provided)
                             (default: {local_timestamp_rolling})
       --timestamp_format TIMESTAMP_FORMAT
                             Format for timestamps.
@@ -280,8 +280,28 @@ Usage
       --chapter_offset CHAPTER_OFFSET
                             Offset in seconds for chapters in merged video. Negative offset is # of seconds before the end of the  
                             subdir video, positive offset if # of seconds after the start of the subdir video. (default: 0)        
-      --merge               Merge the video files from different folders (events) into 1 big video file. (default: False)
+      --merge               Merge the video files from different events (folders) together into a video file.
+                            Optionally a format string can be provided for matching events together to create a merged video file.
+                            When a format string is provided instead of 1 merged video file, multiple video files will be created based on the template.
+                            Filenames for resulting video files will also be based on this template.
+                            Valid format variables:
+                                {layout} - layout chosen (see --layout)
+                                {start_timestamp} - Local time the clip starts at"
+                                {end_timestamp} - Local time the clip ends at"
+                                {event_timestamp} - Event timestamp, for Sentry timestamp that resulted in Sentry event (if provided)
+                                {city} - City name from events.json (if provided)
+                                {reason} - Recording reason from events.json (if provided)
+                                {latitude} - Estimated latitude from events.json (if provided)
+                                {longitude} - Estimated longitude from events.json (if provided)
+
+      --merge_timestamp_format TIMESTAMP_FORMAT
+                            Format for timestamps.
+                            Determines how timestamps should be represented. Any valid value from strftime is accepted.
+                            Default is set '%x %X' which is locale's appropriate date and time representation
+                            More info: https://strftime.org
+                            (default: "%x %x")
       --keep-intermediate   Do not remove the clip video files that are created (default: False)
+      --keep-events         Do not remove the event video files that are created when merging events into a video file (see --merge) (default: False)
       --set_moviefile_timestamp {START,STOP,SENTRY}
                             Match modification timestamp of resulting video files to event timestamp. Use START to match with      
                             when the event started, STOP for end time of the event, SENTRY for timestamp Sentry was triggered. (default: START)
@@ -1409,18 +1429,23 @@ Release Notes
     - New: Option --text_overlay_fmt to set the overlay text for the video. Contributed by JakeShirley
     - New: Option --timestamp_format for formatting timestamps.
     - New: Option --sentry_offset to set the start and end offset based on Sentry event timestamp.
+    - New: Option --merge_template to allow merging of video files grouped based on this. Resulting movie filename be based on this template.
     - New: Option --set_moviefile_timestamp to set the video file timestamp on the OS to start, end, or time of Sentry event.
+    - New: Option --keep-events
     - New: Added support for event information file and ability to display it in the overlay text. Contributed by JakeShirley
     - New: Support for FreeBSD 11. Contributed by busbyjon
     - New: Added option to show current timestamp in output information. Contributed by croadfeldt
     - New: Source can now include wildcards, shell variables, and will do user expansion (i.e. ~ on Unix, ~user on Windows).
     - New: Metadata tag title in video file is now set to reason for event (if exist) and timestamp or start/end timestamp
+    - New: Metadata tag creation_time in video files created is now set to start timestamp of that particular video.
+    - New: When scanning folders a message will be printed after every 10 folders scanned to show progress.
     - Changed: Improvement for Docker file size and stability. Contributed by magicalyak
     - Changed: Choice values for parameters (i.e. FULLSCREEN, intel, black) are now case-insensitive.
     - Changed: Updated supporting libraries to latest available.
     - Changed: When providing a invalid start or end timestamp will now result in a error instead of a traceback.
     - Fixed: Added x265 compatibility tag for QuickTime. Contributed by dburkland
     - Fixed: Event file will now be removed when providing an output file and only 1 event is processed, leaving only 1 movie file.
+    - Fixed: Providing a mount as a source resulted in it no files found. Now when a mount is provided it will be handled same as folders.
 
 
 
