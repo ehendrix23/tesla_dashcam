@@ -34,7 +34,7 @@ _LOGGER = logging.getLogger(__name__)
 #  different ones to be created based on where it should go to (stdout,
 #  log file, ...).
 
-VERSION = {"major": 0, "minor": 1, "patch": 17, "beta": 1}
+VERSION = {"major": 0, "minor": 1, "patch": 17, "beta": 2}
 VERSION_STR = "v{major}.{minor}.{patch}".format(
     major=VERSION["major"], minor=VERSION["minor"], patch=VERSION["patch"]
 )
@@ -390,6 +390,9 @@ class Event(object):
             print(f"{get_current_timestamp()}Bad string format for merge template: Invalid variable {str(e)}")
             template = None
 
+        if template == "":
+            template = f"{self.start_timestamp.astimezone(get_localzone()).strftime(timestamp_format)} - " \
+                       f"{self.end_timestamp.astimezone(get_localzone()).strftime(timestamp_format)}"
         return template
 
 class Movie(object):
@@ -1861,10 +1864,10 @@ def create_intermediate_movie(
                 "event_timestamp_countdown_rolling"] = "%{{pts:hms:{event_timestamp_countdown}}}".format(
                 event_timestamp_countdown=replacement_strings["event_timestamp_countdown"])
 
-        replacement_strings["event_city"] = event_info.metadata["city"] or "n/a"
-        replacement_strings["event_reason"] = event_info.metadata["reason"] or "n/a"
-        replacement_strings["event_latitude"] = event_info.metadata["latitude"] or 0.0
-        replacement_strings["event_longitude"] = event_info.metadata["longitude"] or 0.0
+        replacement_strings["city"] = event_info.metadata["city"] or "n/a"
+        replacement_strings["reason"] = event_info.metadata["reason"] or "n/a"
+        replacement_strings["latitude"] = event_info.metadata["latitude"] or 0.0
+        replacement_strings["longitude"] = event_info.metadata["longitude"] or 0.0
 
     try:
         # Try to replace strings!
@@ -1982,7 +1985,8 @@ def create_movie(
             if not os.path.isfile(video_clip.filename):
                 print(f"{get_current_timestamp()}\t\tFile {video_clip.filename} does not exist anymore, skipping.")
                 continue
-
+            _LOGGER.debug(f"{get_current_timestamp()}Video file {video_clip.filename} will be added to "
+                          f"{movie_filename}")
             # Add this file in our join list.
             # NOTE: Recent ffmpeg changes requires Windows paths in this file to look like
             # file 'file:<actual path>'
@@ -2412,9 +2416,10 @@ def process_folders(event_list, video_settings, delete_source):
                     movies.update({event_info.template(merge_group_template,
                                                        timestamp_format,
                                                        video_settings): Movie()})
-                    movies.get(event_info.template(merge_group_template,
-                                                   timestamp_format,
-                                                   video_settings)).set_event(event_info)
+
+                movies.get(event_info.template(merge_group_template,
+                                               timestamp_format,
+                                               video_settings)).set_event(event_info)
 
                 print(f"{get_current_timestamp()}\tMovie {event_info.filename} for folder {event_folder} with "
                       f"duration {str(timedelta(seconds=int(event_info.duration)))} is ready."
@@ -2492,7 +2497,7 @@ def process_folders(event_list, video_settings, delete_source):
                         elif video_settings["merge_subdirs"] and not video_settings["keep_events"]:
                             # Delete the event files now.
                             delete_file_list = []
-                            for event_info in movies.get(movie).items:
+                            for _, event_info in movies.get(movie).items:
                                 delete_file_list.append(event_info.filename)
                             _LOGGER.debug(f"{get_current_timestamp()}Deleting {len(delete_file_list)} event files")
                             delete_intermediate(delete_file_list)
@@ -2539,7 +2544,7 @@ def process_folders(event_list, video_settings, delete_source):
                     total_folders=len(event_list),
                     clips="" if total_clips < 2 else "s",
                     total_clips=total_clips,
-                    total_movies=total_movies,
+                    total_movies=len(movies_list),
                     movies="has" if len(movies_list) == 1 else "have",
                 )
             else:
@@ -2550,7 +2555,7 @@ def process_folders(event_list, video_settings, delete_source):
                     total_folders=len(event_list),
                     clips="" if total_clips < 2 else "s",
                     total_clips=total_clips,
-                    total_movies=total_movies,
+                    total_movies=len(movies_list),
                     movies="has" if len(movies_list) == 1 else "have",
                     all_movies=len(movies),
                 )
