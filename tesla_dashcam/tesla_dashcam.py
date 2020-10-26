@@ -34,7 +34,7 @@ _LOGGER = logging.getLogger(__name__)
 #  different ones to be created based on where it should go to (stdout,
 #  log file, ...).
 
-VERSION = {"major": 0, "minor": 1, "patch": 17, "beta": 2}
+VERSION = {"major": 0, "minor": 1, "patch": 17, "beta": 3}
 VERSION_STR = "v{major}.{minor}.{patch}".format(
     major=VERSION["major"], minor=VERSION["minor"], patch=VERSION["patch"]
 )
