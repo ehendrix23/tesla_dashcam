@@ -1505,13 +1505,12 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
                 [event_folder],
             )
             # Store video as a camera clip.
-# TODO Need to change this to get the date/time of the file instead if unable to get timestamp from metadata
+            clip_timestamp = metadata[0]["timestamp"] if metadata[0]["timestamp"] is not None \
+                else datetime.fromtimestamp(os.path.getmtime(event_folder))
+
             clip_camera_info = Camera_Clip(filename=event_folder,
                                            duration=metadata[0]["duration"],
-                                           timestamp=(metadata[0]["timestamp"]
-                                                      if metadata[0]["timestamp"] is not None
-                                                      else datetime.now()
-                                                      ),
+                                           timestamp=(clip_timestamp if clip_timestamp  is not None else datetime.now(),
                                            include=True,
                                            )
             # Add it as a clip
