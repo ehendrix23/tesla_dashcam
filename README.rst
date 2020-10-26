@@ -1439,6 +1439,7 @@ Release Notes
     - New: Added support for event information file and ability to display it in the overlay text. Contributed by JakeShirley
     - New: Support for FreeBSD 11. Contributed by busbyjon
     - New: Source can now include wildcards, shell variables, and will do user expansion (i.e. ~ on Unix, ~user on Windows).
+    - New: Output can now include shell variables and will do user expansion (i.e. ~ on Unix, ~user on Windows).
     - New: Metadata tag title in video file is now set to reason for event (if exist) and timestamp or start/end timestamp
     - New: Metadata tag creation_time in video files created is now set to start timestamp of that particular video.
     - New: When scanning folders a message will be printed after every 10 folders scanned to show progress.

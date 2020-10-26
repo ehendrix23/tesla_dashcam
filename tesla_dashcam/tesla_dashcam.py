@@ -3677,7 +3677,7 @@ def main() -> int:
         target_filename = None
 
     # Convert target folder to absolute path if relative path has been provided.
-    target_folder = os.path.abspath(target_folder)
+    target_folder = os.path.abspath(os.path.expanduser(os.path.expandvars(target_folder)))
 
     # Ensure folder if not already exist and if not can be created
     if not make_folder("--output", target_folder):
