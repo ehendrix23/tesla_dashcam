@@ -35,12 +35,10 @@ _LOGGER = logging.getLogger(__name__)
 #  log file, ...).
 
 VERSION = {"major": 0, "minor": 1, "patch": 17, "beta": 3}
-VERSION_STR = "v{major}.{minor}.{patch}".format(
-    major=VERSION["major"], minor=VERSION["minor"], patch=VERSION["patch"]
-)
+VERSION_STR = f"v{VERSION['major']}.{VERSION['minor']}.{VERSION['patch']}"
 
 if VERSION["beta"] > -1:
-    VERSION_STR = VERSION_STR + "b{beta}".format(beta=VERSION["beta"])
+    VERSION_STR = f"{VERSION_STR}b{VERSION['beta']}"
 
 MONITOR_SLEEP_TIME = 5
 
@@ -1256,16 +1254,14 @@ def get_current_timestamp():
 def check_latest_release(include_beta):
     """ Checks GitHub for latest release """
 
-    url = "{url}/repos/{owner}/{repo}/releases".format(
-        url=GITHUB["URL"], owner=GITHUB["owner"], repo=GITHUB["repo"]
-    )
+    url = f"{GITHUB['URL']}/repos/{GITHUB['owner']}/{GITHUB['repo']}/releases"
 
     if not include_beta:
         url = url + "/latest"
     try:
         releases = requests.get(url)
     except requests.exceptions.RequestException as exc:
-        print(get_current_timestamp() + "Unable to check for latest release: {exc}".format(exc=exc))
+        print(f"{get_current_timestamp()}Unable to check for latest release: {exc}")
         return None
 
     release_data = releases.json()
@@ -1291,7 +1287,7 @@ def get_tesladashcam_folder():
     return None, None
 
 
-def get_movie_files(source_folder, exclude_subdirs, video_settings):
+def get_movie_files(source_folder, video_settings):
     """ Find all the clip files within folder (and subfolder if requested)
 
 
@@ -1305,7 +1301,7 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
         _LOGGER.debug(f"{get_current_timestamp()}Processing provided source path {source_pathname}.")
         for pathname in iglob(os.path.expanduser(os.path.expandvars(source_pathname))):
             _LOGGER.debug(f"{get_current_timestamp()}Processing {pathname}.")
-            if os.path.isdir(pathname) or os.path.ismount(pathname) and not exclude_subdirs:
+            if os.path.isdir(pathname) or os.path.ismount(pathname) and not video_settings["exclude_subdirs"]:
                 _LOGGER.debug(f"{get_current_timestamp()}Retrieving all subfolders for {pathname}.")
                 for folder, _, _ in os.walk(pathname, followlinks=True):
                     folder_list.add(folder)
@@ -2044,7 +2040,7 @@ def create_movie(
                 )
 
     if total_clips == 0:
-        print(get_current_timestamp() + "\t\tError: No valid clips to merge found.")
+        print(f"{get_current_timestamp()}\t\tError: No valid clips to merge found.")
         return True
 
     # Write out the meta data file.
@@ -2191,7 +2187,7 @@ def delete_intermediate(movie_files):
                 try:
                     os.remove(file)
                 except OSError as exc:
-                    print(get_current_timestamp() + "\t\tError trying to remove file {}: {}".format(file, exc))
+                    print(f"{get_current_timestamp()}\t\tError trying to remove file {file}: {exc}")
             elif os.path.isdir(file):
                 _LOGGER.debug(f"{get_current_timestamp()}Deleting folder {file}.")
                 # This is more specific for Mac but won't hurt on other platforms.
@@ -2207,20 +2203,28 @@ def delete_intermediate(movie_files):
 
                     os.rmdir(file)
                 except OSError as exc:
-                    print(get_current_timestamp() + "\t\tError trying to remove folder {}: {}".format(file, exc))
+                    print(f"{get_current_timestamp()}\t\tError trying to remove folder {file}: {exc}")
 
 
-def process_folders(event_list, video_settings, delete_source):
+def process_folders(source_folders, video_settings, delete_source):
     """ Process all clips found within folders. """
+
+    # Retrieve all the video files within the folders provided.
+    event_list = get_movie_files(
+        source_folders,
+        video_settings,
+    )
+
+    if event_list is None:
+        print(f"{get_current_timestamp()}No video files found to process.")
+        return
+
     start_time = timestamp()
 
     total_clips = 0
     for _, (event_folder, event_info) in enumerate(event_list.items()):
         total_clips = total_clips + event_info.count
-    print(
-        get_current_timestamp() + "There are {total_folders} event folder(s) with {total_clips} clips to "
-                                  "process.".format(total_folders=len(event_list), total_clips=total_clips)
-    )
+    print(f"{get_current_timestamp()}There are {len(event_list)} event folder(s) with {total_clips} clips to process.")
 
     # Loop through all the events (folders) sorted.
     movies = {}
@@ -2505,12 +2509,10 @@ def process_folders(event_list, video_settings, delete_source):
                   f"{video_settings['target_folder']}"
             )
     else:
-        print(get_current_timestamp() + "No clips found.")
+        print(f"{get_current_timestamp()}No clips found.")
 
     end_time = timestamp()
-    real = int((end_time - start_time))
-
-    print(get_current_timestamp() + "Total processing time: {real}".format(real=str(timedelta(seconds=real))))
+    print(f"{get_current_timestamp()}Total processing time: {str(timedelta(seconds=int((end_time - start_time))))}")
     if video_settings["notification"]:
         if movies_list is None:
             # No merging of movies occurred.
@@ -2592,7 +2594,7 @@ def notify_macos(title, subtitle, message):
             ]
         )
     except Exception as exc:
-        print(get_current_timestamp() + "Failed in notifification: ", exc)
+        print(f"{get_current_timestamp()}Failed in notifification: {str(exc)}")
 
 
 def notify_windows(title, subtitle, message):
@@ -2615,7 +2617,7 @@ def notify_windows(title, subtitle, message):
 
         TOASTER_INSTANCE.show_toast(
             threaded=True,
-            title="{} {}".format(title, subtitle),
+            title=f"{title} {subtitle}",
             msg=message,
             duration=5,
             icon_path=resource_path("tesla_dashcam.ico"),
@@ -2624,8 +2626,8 @@ def notify_windows(title, subtitle, message):
         run(
             [
                 "notify-send",
-                '"{title} {subtitle}"'.format(title=title, subtitle=subtitle),
-                '"{}"'.format(message),
+                f'"{title} {subtitle}"',
+                f'"{message}"',
             ]
         )
     except Exception:
@@ -2638,12 +2640,12 @@ def notify_linux(title, subtitle, message):
         run(
             [
                 "notify-send",
-                '"{title} {subtitle}"'.format(title=title, subtitle=subtitle),
-                '"{}"'.format(message),
+                f'"{title} {subtitle}"',
+                f'"{message}"',
             ]
         )
     except Exception as exc:
-        print(get_current_timestamp() + "Failed in notifification: ", exc)
+        print(f"{get_current_timestamp()}Failed in notifification: {str(exc)}")
 
 
 def notify(title, subtitle, message):
@@ -3253,15 +3255,15 @@ def main() -> int:
 
     # Check that any mutual exclusive items are not both provided.
     if "speed_up" in args and "slow_down" in args:
-        print(
-            get_current_timestamp() + "Option --speed_up and option --slow_down cannot be used together, only use one of them."
-        )
+        print(f"{get_current_timestamp()}Option --speed_up and option --slow_down cannot be used together, "
+              f"only use one of them."
+              )
         return 1
 
     if "enc" in args and "encoding" in args:
-        print(
-            get_current_timestamp() + "Option --enc and option --encoding cannot be used together, only use one of them."
-        )
+        print(f"{get_current_timestamp()}Option --enc and option --encoding cannot be used together, "
+              f"only use one of them."
+              )
         return 1
 
     if not args.no_check_for_updates or args.check_for_updates:
@@ -3312,50 +3314,29 @@ def main() -> int:
                         notify(
                             "TeslaCam",
                             "Update available",
-                            "New {beta}release {release} is available. You are "
-                            "on version {version}".format(
-                                beta=beta,
-                                release=release_info.get("tag_name"),
-                                version=VERSION_STR,
-                            ),
+                            f"New {beta}release {release_info.get('tag_name')} is available. You are on version "
+                            f"{VERSION_STR}",
                         )
                     release_notes = (
                         "Use --check_for_update to get latest " "release notes."
                     )
 
-                print(
-                    get_current_timestamp() + "New {beta}release {release} is available for download "
-                                              "({url}). You are currently on {version}. {rel_note}".format(
-                        beta=beta,
-                        release=release_info.get("tag_name"),
-                        url=release_info.get("html_url"),
-                        version=VERSION_STR,
-                        rel_note=release_notes,
-                    )
-                )
+                print(f"{get_current_timestamp()}New {beta}release {release_info.get('tag_name')} is available for "
+                      f"download ({release_info.get('html_url')}). You are currently on {VERSION_STR}. {release_notes}"
+                      )
 
                 if args.check_for_updates:
-                    print(
-                        get_current_timestamp() + "You can download the new release from: {url}".format(
-                            url=release_info.get("html_url")
-                        )
-                    )
-                    print(
-                        get_current_timestamp() + "Release Notes:\n {release_notes}".format(
-                            release_notes=release_info.get("body")
-                        )
-                    )
+                    print(f"{get_current_timestamp()}You can download the new release from: "
+                          f"{release_info.get('html_url')}"
+                          )
+                    print(f"{get_current_timestamp()}Release Notes:\n {release_info.get('body')}")
                     return 0
             else:
                 if args.check_for_updates:
-                    print(
-                        get_current_timestamp() + "{version} is the latest release available.".format(
-                            version=VERSION_STR
-                        )
-                    )
+                    print(f"{get_current_timestamp()}{VERSION_STR} is the latest release available.")
                     return 0
         else:
-            print(get_current_timestamp() + "Did not retrieve latest version info.")
+            print(f"{get_current_timestamp()} Did not retrieve latest version info.")
 
     ffmpeg = ffmpeg_default if getattr(args, "ffmpeg", None) is None else args.ffmpeg
     if which(ffmpeg) is None:
@@ -3577,9 +3558,9 @@ def main() -> int:
                 f" disable timestamp using --no-timestamp"
             )
             if sys.platform == "linux":
-                print(
-                    get_current_timestamp() + "You can also install the fonts using for example: apt-get install ttf-freefont"
-                )
+                print(f"{get_current_timestamp()}You can also install the fonts using for example: "
+                      f"apt-get install ttf-freefont"
+                      )
             return 0
 
         # noinspection PyPep8,PyPep8,PyPep8
@@ -3635,16 +3616,16 @@ def main() -> int:
 
         # GPU acceleration enabled
         if use_gpu:
-            print(get_current_timestamp() + "GPU acceleration is enabled")
+            print(f"{get_current_timestamp()}GPU acceleration is enabled")
             if sys.platform == "darwin":
                 video_encoding = video_encoding + ["-allow_sw", "1"]
                 encoding = encoding + "_mac"
 
             else:
                 if args.gpu_type is None:
-                    print(
-                        get_current_timestamp() + "Parameter --gpu_type is mandatory when parameter --use_gpu is used."
-                    )
+                    print(f"{get_current_timestamp()}Parameter --gpu_type is mandatory when parameter "
+                          f"--use_gpu is used."
+                          )
                     return 0
 
                 encoding = encoding + "_" + args.gpu_type
@@ -3737,6 +3718,7 @@ def main() -> int:
 
     video_settings = {
         "source_folder": source_list,
+        "exclude_subdirs": args.exclude_subdirs,
         "output": args.output,
         "target_folder": target_folder,
         "target_filename": target_filename,
@@ -3796,10 +3778,9 @@ def main() -> int:
 
         trigger_exist = False
         if monitor_file is None:
-            print(get_current_timestamp() + "Monitoring for TeslaCam Drive to be inserted. Press CTRL-C to stop")
+            print(f"{get_current_timestamp()}Monitoring for TeslaCam Drive to be inserted. Press CTRL-C to stop")
         else:
-            print(get_current_timestamp() + "Monitoring for trigger {} to exist. Press CTRL-C to stop".format(
-                monitor_file))
+            print(f"{get_current_timestamp()}Monitoring for trigger {monitor_file)} to exist. Press CTRL-C to stop")
         while True:
             try:
                 # Monitoring for disk to be inserted and not for a file.
@@ -3808,9 +3789,9 @@ def main() -> int:
                     if source_folder is None:
                         # Nothing found, sleep for 1 minute and check again.
                         if trigger_exist:
-                            print(get_current_timestamp() + "TeslaCam drive has been ejected.")
-                            print(
-                                get_current_timestamp() + "Monitoring for TeslaCam Drive to be inserted. Press CTRL-C to stop")
+                            print(f"{get_current_timestamp()}TeslaCam drive has been ejected.")
+                            print(f"{get_current_timestamp()}Monitoring for TeslaCam Drive to be inserted. "
+                                  f"Press CTRL-C to stop")
 
                         sleep(MONITOR_SLEEP_TIME)
                         trigger_exist = False
@@ -3834,9 +3815,7 @@ def main() -> int:
                                 os.path.join(source_folder, folder)
                             )
 
-                    message = "TeslaCam folder found on {partition}.".format(
-                        partition=source_partition
-                    )
+                    message = f"TeslaCam folder found on {source_partition}."
                 else:
                     # Wait till trigger file exist (can also be folder).
                     if not os.path.exists(monitor_file):
@@ -3849,7 +3828,7 @@ def main() -> int:
                         sleep(MONITOR_SLEEP_TIME)
                         continue
 
-                    message = "Trigger {} exist.".format(monitor_file)
+                    message = f"Trigger {monitor_file} exist."
                     trigger_exist = True
 
                     # Set monitor path, make sure what was provided is a file first otherwise get path.
@@ -3872,7 +3851,7 @@ def main() -> int:
                                     os.path.join(monitor_path, folder)
                                 )
 
-                print(get_current_timestamp() + message)
+                print(f"{get_current_timestamp()}{message}")
                 if args.system_notification:
                     notify("TeslaCam", "Started", message)
 
@@ -3882,10 +3861,6 @@ def main() -> int:
                     print(f"{get_current_timestamp()}Retrieving all files from: ")
                     for folder in source_folder_list:
                         print(f"{get_current_timestamp()}                          {folder}")
-
-                folders = get_movie_files(
-                    source_folder_list, args.exclude_subdirs, video_settings
-                )
 
                 if video_settings["run_type"] == "MONITOR":
                     # We will continue to monitor hence we need to
@@ -3909,9 +3884,9 @@ def main() -> int:
                 )
                 video_settings.update({"movie_filename": movie_filename})
 
-                process_folders(folders, video_settings, args.delete_source)
+                process_folders(source_folder_list, video_settings, args.delete_source)
 
-                print(get_current_timestamp() + "Processing of movies has completed.")
+                print(f"{get_current_timestamp()}Processing of movies has completed.")
                 if args.system_notification:
                     notify(
                         "TeslaCam", "Completed", "Processing of movies has completed."
@@ -3924,43 +3899,35 @@ def main() -> int:
                             try:
                                 os.remove(monitor_file)
                             except OSError as exc:
-                                print(
-                                    get_current_timestamp() + "Error trying to remove trigger file {}: {}".format(
-                                        monitor_file, exc
-                                    )
-                                )
+                                print(f"{get_current_timestamp()}Error trying to remove trigger file "
+                                      f"{monitor_file}: {exc}"
+                                      )
 
-                    print(get_current_timestamp() + "Exiting monitoring as asked process once.")
+                    print(f"{get_current_timestamp()}Exiting monitoring as asked process once.")
                     break
 
                 if monitor_file is None:
                     trigger_exist = True
-                    print(get_current_timestamp() + "Waiting for TeslaCam Drive to be ejected. Press CTRL-C to stop")
+                    print(f"{get_current_timestamp()}Waiting for TeslaCam Drive to be ejected. Press CTRL-C to stop")
                 else:
                     if os.path.isfile(monitor_file):
                         try:
                             os.remove(monitor_file)
                         except OSError as exc:
-                            print(get_current_timestamp() + "Error trying to remove trigger file {}: {}".format(
-                                monitor_file, exc))
+                            print(f"{get_current_timestamp()}Error trying to remove trigger file {monitor_file}: {exc}")
                             break
                         trigger_exist = False
 
-                        print(get_current_timestamp() + "Monitoring for trigger {}. Press CTRL-C to stop".format(
-                            monitor_file))
+                        print(f"{get_current_timestamp()}Monitoring for trigger {monitor_file}. Press CTRL-C to stop")
                     else:
-                        print(
-                            get_current_timestamp() + "Waiting for trigger {} to be removed. Press CTRL-C to stop".format(
-                                monitor_file))
+                        print(f"{get_current_timestamp()}Waiting for trigger {monitor_file} to be removed. "
+                              f"Press CTRL-C to stop"
+                              )
 
             except KeyboardInterrupt:
-                print(get_current_timestamp() + "Monitoring stopped due to CTRL-C.")
+                print(f"{get_current_timestamp()}Monitoring stopped due to CTRL-C.")
                 break
     else:
-        folders = get_movie_files(
-            video_settings["source_folder"], args.exclude_subdirs, video_settings
-        )
-
         movie_filename = (
             datetime.today().strftime("%Y-%m-%d_%H_%M")
             if video_settings["target_filename"] is None
@@ -3969,7 +3936,7 @@ def main() -> int:
         _LOGGER.debug(f"{get_current_timestamp()}video_settings attribute movie_filename set to {movie_filename}.")
         video_settings.update({"movie_filename": movie_filename})
 
-        process_folders(folders, video_settings, args.delete_source)
+        process_folders(video_settings["source_folder"], video_settings, args.delete_source)
 
 
 if sys.version_info < (3, 8):
