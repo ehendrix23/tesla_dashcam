@@ -262,10 +262,13 @@ Usage
       Start and/or end offsets for events
 
       --start_offset START_OFFSET
-                            Skip x number of seconds from start of event for resulting video. (default: None)
+                            Skip x number of seconds from start of event for resulting video. Default is 0 seconds, 60 seconds if
+                            --sentry_offset is provided. (default: None)
       --end_offset END_OFFSET
-                            Ignore the last x seconds of the event for resulting video (default: None)
-      --sentry_offset       Set offsets for Sentry clips based on when timestamp of object detection occurred (default: False)
+                            Ignore the last x seconds of the event for resulting video. Default is 0 seconds, 30 seconds if
+                            --sentry_offset is provided.
+      --sentry_offset       start_offset and end_offset will be based on when timestamp of object detection occurred for Sentry
+                            events instead of start/end of event
 
     Video Output:
       Options related to resulting video creation.

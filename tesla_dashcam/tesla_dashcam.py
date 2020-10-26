@@ -3001,20 +3001,24 @@ def main() -> int:
         "--start_offset",
         dest="start_offset",
         type=int,
-        help="Skip x number of seconds from start of event for resulting video.",
+        help="Skip x number of seconds from start of event for resulting video. Default is 0 seconds, 60 seconds if "
+             "--sentry_offset is provided.",
     )
     offset_group.add_argument(
         "--end_offset",
         dest="end_offset",
         type=int,
         help="Ignore the last x seconds of the event for resulting video",
+        help="Ignore the last x seconds of the event for resulting video. Default is 0 seconds, 30 seconds if "
+             "--sentry_offset is provided.",
     )
 
     offset_group.add_argument(
         "--sentry_offset",
         dest="sentry_offset",
         action="store_true",
-        help="Set offsets for Sentry clips based on when timestamp of object detection occurred",
+        help="start_offset and end_offset will be based on when timestamp of object detection occurred for Sentry"
+             "events instead of start/end of event.",
     )
 
     output_group = parser.add_argument_group(
@@ -3772,8 +3776,8 @@ def main() -> int:
         "right_camera": ffmpeg_right_camera,
         "rear_camera": ffmpeg_rear_camera,
         "start_timestamp": start_timestamp,
-        "start_offset": args.start_offset,
-        "end_timestamp": end_timestamp,
+        "start_offset": 30 if args.start_offset is None and args.sentry_offset else args.start_offset,
+        "end_timestamp": 60 if args.start_offset is None and args.sentry_offset else args.start_offset,
         "end_offset": args.end_offset,
         "sentry_offset": args.sentry_offset,
         "skip_existing": args.skip_existing,
