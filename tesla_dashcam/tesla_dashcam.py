@@ -3780,7 +3780,7 @@ def main() -> int:
         if monitor_file is None:
             print(f"{get_current_timestamp()}Monitoring for TeslaCam Drive to be inserted. Press CTRL-C to stop")
         else:
-            print(f"{get_current_timestamp()}Monitoring for trigger {monitor_file)} to exist. Press CTRL-C to stop")
+            print(f"{get_current_timestamp()}Monitoring for trigger {monitor_file} to exist. Press CTRL-C to stop")
         while True:
             try:
                 # Monitoring for disk to be inserted and not for a file.
