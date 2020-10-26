@@ -1510,7 +1510,7 @@ def get_movie_files(source_folder, exclude_subdirs, video_settings):
 
             clip_camera_info = Camera_Clip(filename=event_folder,
                                            duration=metadata[0]["duration"],
-                                           timestamp=(clip_timestamp if clip_timestamp  is not None else datetime.now(),
+                                           timestamp=clip_timestamp if clip_timestamp  is not None else datetime.now(),
                                            include=True,
                                            )
             # Add it as a clip
