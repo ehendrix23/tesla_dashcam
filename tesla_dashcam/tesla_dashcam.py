@@ -3008,7 +3008,6 @@ def main() -> int:
         "--end_offset",
         dest="end_offset",
         type=int,
-        help="Ignore the last x seconds of the event for resulting video",
         help="Ignore the last x seconds of the event for resulting video. Default is 0 seconds, 30 seconds if "
              "--sentry_offset is provided.",
     )
@@ -3062,6 +3061,7 @@ def main() -> int:
         help="Offset in seconds for chapters in merged video. Negative offset is # of seconds before the end of the "
              "subdir video, positive offset if # of seconds after the start of the subdir video.",
     )
+
     output_group.add_argument(
         "--merge",
         required=False,
@@ -3686,7 +3686,7 @@ def main() -> int:
     temp_folder = args.temp_dir
     if temp_folder is not None:
         # Convert temp folder to absolute path if relative path has been provided
-        temp_folder = os.path.abspath(args.temp_dir)
+        temp_folder = os.path.abspath(os.path.expanduser(os.path.expandvars(args.temp_dir)))
 
         if not make_folder("--temp_dir", temp_folder):
             return 0

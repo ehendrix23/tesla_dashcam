@@ -282,7 +282,7 @@ Usage
                             speed.
       --chapter_offset CHAPTER_OFFSET
                             Offset in seconds for chapters in merged video. Negative offset is # of seconds before the end of the  
-                            subdir video, positive offset if # of seconds after the start of the subdir video. (default: 0)        
+                            event, positive offset if # of seconds after the start of the event. (default: 0)
       --merge               Merge the video files from different events (folders) together into a video file.
                             Optionally a format string can be provided for matching events together to create a merged video file.
                             When a format string is provided instead of 1 merged video file, multiple video files will be created based on the template.
@@ -1439,7 +1439,7 @@ Release Notes
     - New: Added support for event information file and ability to display it in the overlay text. Contributed by JakeShirley
     - New: Support for FreeBSD 11. Contributed by busbyjon
     - New: Source can now include wildcards, shell variables, and will do user expansion (i.e. ~ on Unix, ~user on Windows).
-    - New: Output can now include shell variables and will do user expansion (i.e. ~ on Unix, ~user on Windows).
+    - New: Output and temp_dir can now include shell variables and will do user expansion (i.e. ~ on Unix, ~user on Windows).
     - New: Metadata tag title in video file is now set to reason for event (if exist) and timestamp or start/end timestamp
     - New: Metadata tag creation_time in video files created is now set to start timestamp of that particular video.
     - New: When scanning folders a message will be printed after every 10 folders scanned to show progress.
