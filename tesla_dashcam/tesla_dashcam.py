@@ -80,12 +80,13 @@ MOVIE_ENCODING = {
     "x264": "libx264",
     "x264_nvidia": "h264_nvenc",
     "x264_mac": "h264_videotoolbox",
-    "x264_intel": "h264_qsv",
+    "x264_intel-qsv": "h264_qsv",
+    "x264_intel-vaapi": "h264_vaapi",
     "x264_rpi": "h264_omx",
     "x265": "libx265",
     "x265_nvidia": "hevc_nvenc",
     "x265_mac": "hevc_videotoolbox",
-    "x265_intel": "hevc_qsv",
+    "x265_intel": "hevc_qsv",   #TODO: TP hevc_vaapi?
     "x265_rpi": "h265",
 }
 
@@ -1888,6 +1889,7 @@ def create_intermediate_movie(
             + ffmpeg_text
             + video_settings["ffmpeg_speed"]
             + video_settings["ffmpeg_motiononly"]
+            + video_settings["ffmpeg_hwupload"]
     )
 
     title_timestamp = (
@@ -1913,6 +1915,8 @@ def create_intermediate_movie(
     ffmpeg_command = (
             [video_settings["ffmpeg_exec"]]
             + ["-loglevel", "error"]
+            + [video_settings["ffmpeg_hwdev"]]
+            + [video_settings["ffmpeg_hwout"]]
             + ffmpeg_left_command
             + ffmpeg_front_command
             + ffmpeg_right_command
@@ -2096,6 +2100,8 @@ def create_movie(
     ffmpeg_command = (
             [video_settings["ffmpeg_exec"]]
             + ["-loglevel", "error"]
+            + [video_settings["ffmpeg_hwdev"]]
+            + [video_settings["ffmpeg_hwout"]]
             + ffmpeg_params
             + ffmpeg_metadata
             + ["-y", movie_filename]
@@ -3133,7 +3139,7 @@ def main() -> int:
 
         advancedencoding_group.add_argument(
             "--gpu_type",
-            choices=["nvidia", "intel", "RPi"],
+            choices=["nvidia", "intel-qsv", "intel-vaapi", "RPi"],
             type=str.lower,
             help="Type of graphics card (GPU) in the system. This determines the encoder that will be used."
                  "This parameter is mandatory if --gpu is provided.",
@@ -3602,6 +3608,18 @@ def main() -> int:
         input_clip = f"tmp{filter_counter}"
         filter_counter += 1
 
+    # If using vaapi hw acceleration this takes the decoding and filter processing done in software
+    # and passes it up to the GPU for hw accelerated encoding.
+    ffmpeg_hwupload = ""
+    if args.gpu_type == "intel-vaapi":
+        ffmpeg_hwupload = filter_string.format(
+            input_clip=input_clip,
+            filter=f"format=nv12,hwupload",
+            filter_counter=filter_counter,
+        )
+        input_clip = f"tmp{filter_counter}"
+        filter_counter += 1
+
     ffmpeg_params = ["-preset", args.compression, "-crf", MOVIE_QUALITY[args.quality]]
 
     use_gpu = not args.gpu if sys.platform == "darwin" else args.gpu
@@ -3615,6 +3633,8 @@ def main() -> int:
             video_encoding = video_encoding + ["-vtag", "hvc1"]
 
         # GPU acceleration enabled
+        ffmpeg_hwdev=[]
+        ffmpeg_hwout=[]
         if use_gpu:
             print(f"{get_current_timestamp()}GPU acceleration is enabled")
             if sys.platform == "darwin":
@@ -3627,6 +3647,14 @@ def main() -> int:
                           f"--use_gpu is used."
                           )
                     return 0
+                if args.gpu_type == "intel-vaapi":
+                    if sys.platform == "linux":
+                        ffmpeg_hwdev = ["-vaapi_device", "/dev/dri/renderD128"] 
+                        ffmpeg_hwout = ["-hwaccel_output_format", "vaapi"]
+
+                    else:
+                        print(f"{get_current_timestamp()}Support to be added for vaapi on Windows.")
+                        return 0
 
                 encoding = encoding + "_" + args.gpu_type
 
@@ -3741,6 +3769,8 @@ def main() -> int:
         "movie_quality": args.quality,
         "background": ffmpeg_black_video,
         "ffmpeg_exec": ffmpeg,
+        "ffmpeg_hwdev": ffmpeg_hwdev,
+        "ffmpeg_hwout": ffmpeg_hwout,
         "base": ffmpeg_base,
         "video_layout": layout_settings,
         "clip_positions": ffmpeg_video_position,
@@ -3749,6 +3779,7 @@ def main() -> int:
         "timestamp_format": timestamp_format,
         "ffmpeg_speed": ffmpeg_speed,
         "ffmpeg_motiononly": ffmpeg_motiononly,
+        "ffmpeg_hwupload": ffmpeg_hwupload,
         "movflags_faststart": not args.faststart,
         "input_clip": input_clip,
         "other_params": ffmpeg_params,

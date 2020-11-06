@@ -120,7 +120,7 @@ Usage
                             [--end_timestamp END_TIMESTAMP] [--start_offset START_OFFSET] [--end_offset END_OFFSET]
                             [--output OUTPUT] [--motion_only] [--slowdown SLOW_DOWN] [--speedup SPEED_UP]
                             [--chapter_offset CHAPTER_OFFSET] [--merge] [--keep-intermediate]
-                            [--set_moviefile_timestamp {START,STOP}] [--gpu] [--gpu_type {nvidia,intel,RPi}] [--no-faststart]      
+                            [--set_moviefile_timestamp {START,STOP}] [--gpu] [--gpu_type {nvidia,intel-qsv,intel-vaapi,RPi}] [--no-faststart]      
                             [--quality {LOWEST,LOWER,LOW,MEDIUM,HIGH}]
                             [--compression {ultrafast,superfast,veryfast,faster,fast,medium,slow,slower,veryslow}] [--fps FPS]     
                             [--ffmpeg FFMPEG] [--encoding {x264,x265}] [--enc ENC] [--check_for_update] [--no-check_for_update]    
@@ -317,7 +317,7 @@ Usage
                                   See following link as well:
                                     https://en.wikipedia.org/wiki/List_of_Macintosh_models_grouped_by_CPU_type#Haswell
                             (default: False)
-      --gpu_type {nvidia,intel,RPi}
+      --gpu_type {nvidia,intel-qsv,intel-vaapi,RPi}
                             Type of graphics card (GPU) in the system. This determines the encoder that will be used.This
                             parameter is mandatory if --gpu is provided. (default: None)
       --no-faststart        Do not enable flag faststart on the resulting video files. Use this when using a network share and     
@@ -858,7 +858,9 @@ The following parameters are more advanced settings to determine how ffmpeg shou
 
   All platforms except Macs. Provide the GPU type installed in the system.
 
-    intel: if INTEL GPU is installed
+    intel-qsv: if INTEL GPU is installed and ffmpeg binary has intel-qsv support. 
+
+    intel-vaapi: if newer INTEL GPU is installed and ffmpeg binary has intel-vaapi support. 
 
     nvidia: if NVIDIA GPU is installed
 
@@ -1167,7 +1169,7 @@ Layout so front is shown top middle with side cameras below it and font size of 
 
     python3 tesla_dashcam.py --layout FULLSCREEN --fontsize 24 /home/me/Tesla/2019-02-27_14-02-03
 
-Specify location of ffmpeg binay (in case ffmpeg is not in path):
+Specify location of ffmpeg binary (in case ffmpeg is not in path):
 
 * Windows:
 
