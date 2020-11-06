@@ -1915,8 +1915,8 @@ def create_intermediate_movie(
     ffmpeg_command = (
             [video_settings["ffmpeg_exec"]]
             + ["-loglevel", "error"]
-            + [video_settings["ffmpeg_hwdev"]]
-            + [video_settings["ffmpeg_hwout"]]
+            + video_settings["ffmpeg_hwdev"]
+            + video_settings["ffmpeg_hwout"]
             + ffmpeg_left_command
             + ffmpeg_front_command
             + ffmpeg_right_command
@@ -2100,8 +2100,8 @@ def create_movie(
     ffmpeg_command = (
             [video_settings["ffmpeg_exec"]]
             + ["-loglevel", "error"]
-            + [video_settings["ffmpeg_hwdev"]]
-            + [video_settings["ffmpeg_hwout"]]
+            + video_settings["ffmpeg_hwdev"]
+            + video_settings["ffmpeg_hwout"]
             + ffmpeg_params
             + ffmpeg_metadata
             + ["-y", movie_filename]
@@ -3633,8 +3633,8 @@ def main() -> int:
             video_encoding = video_encoding + ["-vtag", "hvc1"]
 
         # GPU acceleration enabled
-        ffmpeg_hwdev=[]
-        ffmpeg_hwout=[]
+        ffmpeg_hwdev = []
+        ffmpeg_hwout = []
         if use_gpu:
             print(f"{get_current_timestamp()}GPU acceleration is enabled")
             if sys.platform == "darwin":
@@ -3649,8 +3649,8 @@ def main() -> int:
                     return 0
                 if args.gpu_type == "intel-vaapi":
                     if sys.platform == "linux":
-                        ffmpeg_hwdev = ["-vaapi_device", "/dev/dri/renderD128"] 
-                        ffmpeg_hwout = ["-hwaccel_output_format", "vaapi"]
+                        ffmpeg_hwdev = ffmpeg_hwdev + ["-vaapi_device", "/dev/dri/renderD128"] 
+                        ffmpeg_hwout = ffmpeg_hwout + ["-hwaccel_output_format", "vaapi"]
 
                     else:
                         print(f"{get_current_timestamp()}Support to be added for vaapi on Windows.")
