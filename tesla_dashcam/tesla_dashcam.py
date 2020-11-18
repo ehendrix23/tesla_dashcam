@@ -3652,6 +3652,11 @@ def main() -> int:
                         ffmpeg_hwdev = ffmpeg_hwdev + ["-vaapi_device", "/dev/dri/renderD128"] 
                         ffmpeg_hwout = ffmpeg_hwout + ["-hwaccel_output_format", "vaapi"]
 
+                if args.gpu_type == "intel-qsv":
+                    if sys.platform == "linux":
+                        ffmpeg_hwdev = ffmpeg_hwdev + ["-qsv_device", "/dev/dri/renderD128"] 
+                        ffmpeg_hwout = ffmpeg_hwout + ["-hwaccel", "qsv"]
+
                     else:
                         print(f"{get_current_timestamp()}Support to be added for vaapi on Windows.")
                         return 0
