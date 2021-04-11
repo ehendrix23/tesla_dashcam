@@ -2974,7 +2974,7 @@ def main() -> int:
         default="%x %X",
         help="R|Format for timestamps.\n "
              "Determines how timestamps should be represented. Any valid value from strftime is accepted."
-             "Default is set '%x %X' which is locale's appropriate date and time representation"
+             "Default is set '%%x %%X' which is locale's appropriate date and time representation"
              "More info: https://strftime.org"
 
     )
@@ -3081,7 +3081,7 @@ def main() -> int:
         default="%Y-%m-%d_%H_%M",
         help="R|Format for timestamps in merge_template.\n "
              "Determines how timestamps should be represented within merge_template. Any valid value from strftime is accepted."
-             "Default is set '%Y-%m-%d_%H_%M'"
+             "Default is set '%%Y-%%m-%%d_%%H_%%M'"
              "More info: https://strftime.org"
 
     )
