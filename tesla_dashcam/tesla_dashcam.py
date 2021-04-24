@@ -1705,7 +1705,7 @@ def create_intermediate_movie(
     input_count = 0
     if left_camera is not None:
         ffmpeg_left_command = ffmpeg_offset_command + ["-i", left_camera]
-        ffmpeg_left_camera = ";[0:v] " + video_settings["left_camera"]
+        ffmpeg_left_camera = ";[" + str(input_count) + ":v] " + video_settings["left_camera"]
         input_count += 1
     else:
         ffmpeg_left_command = []
