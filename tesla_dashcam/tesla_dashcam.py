@@ -1837,14 +1837,14 @@ def create_intermediate_movie(
     replacement_strings = {
         "start_timestamp": starting_timestamp.astimezone(get_localzone()).strftime(user_timestamp_format),
         "end_timestamp": ending_timestamp.astimezone(get_localzone()).strftime(user_timestamp_format),
-        "timestamp_rolling": f"%{{pts:localtime:{starting_epoch_timestamp}:{ffmpeg_user_timestamp_format}}}",
+        "local_timestamp_rolling": f"%{{pts:localtime:{starting_epoch_timestamp}:{ffmpeg_user_timestamp_format}}}",
         "event_timestamp_countdown": "n/a",
         "event_timestamp_countdown_rolling": "n/a",
         "event_timestamp": "n/a",
-        "city": "n/a",
-        "reason": "n/a",
-        "latitude": 0.0,
-        "longitude": 0.0,
+        "event_city": "n/a",
+        "event_reason": "n/a",
+        "event_latitude": 0.0,
+        "event_longitude": 0.0,
     }
 
     if event_info.metadata is not None:
@@ -1859,10 +1859,10 @@ def create_intermediate_movie(
                 "event_timestamp_countdown_rolling"] = "%{{pts:hms:{event_timestamp_countdown}}}".format(
                 event_timestamp_countdown=replacement_strings["event_timestamp_countdown"])
 
-        replacement_strings["city"] = event_info.metadata["city"] or "n/a"
-        replacement_strings["reason"] = event_info.metadata["reason"] or "n/a"
-        replacement_strings["latitude"] = event_info.metadata["latitude"] or 0.0
-        replacement_strings["longitude"] = event_info.metadata["longitude"] or 0.0
+        replacement_strings["event_city"] = event_info.metadata["city"] or "n/a"
+        replacement_strings["event_reason"] = event_info.metadata["reason"] or "n/a"
+        replacement_strings["event_latitude"] = event_info.metadata["latitude"] or 0.0
+        replacement_strings["event_longitude"] = event_info.metadata["longitude"] or 0.0
 
     try:
         # Try to replace strings!
