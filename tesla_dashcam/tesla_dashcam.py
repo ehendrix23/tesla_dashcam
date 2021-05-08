@@ -1837,7 +1837,7 @@ def create_intermediate_movie(
     replacement_strings = {
         "start_timestamp": starting_timestamp.astimezone(get_localzone()).strftime(user_timestamp_format),
         "end_timestamp": ending_timestamp.astimezone(get_localzone()).strftime(user_timestamp_format),
-        "timestamp_rolling": f"%{{pts:localtime:{starting_epoch_timestamp}:{ffmpeg_user_timestamp_format}}}",
+        "local_timestamp_rolling": f"%{{pts:localtime:{starting_epoch_timestamp}:{ffmpeg_user_timestamp_format}}}",
         "event_timestamp_countdown": "n/a",
         "event_timestamp_countdown_rolling": "n/a",
         "event_timestamp": "n/a",
