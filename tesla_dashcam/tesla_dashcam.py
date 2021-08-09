@@ -7,6 +7,7 @@ import logging
 import os
 import sys
 import json
+import shutil
 from datetime import datetime, timedelta, timezone
 from glob import glob, iglob
 from pathlib import Path
@@ -22,6 +23,13 @@ import requests
 from dateutil.parser import isoparse
 from psutil import disk_partitions
 from tzlocal import get_localzone
+
+has_staticmap = False
+try:
+    import staticmap
+    has_staticmap = True
+except ImportError:
+    pass
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -1705,7 +1713,7 @@ def create_intermediate_movie(
     input_count = 0
     if left_camera is not None:
         ffmpeg_left_command = ffmpeg_offset_command + ["-i", left_camera]
-        ffmpeg_left_camera = ";[0:v] " + video_settings["left_camera"]
+        ffmpeg_left_camera = ";[" + str(input_count) + ":v] " + video_settings["left_camera"]
         input_count += 1
     else:
         ffmpeg_left_command = []
@@ -1947,18 +1955,87 @@ def create_intermediate_movie(
     return True
 
 
+def create_title_screen(event_metadata):
+    """ Create a map centered around the event """
+    if has_staticmap == False:
+        return None
+
+    if event_metadata == None:
+        return None
+
+    try:
+        lon = float(event_metadata["longitude"])
+        lat = float(event_metadata["latitude"])
+    except:
+        return None
+
+    m = staticmap.StaticMap(1920, 960)
+    marker_outline = staticmap.CircleMarker((lon, lat), 'white', 18)
+    marker = staticmap.CircleMarker((lon, lat), '#0036FF', 12)
+
+    m.add_marker(marker_outline)
+    m.add_marker(marker)
+
+    image = m.render(zoom=13)
+
+    return image
+
 def create_movie(
         movie,
         event_info,
         movie_filename,
         video_settings,
         chapter_offset,
+        title_image,
 ):
     """ Concatenate provided movie files into 1."""
     # Just return if there are no clips.
     if movie.count <= 0:
         _LOGGER.debug(f"{get_current_timestamp()}Movie list is empty")
         return True
+
+    title_image_filename = None
+    if title_image:
+        title_image_fh, title_image_filename = mkstemp(suffix=".png", text=False)
+
+        title_image.save(title_image_filename)
+
+    title_video_filename = None
+    if title_image_filename:
+        title_video_fd, title_video_filename = mkstemp(suffix=".mp4", text=False)
+        ffmpeg_params = [
+            "-y",
+            "-framerate",
+            "1/3",
+            "-i",
+            title_image_filename,
+            title_video_filename,
+        ]
+        ffmpeg_command = (
+            [video_settings["ffmpeg_exec"]]
+            + ["-loglevel", "error"]
+            + ffmpeg_params
+            + video_settings["other_params"]
+        )
+        if movie.duration:
+            movie.duration = movie.duration + 3
+
+        try:
+            run(ffmpeg_command, capture_output=True, check=True)
+        except CalledProcessError as exc:
+            print(
+                "\t\tError trying to create title video {base_name}. RC: {rc}\n"
+                "\t\tCommand: {command}\n"
+                "\t\tError: {stderr}\n\n".format(
+                    base_name=title_video_filename,
+                    rc=exc.returncode,
+                    command=exc.cmd,
+                    stderr=exc.stderr,
+                )
+            )
+            movie_filename = None
+            duration = 0
+
 
     # Go through the list of clips to create the command and content for chapter meta file.
     ffmpeg_join_filehandle, ffmpeg_join_filename = mkstemp(suffix=".txt", text=True)
@@ -1970,6 +2047,8 @@ def create_movie(
     end_timestamp = None
     chapter_offset = chapter_offset * 1000000000
     with os.fdopen(ffmpeg_join_filehandle, "w") as fp:
+        if title_video_filename:
+            fp.write(f"file 'file:{title_video_filename.replace(os.sep, '/')}'{os.linesep}")
         # Loop through the list sorted by video timestamp.
         for movie_item in movie.sorted:
             video_clip = movie.item(movie_item)
@@ -2145,6 +2224,13 @@ def create_movie(
         os.remove(ffmpeg_meta_filename)
     except:
         _LOGGER.debug(f"{get_current_timestamp()}Failed to remove {ffmpeg_meta_filename}")
+        pass
+
+    try:
+        if title_image_filename:
+            os.remove(title_image_filename)
+    except:
+        _LOGGER.debug(f"Failed to remove {title_image_filename}")
         pass
 
     if movie.filename is None:
@@ -2408,11 +2494,17 @@ def process_folders(source_folders, video_settings, delete_source):
         # together now.
         print(f"{get_current_timestamp()}\t\tCreating movie {event_movie_filename}, please be patient.")
 
+
+        title_image = None
+        if video_settings["video_layout"].title_screen_map:
+            title_image = create_title_screen(event_info.metadata)
+
         if create_movie(event_info,
                         event_info,
                         event_movie_filename,
                         video_settings,
                         0,
+                        title_image,
                         ):
             if event_info.filename is not None:
                 if movies.get(event_info.template(merge_group_template, timestamp_format, video_settings)) is None:
@@ -2482,6 +2574,7 @@ def process_folders(source_folders, video_settings, delete_source):
                         movie_filename,
                         video_settings,
                         video_settings["chapter_offset"],
+                        None,
                 ):
 
                     if movies.get(movie).filename is not None:
@@ -2864,6 +2957,13 @@ def main() -> int:
         default="black",
         type=str.lower,
         help="Background color for video. Can be a color string or RGB value. Also see --fontcolor.",
+    )
+
+    layout_group.add_argument(
+        "--title_screen_map",
+        dest="title_screen_map",
+        action="store_true",
+        help="Show a map of the event location for the first 3 seconds of the movie. Requires the staticmap package",
     )
 
     camera_group = parser.add_argument_group(
@@ -3410,6 +3510,7 @@ def main() -> int:
     )
 
     layout_settings.swap_front_rear = args.swap_frontrear
+    layout_settings.title_screen_map = args.title_screen_map
 
     layout_settings.font.font = args.font
     layout_settings.font.color = args.fontcolor
