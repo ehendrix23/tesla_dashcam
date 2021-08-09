@@ -3133,7 +3133,7 @@ def main() -> int:
 
         advancedencoding_group.add_argument(
             "--gpu_type",
-            choices=["nvidia", "intel", "RPi"],
+            choices=["nvidia", "intel", "rpi"],
             type=str.lower,
             help="Type of graphics card (GPU) in the system. This determines the encoder that will be used."
                  "This parameter is mandatory if --gpu is provided.",
