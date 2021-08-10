@@ -824,11 +824,11 @@ These are additional parameters related to the resulting video creation.
 
   To merge events in a movies grouped by date/hour:
 
-      --merge {event_timestamp} --merge_timestamp_format %Y-%m-%d_%H
+      --merge "{event_timestamp}" --merge_timestamp_format "%Y-%m-%d_%H"
   
   To merge events in a movies grouped by date:
 
-      --merge {event_timestamp} --merge_timestamp_format %Y-%m-%d
+      --merge "{event_timestamp}" --merge_timestamp_format "%Y-%m-%d"
   
 
 *--keep-intermediate*
