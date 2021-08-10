@@ -23,13 +23,7 @@ from dateutil.parser import isoparse
 from psutil import disk_partitions
 from tzlocal import get_localzone
 
-has_staticmap = False
-try:
-    import staticmap
-
-    has_staticmap = True
-except ImportError:
-    pass
+import staticmap
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -2098,9 +2092,6 @@ def create_intermediate_movie(
 
 def create_title_screen(event_metadata):
     """ Create a map centered around the event """
-    if has_staticmap == False:
-        return None
-
     if event_metadata == None:
         return None
 
@@ -2110,7 +2101,10 @@ def create_title_screen(event_metadata):
     except:
         return None
 
-    m = staticmap.StaticMap(1920, 960)
+    m = staticmap.StaticMap(
+        video_settings["video_layout"].video_width,
+        video_settings["video_layout"].video_height,
+    )
     marker_outline = staticmap.CircleMarker((lon, lat), "white", 18)
     marker = staticmap.CircleMarker((lon, lat), "#0036FF", 12)
 
@@ -2133,45 +2127,59 @@ def create_movie(
 
     title_image_filename = None
     if title_image:
-        title_image_fh, title_image_filename = mkstemp(suffix=".png", text=False)
+        _, title_image_filename = mkstemp(suffix=".png", text=False)
 
         title_image.save(title_image_filename)
+        _LOGGER.debug(
+            f"{get_current_timestamp()}Title image saved to {title_image_filename}"
+        )
 
     title_video_filename = None
     if title_image_filename:
-        title_video_fd, title_video_filename = mkstemp(suffix=".mp4", text=False)
+        _, title_video_filename = mkstemp(suffix=".mp4", text=False)
+        _LOGGER.debug(
+            f"{get_current_timestamp()}Creating movie for title image to {title_video_filename}"
+        )
         ffmpeg_params = [
             "-y",
             "-framerate",
             "1/3",
             "-i",
             title_image_filename,
+            "-vf",
+            f"fps={video_settings['fps']},"
+            f"scale={video_settings['video_layout'].video_width}:{video_settings['video_layout'].video_height}",
+            "-pix_fmt",
+            "yuv420p",
             title_video_filename,
         ]
+
         ffmpeg_command = (
             [video_settings["ffmpeg_exec"]]
             + ["-loglevel", "error"]
             + ffmpeg_params
             + video_settings["other_params"]
         )
-        if movie.duration:
-            movie.duration = movie.duration + 3
 
+        _LOGGER.debug(f"{get_current_timestamp()}FFMPEG Command: {ffmpeg_command}")
         try:
             run(ffmpeg_command, capture_output=True, check=True)
         except CalledProcessError as exc:
             print(
-                "\t\tError trying to create title video {base_name}. RC: {rc}\n"
-                "\t\tCommand: {command}\n"
-                "\t\tError: {stderr}\n\n".format(
-                    base_name=title_video_filename,
-                    rc=exc.returncode,
-                    command=exc.cmd,
-                    stderr=exc.stderr,
-                )
+                f"{get_current_timestamp()}\t\t\tError trying to create title clip. RC: {exc.returncode}\n"
+                f"{get_current_timestamp()}\t\t\tCommand: {exc.cmd}\n"
+                f"{get_current_timestamp()}\t\t\tError: {exc.stderr}\n\n"
             )
-            movie_filename = None
-            duration = 0
+            title_video_filename = None
+
+        # Now remove the title image
+        try:
+            os.remove(title_image_filename)
+        except:
+            _LOGGER.debug(
+                f"{get_current_timestamp()}Failed to remove {title_image_filename}"
+            )
+            pass
 
     # Go through the list of clips to create the command and content for chapter meta file.
     ffmpeg_join_filehandle, ffmpeg_join_filename = mkstemp(suffix=".txt", text=True)
@@ -2187,6 +2195,8 @@ def create_movie(
             fp.write(
                 f"file 'file:{title_video_filename.replace(os.sep, '/')}'{os.linesep}"
             )
+            total_videoduration += 3
+            meta_start += 4
         # Loop through the list sorted by video timestamp.
         for movie_item in movie.sorted:
             video_clip = movie.item(movie_item)
@@ -2390,12 +2400,16 @@ def create_movie(
         )
         pass
 
-    try:
-        if title_image_filename:
-            os.remove(title_image_filename)
-    except:
-        _LOGGER.debug(f"Failed to remove {title_image_filename}")
-        pass
+    # Remove image video
+    if title_video_filename:
+        # noinspection PyBroadException,PyPep8
+        try:
+            os.remove(title_video_filename)
+        except:
+            _LOGGER.debug(
+                f"{get_current_timestamp()}Failed to remove {title_video_filename}"
+            )
+            pass
 
     if movie.filename is None:
         return False
@@ -4117,6 +4131,7 @@ def main() -> int:
         "movie_speed": speed,
         "video_encoding": video_encoding,
         "movie_encoding": args.encoding if "encoding" in args else "x264",
+        "fps": args.fps,
         "movie_compression": args.compression,
         "movie_quality": args.quality,
         "background": ffmpeg_black_video,
