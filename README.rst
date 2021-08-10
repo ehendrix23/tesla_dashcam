@@ -820,6 +820,16 @@ These are additional parameters related to the resulting video creation.
   Default: %Y-%m-%d_%H_%M
 
   Determine how timestamps should be represented within the template provided for --merge.
+  For example:
+
+  To merge events in a movies grouped by date/hour:
+
+      --merge {event_timestamp} --merge_timestamp_format %Y-%m-%d_%H
+  
+  To merge events in a movies grouped by date:
+
+      --merge {event_timestamp} --merge_timestamp_format %Y-%m-%d
+  
 
 *--keep-intermediate*
 
