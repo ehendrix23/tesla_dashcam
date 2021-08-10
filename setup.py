@@ -28,6 +28,7 @@ REQUIRED = [  # type: ignore
     "requests",
     "psutil",
     "python-dateutil",
+    "staticmap",
 ]
 
 # The rest you shouldn't have to touch too much :)
