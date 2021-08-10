@@ -789,8 +789,10 @@ These are additional parameters related to the resulting video creation.
 *--output <path/filename>*
 
   Path/filename for the resulting video. If a filename is provided here and --merge is set then the resulting merged
-  video will be saved with this filename. The event videos will be stored within the same folder.
-
+  video will be saved with this filename. The event videos will be stored within the same folder. To just provide a filename, 
+  but keeping the default folder based on platform, add an extension to the name. For example, providing "event" will create 
+  the files in folder event, but providing "event.mp4" will instead create the movie file event.mp4 in the default folder.
+  
 *--motion_only*
 
   Default: False
