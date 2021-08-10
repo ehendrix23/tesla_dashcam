@@ -2350,24 +2350,25 @@ def create_movie(
         movie.end_timestamp = end_timestamp
 
         # Set the file timestamp if to be set based on timestamp event
-        moviefile_timestamp = start_timestamp.astimezone(get_localzone())
-        if video_settings["set_moviefile_timestamp"] == "STOP":
-            moviefile_timestamp = end_timestamp.astimezone(get_localzone())
-        elif (
-            video_settings["set_moviefile_timestamp"] == "SENTRY"
-            and event_info is not None
-            and event_info.metadata.get("timestamp") is not None
-        ):
-            moviefile_timestamp = event_info.metadata.get("timestamp").astimezone(
-                get_localzone()
-            )
+        if video_settings["set_moviefile_timestamp"] != "RENDER":
+            moviefile_timestamp = start_timestamp.astimezone(get_localzone())
+            if video_settings["set_moviefile_timestamp"] == "STOP":
+                moviefile_timestamp = end_timestamp.astimezone(get_localzone())
+            elif (
+                video_settings["set_moviefile_timestamp"] == "SENTRY"
+                and event_info is not None
+                and event_info.metadata.get("timestamp") is not None
+            ):
+                moviefile_timestamp = event_info.metadata.get("timestamp").astimezone(
+                    get_localzone()
+                )
 
-        _LOGGER.debug(
-            f"{get_current_timestamp()}Setting timestamp for movie file {movie_filename} to "
-            f"{moviefile_timestamp.strftime('%Y-%m-%dT%H-%M-%S')}"
-        )
-        moviefile_timestamp = mktime(moviefile_timestamp.timetuple())
-        os.utime(movie_filename, (moviefile_timestamp, moviefile_timestamp))
+            _LOGGER.debug(
+                f"{get_current_timestamp()}Setting timestamp for movie file {movie_filename} to "
+                f"{moviefile_timestamp.strftime('%Y-%m-%dT%H-%M-%S')}"
+            )
+            moviefile_timestamp = mktime(moviefile_timestamp.timetuple())
+            os.utime(movie_filename, (moviefile_timestamp, moviefile_timestamp))
 
     # Remove temp join file.
     # noinspection PyBroadException,PyPep8
@@ -3425,7 +3426,7 @@ def main() -> int:
         "Optionally add a template string to group events in different video files based on the template.",
     )
 
-    text_overlay_group.add_argument(
+    output_group.add_argument(
         "--merge_timestamp_format",
         required=False,
         type=str,
@@ -3454,11 +3455,11 @@ def main() -> int:
         "--set_moviefile_timestamp",
         dest="set_moviefile_timestamp",
         required=False,
-        choices=["START", "STOP", "SENTRY"],
+        choices=["START", "STOP", "SENTRY", "RENDER"],
         type=str.upper,
         default="START",
         help="Match modification timestamp of resulting video files to event timestamp. Use START to match with when "
-        "the event started, STOP for end time of the event, SENTRY for Sentry event timestamp",
+        "the event started, STOP for end time of the event, SENTRY for Sentry event timestamp, or RENDER to not change it.",
     )
 
     advancedencoding_group = parser.add_argument_group(
@@ -3478,11 +3479,12 @@ def main() -> int:
         " --gpu_type has to be provided as well when enabling this parameter"
     )
 
-    if sys.platform == "darwin":
+    PRINT_ALL = True
+    if sys.platform == "darwin" or PRINT_ALL:
         advancedencoding_group.add_argument(
             "--no-gpu", dest="gpu", action="store_true", help=mac_gpu_help
         )
-    else:
+    if sys.platform != "darwin" or PRINT_ALL:
         advancedencoding_group.add_argument(
             "--gpu", dest="gpu", action="store_true", help=nonmac_gpu_help
         )
