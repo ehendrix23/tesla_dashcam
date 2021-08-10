@@ -840,19 +840,14 @@ Advanced Encoding Settings
 
 The following parameters are more advanced settings to determine how ffmpeg should encode the videos.
 
-*--gpu or --no-gpu*
+*--no-gpu*
+  For MacOS only! Disables GPU acceleration. If not provided GPU acceleration will be used.
 
-  Determine if GPU acceleration should be used or not. On MACs the default is to use GPU acceleration whereas on all
-  other platforms the default is not to use GPU acceleration (this is because the encoder being used on other
-  platforms is depending then on the GPU installed in the PC).
+*--gpu*
 
-  For Macs, use --no-gpu to disable using the GPU for encoding, note that encoding will use a lot more CPU and will
-  end up being slower.
+  All platforms except Macs. Enables GPU acceleration.
 
-  For all other platforms, use --gpu to enable GPU encoding. When enabling you will also need to provide the GPU
-  installed within the system (see --gpu_type).
-
-  Note, --gpu option is only available on non-Macs whereas option --no-gpu is only available on Macs!
+  Note: When providing this parameter to enable GPU you also have to provide parameter --gpu_type.
 
 *--gpu_type*
 
@@ -1446,7 +1441,7 @@ Release Notes
     - Changed: Improvement for Docker file size and stability. Contributed by magicalyak
     - Changed: Choice values for parameters (i.e. FULLSCREEN, intel, black) are now case-insensitive.
     - Changed: Updated supporting libraries to latest available.
-    - Changed: When providing a invalid start or end timestamp will now result in a error instead of a traceback.
+    - Fixed: When providing an invalid start or end timestamp will now result in a error instead of a traceback.
     - Fixed: Added x265 compatibility tag for QuickTime. Contributed by dburkland
     - Fixed: Event file will now be removed when providing an output file and only 1 event is processed, leaving only 1 movie file.
     - Fixed: Providing a mount as a source resulted in it no files found. Now when a mount is provided it will be handled same as folders.
