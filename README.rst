@@ -109,33 +109,27 @@ Usage
 
 .. code:: bash
 
-    usage: tesla_dashcam.py [-h] [--version] [--loglevel {DEBUG,INFO,WARNING,ERROR,CRITICAL}] [--temp_dir TEMP_DIR]
-                            [--no-notification] [--skip_existing] [--delete_source] [--exclude_subdirs] [--monitor]
-                            [--monitor_once] [--monitor_trigger MONITOR_TRIGGER]
-                            [--layout {WIDESCREEN,FULLSCREEN,PERSPECTIVE,CROSS,DIAMOND}] [--perspective]
-                            [--scale CLIP_SCALE [CLIP_SCALE ...]] [--mirror] [--rear] [--swap] [--no-swap] [--swap_frontrear]      
-                            [--background BACKGROUND] [--no-front] [--no-left] [--no-right] [--no-rear] [--no-timestamp]
-                            [--halign {LEFT,CENTER,RIGHT}] [--valign {TOP,MIDDLE,BOTTOM}] [--font FONT] [--fontsize FONTSIZE]      
-                            [--fontcolor FONTCOLOR] [--text_overlay_fmt TEXT_OVERLAY_FMT] [--start_timestamp START_TIMESTAMP]      
-                            [--end_timestamp END_TIMESTAMP] [--start_offset START_OFFSET] [--end_offset END_OFFSET]
-                            [--output OUTPUT] [--motion_only] [--slowdown SLOW_DOWN] [--speedup SPEED_UP]
-                            [--chapter_offset CHAPTER_OFFSET] [--merge] [--keep-intermediate]
-                            [--set_moviefile_timestamp {START,STOP}] [--gpu] [--gpu_type {nvidia,intel,RPi}] [--no-faststart]      
-                            [--quality {LOWEST,LOWER,LOW,MEDIUM,HIGH}]
-                            [--compression {ultrafast,superfast,veryfast,faster,fast,medium,slow,slower,veryslow}] [--fps FPS]     
-                            [--ffmpeg FFMPEG] [--encoding {x264,x265}] [--enc ENC] [--check_for_update] [--no-check_for_update]    
-                            [--include_test]
+    usage: tesla_dashcam.py [-h] [--version] [--loglevel {DEBUG,INFO,WARNING,ERROR,CRITICAL}] [--temp_dir TEMP_DIR] [--no-notification] [--display_ts] [--skip_existing]
+                            [--delete_source] [--exclude_subdirs] [--monitor] [--monitor_once] [--monitor_trigger MONITOR_TRIGGER]
+                            [--layout {WIDESCREEN,FULLSCREEN,PERSPECTIVE,CROSS,DIAMOND}] [--perspective] [--scale CLIP_SCALE [CLIP_SCALE ...]] [--mirror] [--rear] [--swap] [--no-swap]
+                            [--swap_frontrear] [--background BACKGROUND] [--title_screen_map] [--no-front] [--no-left] [--no-right] [--no-rear] [--no-timestamp]
+                            [--halign {LEFT,CENTER,RIGHT}] [--valign {TOP,MIDDLE,BOTTOM}] [--font FONT] [--fontsize FONTSIZE] [--fontcolor FONTCOLOR]
+                            [--text_overlay_fmt TEXT_OVERLAY_FMT] [--timestamp_format TIMESTAMP_FORMAT] [--start_timestamp START_TIMESTAMP] [--end_timestamp END_TIMESTAMP]
+                            [--start_offset START_OFFSET] [--end_offset END_OFFSET] [--sentry_offset] [--output OUTPUT] [--motion_only] [--slowdown SLOW_DOWN] [--speedup SPEED_UP]
+                            [--chapter_offset CHAPTER_OFFSET] [--merge [MERGE_GROUP_TEMPLATE]] [--merge_timestamp_format MERGE_TIMESTAMP_FORMAT] [--keep-intermediate] [--keep-events]
+                            [--set_moviefile_timestamp {START,STOP,SENTRY,RENDER}] [--no-gpu] [--gpu] [--gpu_type {nvidia,intel,rpi}] [--no-faststart]
+                            [--quality {LOWEST,LOWER,LOW,MEDIUM,HIGH}] [--compression {ultrafast,superfast,veryfast,faster,fast,medium,slow,slower,veryslow}] [--fps FPS]
+                            [--ffmpeg FFMPEG] [--encoding {x264,x265}] [--enc ENC] [--check_for_update] [--no-check_for_update] [--include_test]
                             [source [source ...]]
 
     tesla_dashcam - Tesla DashCam & Sentry Video Creator
 
     positional arguments:
-      source                Folder(s) (events) containing the saved camera files. Filenames can be provided as well to manage      
-                            individual clips. (default: None)
+      source                Folder(s) (events) containing the saved camera files. Filenames can be provided as well to manage individual clips. (default: None)
 
     optional arguments:
       -h, --help            show this help message and exit
-      --version             show program''s version number and exit
+      --version             show program's version number and exit
       --loglevel {DEBUG,INFO,WARNING,ERROR,CRITICAL}
                             Logging level. (default: INFO)
       --temp_dir TEMP_DIR   Path to store temporary files. (default: None)
@@ -145,8 +139,7 @@ Usage
     Video Input:
       Options related to what clips and events to process.
 
-      --skip_existing       Skip creating encoded video file if it already exist. Note that only existence is checked, not if      
-                            layout etc. are the same. (default: False)
+      --skip_existing       Skip creating encoded video file if it already exist. Note that only existence is checked, not if layout etc. are the same. (default: False)
       --delete_source       Delete the processed files upon completion. (default: False)
       --exclude_subdirs     Do not search sub folders (events) for video files to process. (default: False)
 
@@ -154,12 +147,10 @@ Usage
       Parameters for monitoring of insertion of TeslaCam drive, folder, or file existence.
 
       --monitor             Enable monitoring for drive to be attached with TeslaCam folder. (default: False)
-      --monitor_once        Enable monitoring and exit once drive with TeslaCam folder has been attached and files processed.      
-                            (default: False)
+      --monitor_once        Enable monitoring and exit once drive with TeslaCam folder has been attached and files processed. (default: False)
       --monitor_trigger MONITOR_TRIGGER
-                            Trigger file to look for instead of waiting for drive to be attached. Once file is discovered then     
-                            processing will start, file will be deleted when processing has been completed. If source is not       
-                            provided then folder where file is located will be used as source. (default: None)
+                            Trigger file to look for instead of waiting for drive to be attached. Once file is discovered then processing will start, file will be deleted when
+                            processing has been completed. If source is not provided then folder where file is located will be used as source. (default: None)
 
     Video Layout:
       Set what the layout of the resulting video should be
@@ -179,7 +170,7 @@ Usage
                             for example:
                               --scale 0.5                                             all are 640x480
                               --scale 640x480                                         all are 640x480
-                              --scale 0.5 --scale camera=front 1                      all are 640x480 except front at 1280x960     
+                              --scale 0.5 --scale camera=front 1                      all are 640x480 except front at 1280x960
                               --scale camera=left .25 --scale camera=right 320x240    left and right are set to 320x240
                             Defaults:
                                 WIDESCREEN: 1/2 (front 1280x960, others 640x480, video is 1920x1920)
@@ -187,18 +178,16 @@ Usage
                                 CROSS: 1/2 (640x480, video is 1280x1440)
                                 DIAMOND: 1/2 (640x480, video is 1920x976)
                             (default: None)
-      --mirror              Video from side and rear cameras as if being viewed through the mirror. Default when not providing     
-                            parameter --no-front. Cannot be used in combination with --rear. (default: None)
-      --rear                Video from side and rear cameras as if looking backwards. Default when providing parameter --no-       
-                            front. Cannot be used in combination with --mirror. (default: None)
-      --swap                Swap left and right cameras in output, default when side and rear cameras are as if looking
-                            backwards. See --rear parameter. (default: None)
-      --no-swap             Do not swap left and right cameras, default when side and rear cameras are as if looking through a     
-                            mirror. Also see --mirror parameter (default: None)
+      --mirror              Video from side and rear cameras as if being viewed through the mirror. Default when not providing parameter --no-front. Cannot be used in combination with
+                            --rear. (default: None)
+      --rear                Video from side and rear cameras as if looking backwards. Default when providing parameter --no-front. Cannot be used in combination with --mirror. (default:
+                            None)
+      --swap                Swap left and right cameras in output, default when side and rear cameras are as if looking backwards. See --rear parameter. (default: None)
+      --no-swap             Do not swap left and right cameras, default when side and rear cameras are as if looking through a mirror. Also see --mirror parameter (default: None)
       --swap_frontrear      Swap front and rear cameras in output. (default: False)
       --background BACKGROUND
-                            Background color for video. Can be a color string or RGB value. Also see --fontcolor. (default:        
-                            black)
+                            Background color for video. Can be a color string or RGB value. Also see --fontcolor. (default: black)
+      --title_screen_map    Show a map of the event location for the first 3 seconds of the movie. Requires the staticmap package (default: False)
 
     Camera Exclusion:
       Exclude one or more cameras:
@@ -216,8 +205,7 @@ Usage
                             Horizontal alignment for timestamp (default: None)
       --valign {TOP,MIDDLE,BOTTOM}
                             Vertical Alignment for timestamp (default: None)
-      --font FONT           Fully qualified filename (.ttf) to the font to be chosen for timestamp. (default:
-                            /Windows/Fonts/arial.ttf)
+      --font FONT           Fully qualified filename (.ttf) to the font to be chosen for timestamp. (default: /Library/Fonts/Arial Unicode.ttf)
       --fontsize FONTSIZE   Font size for timestamp. Default is scaled based on resulting video size. (default: None)
       --fontcolor FONTCOLOR
                             Font color for timestamp. Any color is accepted as a color string or RGB value.
@@ -231,27 +219,25 @@ Usage
       --text_overlay_fmt TEXT_OVERLAY_FMT
                             Format string for text overlay.
                             Valid format variables:
-                                {start_timestamp} - Local time the clip starts at"
-                                {end_timestamp} - Local time the clip ends at"
-                                {timestamp_rolling} - Local time which continuously updates
-                                {event_timestamp} - Event timestamp, for Sentry timestamp that resulted in Sentry event (if provided)
-                                {event_timestamp_countdown} -
-                                {event_timestamp_countdown_rolling} - Rolling
-                                {city} - City name from events.json (if provided)
-                                {reason} - Recording reason from events.json (if provided)
-                                {latitude} - Estimated latitude from events.json (if provided)
-                                {longitude} - Estimated longitude from events.json (if provided)
+                                {clip_start_timestamp} - Local time the clip starts at
+                                {clip_end_timestamp} - Local time the clip ends at
+                                {local_timestamp_rolling} - Local time which continuously updates (shorthand for '%{{pts:localtime:{local_timestamp}:%x %X}}'), string
+                                {event_timestamp} - Timestamp from events.json (if provided), string
+                                {event_timestamp_countdown_rolling} - Local time which continuously updates (shorthand for '%{{hms:localtime:{event_timestamp}}}'), string
+                                {event_city} - City name from events.json (if provided), string
+                                {event_reason} - Recording reason from events.json (if provided), string
+                                {event_latitude} - Estimated latitude from events.json (if provided), float
+                                {event_longitude} - Estimated longitude from events.json (if provided), float
+                                
+                                All valid ffmpeg 'text expansion' syntax is accepted here.
+                                More info: http://ffmpeg.org/ffmpeg-filters.html#Text-expansion
                             (default: {local_timestamp_rolling})
       --timestamp_format TIMESTAMP_FORMAT
                             Format for timestamps.
-                            Determines how timestamps should be represented. Any valid value from strftime is accepted.
-                            Default is set '%x %X' which is locale's appropriate date and time representation
-                            More info: https://strftime.org
-                            (default: "%x %x")
+                            Determines how timestamps should be represented. Any valid value from strftime is accepted.Default is set '%x %X' which is locale's appropriate date and time representationMore info: https://strftime.org (default: %x %X)
 
     Timestamp Restriction:
-      Restrict video to be between start and/or end timestamps. Timestamp to be provided in a ISO-8601 format (see
-      https://fits.gsfc.nasa.gov/iso-time.html for examples)
+      Restrict video to be between start and/or end timestamps. Timestamp to be provided in a ISO-8601 format (see https://fits.gsfc.nasa.gov/iso-time.html for examples)
 
       --start_timestamp START_TIMESTAMP
                             Starting timestamp (default: None)
@@ -262,77 +248,57 @@ Usage
       Start and/or end offsets for events
 
       --start_offset START_OFFSET
-                            Skip x number of seconds from start of event for resulting video. Default is 0 seconds, 60 seconds if
-                            --sentry_offset is provided. (default: None)
+                            Skip x number of seconds from start of event for resulting video. Default is 0 seconds, 60 seconds if --sentry_offset is provided. (default: None)
       --end_offset END_OFFSET
-                            Ignore the last x seconds of the event for resulting video. Default is 0 seconds, 30 seconds if
-                            --sentry_offset is provided.
-      --sentry_offset       start_offset and end_offset will be based on when timestamp of object detection occurred for Sentry
-                            events instead of start/end of event
+                            Ignore the last x seconds of the event for resulting video. Default is 0 seconds, 30 seconds if --sentry_offset is provided. (default: None)
+      --sentry_offset       start_offset and end_offset will be based on when timestamp of object detection occurred for Sentryevents instead of start/end of event. (default: False)
 
     Video Output:
       Options related to resulting video creation.
 
       --output OUTPUT       Path/Filename for the new movie file. Event files will be stored in same folder.
-                            (default: C:\Users\jashir\Videos\Tesla_Dashcam\)
+                            (default: /Users/ehendrix/Movies/Tesla_Dashcam/)
       --motion_only         Fast-forward through video when there is no motion. (default: False)
-      --slowdown SLOW_DOWN  Slow down video output. Accepts a number that is then used as multiplier, providing 2 means half the   
-                            speed.
-      --speedup SPEED_UP    Speed up the video. Accepts a number that is then used as a multiplier, providing 2 means twice the    
-                            speed.
+      --slowdown SLOW_DOWN  Slow down video output. Accepts a number that is then used as multiplier, providing 2 means half the speed.
+      --speedup SPEED_UP    Speed up the video. Accepts a number that is then used as a multiplier, providing 2 means twice the speed.
       --chapter_offset CHAPTER_OFFSET
-                            Offset in seconds for chapters in merged video. Negative offset is # of seconds before the end of the  
-                            event, positive offset if # of seconds after the start of the event. (default: 0)
-      --merge               Merge the video files from different events (folders) together into a video file.
-                            Optionally a format string can be provided for matching events together to create a merged video file.
-                            When a format string is provided instead of 1 merged video file, multiple video files will be created based on the template.
-                            Filenames for resulting video files will also be based on this template.
-                            Valid format variables:
-                                {layout} - layout chosen (see --layout)
-                                {start_timestamp} - Local time the clip starts at"
-                                {end_timestamp} - Local time the clip ends at"
-                                {event_timestamp} - Event timestamp, for Sentry timestamp that resulted in Sentry event (if provided)
-                                {city} - City name from events.json (if provided)
-                                {reason} - Recording reason from events.json (if provided)
-                                {latitude} - Estimated latitude from events.json (if provided)
-                                {longitude} - Estimated longitude from events.json (if provided)
-
-      --merge_timestamp_format TIMESTAMP_FORMAT
-                            Format for timestamps.
-                            Determines how timestamps should be represented. Any valid value from strftime is accepted.
-                            Default is set '%x %X' which is locale's appropriate date and time representation
-                            More info: https://strftime.org
-                            (default: "%x %x")
+                            Offset in seconds for chapters in merged video. Negative offset is # of seconds before the end of the subdir video, positive offset if # of seconds after the
+                            start of the subdir video. (default: 0)
+      --merge [MERGE_GROUP_TEMPLATE]
+                            Merge the video files from different folders (events) into 1 big video file.
+                            Optionally add a template string to group events in different video files based on the template.
+      --merge_timestamp_format MERGE_TIMESTAMP_FORMAT
+                            Format for timestamps in merge_template.
+                            Determines how timestamps should be represented within merge_template. Any valid value from strftime is accepted.Default is set '%Y-%m-%d_%H_%M'More info: https://strftime.org (default: %Y-%m-%d_%H_%M)
       --keep-intermediate   Do not remove the clip video files that are created (default: False)
       --keep-events         Do not remove the event video files that are created when merging events into a video file (see --merge) (default: False)
-      --set_moviefile_timestamp {START,STOP,SENTRY}
-                            Match modification timestamp of resulting video files to event timestamp. Use START to match with      
-                            when the event started, STOP for end time of the event, SENTRY for timestamp Sentry was triggered. (default: START)
+      --set_moviefile_timestamp {START,STOP,SENTRY,RENDER}
+                            Match modification timestamp of resulting video files to event timestamp. Use START to match with when the event started, STOP for end time of the event,
+                            SENTRY for Sentry event timestamp, or RENDER to not change it. (default: START)
 
     Advanced encoding settings:
       Advanced options for encoding
 
-      --gpu                 Use GPU acceleration, only enable if supported by hardware.
-                            MAC: All MACs with Haswell CPU or later support this (Macs after 2013).
-                                  See following link as well:
+      --no-gpu              Disable use of GPU acceleration.
+                            All MACs with Haswell CPU or later support this (Macs after 2013).
+                                  See following link as well: 
                                     https://en.wikipedia.org/wiki/List_of_Macintosh_models_grouped_by_CPU_type#Haswell
+                            Note: ffmpeg currently seems to have issues on Apple Silicon with GPU acceleration, --no-gpu might need to be set to produce video.
                             (default: False)
-      --gpu_type {nvidia,intel,RPi}
-                            Type of graphics card (GPU) in the system. This determines the encoder that will be used.This
-                            parameter is mandatory if --gpu is provided. (default: None)
-      --no-faststart        Do not enable flag faststart on the resulting video files. Use this when using a network share and     
-                            errors occur during encoding. (default: False)
+      --gpu                 Use GPU acceleration, only enable if supported by hardware.
+                            --gpu_type has to be provided as well when enabling this parameter (default: False)
+      --gpu_type {nvidia,intel,rpi}
+                            Type of graphics card (GPU) in the system. This determines the encoder that will be used.This parameter is mandatory if --gpu is provided. (default: None)
+      --no-faststart        Do not enable flag faststart on the resulting video files. Use this when using a network share and errors occur during encoding. (default: False)
       --quality {LOWEST,LOWER,LOW,MEDIUM,HIGH}
-                            Define the quality setting for the video, higher quality means bigger file size but might not be       
-                            noticeable. (default: LOWER)
+                            Define the quality setting for the video, higher quality means bigger file size but might not be noticeable. (default: LOWER)
       --compression {ultrafast,superfast,veryfast,faster,fast,medium,slow,slower,veryslow}
-                            Speed to optimize video. Faster speed results in a bigger file. This does not impact the quality of    
-                            the video, just how much time is used to compress it. (default: medium)
-      --fps FPS             Frames per second for resulting video. Tesla records at about 33fps hence going higher wouldn't do     
-                            much as frames would just be duplicated. Default is 24fps which is the standard for movies and TV      
-                            shows (default: 24)
-      --ffmpeg FFMPEG       Path and filename for ffmpeg. Specify if ffmpeg is not within path. (default:
-                            d:\src\tesla_dashcam\tesla_dashcam\ffmpeg.exe)
+                            Speed to optimize video. Faster speed results in a bigger file. This does not impact the quality of the video, just how much time is used to compress it.
+                            (default: medium)
+      --fps FPS             Frames per second for resulting video. Tesla records at about 33fps hence going higher wouldn't do much as frames would just be duplicated. Default is 24fps
+                            which is the standard for movies and TV shows (default: 24)
+      --ffmpeg FFMPEG       Path and filename for ffmpeg. Specify if ffmpeg is not within path. (default: /Users/ehendrix-
+                            personal/Documents_local/GitHub/tesla_dashcam/tesla_dashcam/ffmpeg)
       --encoding {x264,x265}
                             Encoding to use for video creation.
                                 x264: standard encoding, can be viewed on most devices but results in bigger file.
@@ -345,8 +311,7 @@ Usage
 
       --check_for_update    Check for update and exit. (default: False)
       --no-check_for_update
-                            A check for new updates is performed every time. With this parameter that can be disabled (default:    
-                            False)
+                            A check for new updates is performed every time. With this parameter that can be disabled (default: False)
       --include_test        Include test (beta) releases when checking for updates. (default: False)
 
 Positional Argument
@@ -389,6 +354,10 @@ or so.
 
   Upon completion a notification is provided on the screen that processing is completed. Use this parameter to
   disable this notification.
+
+  *--display_ts*
+
+  Add timestamp to the text output procuded.
 
 Video Input
 -----------
@@ -576,6 +545,13 @@ Video example: https://youtu.be/nPleIhVxyhQ
 
   Specify the background color for the video. Default is black. See --fontcolor for possible values.
 
+  *--title_screen_map*
+
+  Default: False
+
+  Show a map of the event location for the first 3 seconds within the event. 
+  Note, if merging multiple events within a movie then a map will be shown at the start of each event within that movie.
+
 Camera Exclusion
 ----------------
 
@@ -632,6 +608,12 @@ Following parameters are to change settings for the text that is being added to 
 
   `{event_longitude}`: Estimated longitude from events.json (if provided), float
 
+
+*--timestamp_format*
+
+  Default: %x %X
+
+  Set how timestamps should be formatted. See https://strftime.org on how to use this. Default represents date and time in current locale's format.
 
 *--no-timestamp*
 
@@ -779,8 +761,12 @@ a positive value it will be after the event.
 
   Ending offset within the event. <offset> is in seconds.
 
-*--senty_offset
+*--senty_offset*
 
+  Default: False
+
+  Start and end offsets will be based on the timestamp that triggered the Sentry event instead of the start and end timestamps of the event.
+  
 Video Output
 ------------
 
@@ -825,7 +811,15 @@ These are additional parameters related to the resulting video creation.
   Default: False
 
   A video file is created for each event (folder) found. When parameter --merge is provided these individual event
-  video files will then be further merged into 1 bigger video file.
+  video files will then be further merged into 1 bigger video file. 
+  Optionally add a template string to group events together and create multiple video files. Resulting video filename will be based on this template.
+  See --text_overlay_fmt for format variables.
+ 
+*--merge_timestamp_format*
+
+  Default: %Y-%m-%d_%H_%M
+
+  Determine how timestamps should be represented within the template provided for --merge.
 
 *--keep-intermediate*
 
@@ -836,6 +830,21 @@ These are additional parameters related to the resulting video creation.
   These files are then deleted once the event is processed and the event video file has been created. Use this
   parameter to keep these temporary video files instead. Note that depending on the number of events a lot more
   storage will be required then.
+
+*--keep-events*
+
+  Default: False
+
+  When set the event video files that were generated will not be deleted after they have been merged into a video file (see --merge). 
+  If this is not set then the event video files will be automatically deleted upon successful creation of the merged video file.
+
+*--set_moviefile_timestamp*
+
+  Default: START
+
+  Determine what the modification timestamp on the OS for resulting video file should be set at. START will set it at the start of the event, 
+  STOP for the end of the event, SENTY for the timestamp that triggered the SENTRY event (if no SENTRY timestamp then will go back to START),
+  or RENDER to not modify the timestamp resulting in it being when the movie was created.
 
 Advanced Encoding Settings
 --------------------------
@@ -1433,6 +1442,7 @@ Release Notes
     - New: Option --set_moviefile_timestamp to set the video file timestamp on the OS to start, end, or time of Sentry event.
     - New: Option --keep-events
     - New: Option --display_ts to show timestamps in the text output. This does not impact video output but is handy when using a monitor option. Contributed by croadfeldt
+    - New: Option --title_screen_map, which generates a map of the event location and displays it for the first 3 seconds of the movie.
     - New: Added support for event information file and ability to display it in the overlay text. Contributed by JakeShirley
     - New: Support for FreeBSD 11. Contributed by busbyjon
     - New: Source can now include wildcards, shell variables, and will do user expansion (i.e. ~ on Unix, ~user on Windows).
