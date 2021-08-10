@@ -2090,10 +2090,15 @@ def create_intermediate_movie(
     return True
 
 
-def create_title_screen(event_metadata):
+def create_title_screen(event_metadata, video_settings):
     """ Create a map centered around the event """
-    if event_metadata == None:
+    if event_metadata == None or len(event_metadata) == 0:
         return None
+
+    m = staticmap.StaticMap(
+        video_settings["video_layout"].video_width,
+        video_settings["video_layout"].video_height,
+    )
 
     try:
         lon = float(event_metadata["longitude"])
@@ -2101,10 +2106,6 @@ def create_title_screen(event_metadata):
     except:
         return None
 
-    m = staticmap.StaticMap(
-        video_settings["video_layout"].video_width,
-        video_settings["video_layout"].video_height,
-    )
     marker_outline = staticmap.CircleMarker((lon, lat), "white", 18)
     marker = staticmap.CircleMarker((lon, lat), "#0036FF", 12)
 
@@ -2728,7 +2729,9 @@ def process_folders(source_folders, video_settings, delete_source):
 
         title_image = None
         if video_settings["video_layout"].title_screen_map:
-            title_image = create_title_screen(event_info.metadata)
+            title_image = create_title_screen(
+                event_metadata=event_info.metadata, video_settings=video_settings
+            )
 
         if create_movie(
             event_info, event_info, event_movie_filename, video_settings, 0, title_image
