@@ -325,11 +325,18 @@ class Event(object):
 
     @property
     def first_item(self):
-        return list(self._clips.values())[0]
+        return self.clip(self.sorted[0])
 
     @property
     def items(self):
         return self._clips.items()
+
+    @property
+    def items_sorted(self):
+        sorted_items = []
+        for clip in self.sorted:
+            sorted_items.append(self.clip(clip))
+        return sorted_items
 
     @property
     def start_timestamp(self):
@@ -470,11 +477,18 @@ class Movie(object):
 
     @property
     def first_item(self):
-        return list(self._events.values())[0]
+        return self.event(self.sorted[0])
 
     @property
     def items(self):
         return self._events.items()
+
+    @property
+    def items_sorted(self):
+        sorted_items = []
+        for event in self.sorted:
+            sorted_items.append(self.event(event))
+        return sorted_items
 
     @property
     def start_timestamp(self):
@@ -2090,9 +2104,11 @@ def create_intermediate_movie(
     return True
 
 
-def create_title_screen(event_metadata, video_settings):
+def create_title_screen(events, video_settings):
     """ Create a map centered around the event """
-    if event_metadata == None or len(event_metadata) == 0:
+    _LOGGER.debug(f"Creating map based on {len(events)}")
+    if events == None or len(events) == 0:
+        _LOGGER.debug("No events provided to create map for.")
         return None
 
     m = staticmap.StaticMap(
@@ -2100,87 +2116,115 @@ def create_title_screen(event_metadata, video_settings):
         video_settings["video_layout"].video_height,
     )
 
-    try:
-        lon = float(event_metadata["longitude"])
-        lat = float(event_metadata["latitude"])
-    except:
+    coordinates = []
+    for event in events:
+        try:
+            lon = float(event.metadata["longitude"])
+            lat = float(event.metadata["latitude"])
+        except:
+            _LOGGER.debug(
+                f"Error trying to convert {event.metadata['longitude']} or {event.metadata['latitude']} into a float"
+            )
+            continue
+
+        coordinate = [lon, lat]
+        coordinates.append(coordinate)
+
+        # Add marker for each point
+        # Marker outline
+        m.add_marker(staticmap.CircleMarker(coordinate, "white", 18))
+        # Marker
+        m.add_marker(staticmap.CircleMarker(coordinate, "#0036FF", 12))
+
+    if len(coordinates) == 0:
+        _LOGGER.debug("No valid coordinates found within the events.")
         return None
-
-    marker_outline = staticmap.CircleMarker((lon, lat), "white", 18)
-    marker = staticmap.CircleMarker((lon, lat), "#0036FF", 12)
-
-    m.add_marker(marker_outline)
-    m.add_marker(marker)
+    # Only create line if we have more then 1 coordinate
+    elif len(coordinates) > 1:
+        # Line outline
+        m.add_line(staticmap.Line(coordinates, "white", 18))
+        # Line
+        m.add_line(staticmap.Line(coordinates, "#0036FF", 12))
 
     image = m.render(zoom=13)
 
     return image
 
 
-def create_movie(
-    movie, event_info, movie_filename, video_settings, chapter_offset, title_image
-):
+def create_movie(movie, event_info, movie_filename, video_settings, chapter_offset):
     """ Concatenate provided movie files into 1."""
     # Just return if there are no clips.
     if movie.count <= 0:
         _LOGGER.debug(f"{get_current_timestamp()}Movie list is empty")
         return True
 
-    title_image_filename = None
-    if title_image:
-        _, title_image_filename = mkstemp(suffix=".png", text=False)
-
-        title_image.save(title_image_filename)
-        _LOGGER.debug(
-            f"{get_current_timestamp()}Title image saved to {title_image_filename}"
-        )
-
     title_video_filename = None
-    if title_image_filename:
-        _, title_video_filename = mkstemp(suffix=".mp4", text=False)
-        _LOGGER.debug(
-            f"{get_current_timestamp()}Creating movie for title image to {title_video_filename}"
-        )
-        ffmpeg_params = [
-            "-y",
-            "-framerate",
-            "1/3",
-            "-i",
-            title_image_filename,
-            "-vf",
-            f"fps={video_settings['fps']},"
-            f"scale={video_settings['video_layout'].video_width}:{video_settings['video_layout'].video_height}",
-            "-pix_fmt",
-            "yuv420p",
-            title_video_filename,
-        ]
-
-        ffmpeg_command = (
-            [video_settings["ffmpeg_exec"]]
-            + ["-loglevel", "error"]
-            + ffmpeg_params
-            + video_settings["other_params"]
+    if video_settings["video_layout"].title_screen_map:
+        title_image = create_title_screen(
+            events=event_info, video_settings=video_settings
         )
 
-        _LOGGER.debug(f"{get_current_timestamp()}FFMPEG Command: {ffmpeg_command}")
-        try:
-            run(ffmpeg_command, capture_output=True, check=True)
-        except CalledProcessError as exc:
-            print(
-                f"{get_current_timestamp()}\t\t\tError trying to create title clip. RC: {exc.returncode}\n"
-                f"{get_current_timestamp()}\t\t\tCommand: {exc.cmd}\n"
-                f"{get_current_timestamp()}\t\t\tError: {exc.stderr}\n\n"
-            )
-            title_video_filename = None
+        title_image_filename = None
+        if title_image is not None:
+            _, title_image_filename = mkstemp(suffix=".png", text=False)
 
-        # Now remove the title image
-        try:
-            os.remove(title_image_filename)
-        except:
+            try:
+                title_image.save(title_image_filename)
+            except (ValueError, OSError) as exc:
+                print(
+                    f"{get_current_timestamp()}\t\t\tError trying to save title image. RC: {str(exc)}"
+                )
+                title_image_filename = None
+            else:
+                _LOGGER.debug(
+                    f"{get_current_timestamp()}Title image saved to {title_image_filename}"
+                )
+
+        if title_image_filename is not None:
+            _, title_video_filename = mkstemp(suffix=".mp4", text=False)
             _LOGGER.debug(
-                f"{get_current_timestamp()}Failed to remove {title_image_filename}"
+                f"{get_current_timestamp()}Creating movie for title image to {title_video_filename}"
             )
-            pass
+            ffmpeg_params = [
+                "-y",
+                "-framerate",
+                "1/3",
+                "-i",
+                title_image_filename,
+                "-vf",
+                f"fps={video_settings['fps']},"
+                f"scale={video_settings['video_layout'].video_width}:{video_settings['video_layout'].video_height}",
+                "-pix_fmt",
+                "yuv420p",
+                title_video_filename,
+            ]
+
+            ffmpeg_command = (
+                [video_settings["ffmpeg_exec"]]
+                + ["-loglevel", "error"]
+                + ffmpeg_params
+                + video_settings["other_params"]
+            )
+
+            _LOGGER.debug(f"{get_current_timestamp()}FFMPEG Command: {ffmpeg_command}")
+            try:
+                run(ffmpeg_command, capture_output=True, check=True)
+            except CalledProcessError as exc:
+                print(
+                    f"{get_current_timestamp()}\t\t\tError trying to create title clip. RC: {exc.returncode}\n"
+                    f"{get_current_timestamp()}\t\t\tCommand: {exc.cmd}\n"
+                    f"{get_current_timestamp()}\t\t\tError: {exc.stderr}\n\n"
+                )
+                title_video_filename = None
+
+                # Now remove the title image
+                try:
+                    os.remove(title_image_filename)
+                except:
+                    _LOGGER.debug(
+                        f"{get_current_timestamp()}Failed to remove {title_image_filename}"
+                    )
+                    pass
 
     # Go through the list of clips to create the command and content for chapter meta file.
     ffmpeg_join_filehandle, ffmpeg_join_filename = mkstemp(suffix=".txt", text=True)
@@ -2196,8 +2240,8 @@ def create_movie(
             fp.write(
                 f"file 'file:{title_video_filename.replace(os.sep, '/')}'{os.linesep}"
             )
-            total_videoduration += 3
-            meta_start += 4
+            total_videoduration += 3 * 1000000000
+            meta_start += 3 * 1000000000 + 1
         # Loop through the list sorted by video timestamp.
         for movie_item in movie.sorted:
             video_clip = movie.item(movie_item)
@@ -2305,19 +2349,20 @@ def create_movie(
 
     ffmpeg_params = ffmpeg_params + ["-c", "copy"]
     user_timestamp_format = video_settings["timestamp_format"]
-    if event_info is not None:
+    if len(event_info) == 1:
         title_timestamp = (
-            event_info.metadata["event_timestamp"]
+            event_info[0]
+            .metadata["event_timestamp"]
             .astimezone(get_localzone())
             .strftime(user_timestamp_format)
-            if event_info.metadata["reason"] == "SENTRY"
+            if event_info[0].metadata["reason"] == "SENTRY"
             else start_timestamp.astimezone(get_localzone()).strftime(
                 user_timestamp_format
             )
         )
         title = (
-            f"{event_info.metadata.get('reason')}: {title_timestamp}"
-            if event_info.metadata.get("reason") is not None
+            f"{event_info[0].metadata.get('reason')}: {title_timestamp}"
+            if event_info[0].metadata.get("reason") is not None
             else title_timestamp
         )
     else:
@@ -2367,11 +2412,11 @@ def create_movie(
                 moviefile_timestamp = end_timestamp.astimezone(get_localzone())
             elif (
                 video_settings["set_moviefile_timestamp"] == "SENTRY"
-                and event_info is not None
-                and event_info.metadata.get("timestamp") is not None
+                and len(event_info) == 1
+                and event_info[0].metadata.get("timestamp") is not None
             ):
-                moviefile_timestamp = event_info.metadata.get("timestamp").astimezone(
-                    get_localzone()
+                moviefile_timestamp = (
+                    event_info[0].metadata.get("timestamp").astimezone(get_localzone())
                 )
 
             _LOGGER.debug(
@@ -2665,28 +2710,13 @@ def process_folders(source_folders, video_settings, delete_source):
             event_info.filename = event_movie_filename
             event_info.start_timestamp = event_start_timestamp
             event_info.end_timestamp = event_end_timestamp
+            key = event_info.template(
+                merge_group_template, timestamp_format, video_settings
+            )
+            if movies.get(key) is None:
+                movies.update({key: Movie()})
 
-            if (
-                movies.get(
-                    event_info.template(
-                        merge_group_template, timestamp_format, video_settings
-                    )
-                )
-                is None
-            ):
-                movies.update(
-                    {
-                        event_info.template(
-                            merge_group_template, timestamp_format, video_settings
-                        ): Movie()
-                    }
-                )
-
-            movies.get(
-                event_info.template(
-                    merge_group_template, timestamp_format, video_settings
-                )
-            ).set_event(event_info)
+            movies.get(key).set_event(event_info)
             continue
 
         print(
@@ -2727,37 +2757,17 @@ def process_folders(source_folders, video_settings, delete_source):
             f"{get_current_timestamp()}\t\tCreating movie {event_movie_filename}, please be patient."
         )
 
-        title_image = None
-        if video_settings["video_layout"].title_screen_map:
-            title_image = create_title_screen(
-                event_metadata=event_info.metadata, video_settings=video_settings
-            )
-
         if create_movie(
-            event_info, event_info, event_movie_filename, video_settings, 0, title_image
+            event_info, [event_info], event_movie_filename, video_settings, 0
         ):
             if event_info.filename is not None:
-                if (
-                    movies.get(
-                        event_info.template(
-                            merge_group_template, timestamp_format, video_settings
-                        )
-                    )
-                    is None
-                ):
-                    movies.update(
-                        {
-                            event_info.template(
-                                merge_group_template, timestamp_format, video_settings
-                            ): Movie()
-                        }
-                    )
+                key = event_info.template(
+                    merge_group_template, timestamp_format, video_settings
+                )
+                if movies.get(key) is None:
+                    movies.update({key: Movie()})
 
-                movies.get(
-                    event_info.template(
-                        merge_group_template, timestamp_format, video_settings
-                    )
-                ).set_event(event_info)
+                movies.get(key).set_event(event_info)
 
                 print(
                     f"{get_current_timestamp()}\tMovie {event_info.filename} for folder {event_folder} with "
@@ -2837,11 +2847,10 @@ def process_folders(source_folders, video_settings, delete_source):
 
                 if create_movie(
                     movies.get(movie),
-                    None,
+                    movies.get(movie).items_sorted,
                     movie_filename,
                     video_settings,
                     video_settings["chapter_offset"],
-                    None,
                 ):
 
                     if movies.get(movie).filename is not None:
@@ -3232,7 +3241,7 @@ def main() -> int:
         "--title_screen_map",
         dest="title_screen_map",
         action="store_true",
-        help="Show a map of the event location for the first 3 seconds of the movie. Requires the staticmap package",
+        help="Show a map of the event location for the first 3 seconds of the event movie, when merging events it will also create map with lines linking the events",
     )
 
     camera_group = parser.add_argument_group(
