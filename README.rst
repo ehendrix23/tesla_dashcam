@@ -3,6 +3,8 @@
 .. |Github all releases| image:: https://img.shields.io/github/downloads/ehendrix23/tesla_dashcam/total
    :target: https://img.shields.io/github/downloads/ehendrix23/tesla_dashcam/total)
 
+   |Github latest releases| image:: https://img.shields.io/github/downloads/ehendrix23/tesla_dashcam/latest
+   :target: https://img.shields.io/github/downloads/ehendrix23/tesla_dashcam/latest)
 
 [![Github releases (by asset](https://img.shields.io/github/downloads/ehendrix23/tesla_dashcam/latest/strapdown.min.js)](https://GitHub.com/ehendrix23/tesla_dashcam/releases/)
 
