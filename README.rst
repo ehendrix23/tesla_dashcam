@@ -1,4 +1,11 @@
 ![GitHub all releases](https://img.shields.io/github/downloads/ehendrix23/tesla_dashcam/total)
+
+|Github all releases|
+
+.. |Github all releases| image:: https://img.shields.io/github/downloads/Naereen/StrapDown.js/total.svg
+   :target: https://img.shields.io/github/downloads/ehendrix23/tesla_dashcam/total)
+
+
 ![GitHub release (latest by SemVer)](https://img.shields.io/github/downloads/ehendrix23/tesla_dashcam/latest/total)
 
 [![GitHub Release][releases-shield]][releases]
