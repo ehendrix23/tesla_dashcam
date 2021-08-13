@@ -863,6 +863,7 @@ Advanced Encoding Settings
 The following parameters are more advanced settings to determine how ffmpeg should encode the videos.
 
 *--no-gpu*
+
   For MacOS only! Disables GPU acceleration. If not provided GPU acceleration will be used.
 
 *--gpu*
