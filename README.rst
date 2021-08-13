@@ -2,7 +2,7 @@
 
 |Github all releases|
 
-.. |Github all releases| image:: https://img.shields.io/github/downloads/Naereen/StrapDown.js/total.svg
+.. |Github all releases| image:: https://img.shields.io/github/downloads/ehendrix23/tesla_dashcam/total
    :target: https://img.shields.io/github/downloads/ehendrix23/tesla_dashcam/total)
 
 
