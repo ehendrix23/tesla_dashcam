@@ -1,5 +1,3 @@
-GitHub:
-
 .. image:: https://img.shields.io/github/downloads/ehendrix23/tesla_dashcam/total
    :target: https://img.shields.io/github/downloads/ehendrix23/tesla_dashcam/total
 .. image:: https://img.shields.io/github/downloads/ehendrix23/tesla_dashcam/latest/total
