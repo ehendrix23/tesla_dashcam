@@ -82,7 +82,7 @@ Requirements
 This package relies on `ffmpeg <https://ffmpeg.org>`__ to be installed, this is a free, open source cross-platform
 solution to convert video. The created executables for Windows and MacOS include an ffmpeg version.
 
-If not using the executables (Windows and MacOS) then `Python <https://www.python.org>`__ 3.7 or higher is required.
+If not using the executables (Windows and MacOS) then `Python <https://www.python.org>`__ 3.8.6 or higher is required.
 
 
 Installation
@@ -187,7 +187,7 @@ Usage
       --swap_frontrear      Swap front and rear cameras in output. (default: False)
       --background BACKGROUND
                             Background color for video. Can be a color string or RGB value. Also see --fontcolor. (default: black)
-      --title_screen_map    Show a map of the event location for the first 3 seconds of the movie. Requires the staticmap package (default: False)
+      --title_screen_map    Show a map of the event location for the first 3 seconds of the event movie, when merging events it will also create map with lines linking the events (default: False)
 
     Camera Exclusion:
       Exclude one or more cameras:
@@ -549,7 +549,8 @@ Video example: https://youtu.be/nPleIhVxyhQ
 
   Default: False
 
-  Show a map of the event location for the first 3 seconds within the event. 
+  Show a map of the event location for the first 3 seconds within the event. When merging multiple events an additional map will
+  be created for the start of the movie showing locations of all events within the movie linked with lines.
   Note, if merging multiple events within a movie then a map will be shown at the start of each event within that movie.
 
 Camera Exclusion
@@ -1450,7 +1451,7 @@ Release Notes
     - New: Option --sentry_offset to set the start and end offset based on Sentry event timestamp.
     - New: Option --merge_template to allow merging of video files grouped based on this. Resulting movie filename be based on this template.
     - New: Option --set_moviefile_timestamp to set the video file timestamp on the OS to start, end, or time of Sentry event.
-    - New: Option --keep-events
+    - New: Option --keep-events to keep event video files after they have been merged into a video.
     - New: Option --display_ts to show timestamps in the text output. This does not impact video output but is handy when using a monitor option. Contributed by croadfeldt
     - New: Option --title_screen_map, which generates a map of the event location and displays it for the first 3 seconds of the movie.
     - New: Added support for event information file and ability to display it in the overlay text. Contributed by JakeShirley
