@@ -1,14 +1,11 @@
-|Github all releases|
+GitHub:
 
-.. |Github all releases| image:: https://img.shields.io/github/downloads/ehendrix23/tesla_dashcam/total
-   :target: https://img.shields.io/github/downloads/ehendrix23/tesla_dashcam/total)
-
-|Github Releases (by Release)|
-
-.. |Github Releases (by Release)| image:: https://img.shields.io/github/downloads/ehendrix23/tesla_dashcam/latest/total
-   :target: https://GitHub.com/ehendrix23/tesla_dashcam/releases/)
-   
-
+.. image:: https://img.shields.io/github/downloads/ehendrix23/tesla_dashcam/total
+   :target: https://img.shields.io/github/downloads/ehendrix23/tesla_dashcam/total
+.. image:: https://img.shields.io/github/downloads/ehendrix23/tesla_dashcam/latest/total
+   :target: https://GitHub.com/ehendrix23/tesla_dashcam/releases/
+.. image:: https://img.shields.io/pypi/dm/tesla-dashcam
+   :target: https://pypi.python.org/pypi/tesla-dashcam/
 
 tesla_dashcam
 =============
