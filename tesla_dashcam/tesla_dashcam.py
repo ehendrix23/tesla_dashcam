@@ -11,7 +11,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from glob import glob, iglob
 from pathlib import Path
-from re import match, search
+from re import match, search, IGNORECASE as re_IGNORECASE
 from shlex import split as shlex_split
 from shutil import which
 from subprocess import CalledProcessError, run
@@ -124,6 +124,17 @@ PLATFORM = sys.platform
 # PLATFORM = "linux"
 
 PROCESSOR = platform_processor()
+if PLATFORM == "darwin" and PROCESSOR == "i386":
+    _LOGGER.debug(
+        f"Platform is {PLATFORM} and processor is {PROCESSOR}, running sysctl to check processor."
+    )
+    sysctl = run(["sysctl", "-n", "machdep.cpu.vendor"], capture_output=True, text=True)
+    if sysctl.returncode == 0:
+        if search("Apple", sysctl.stdout, re_IGNORECASE) is not None:
+            PROCESSOR = "arm"
+    else:
+        _LOGGER.debug(f"Error running sysctl: {sysctl.returncode} - {sysctl.stderr}")
+
 # Allow setting for testing.
 # PROCESSOR = "arm"
 
@@ -3505,14 +3516,8 @@ def main() -> int:
 
     if PLATFORM == "darwin":
         if PROCESSOR != "arm":
-            nogpuhelp = (
-                "R|Disable use of GPU acceleration, default is to use GPU acceleration.\n"
-                "  Note: if this is being run on Apple Silicon then please check README for --no-gpu!!\n"
-            )
-            gpuhelp = (
-                "R|Use GPU acceleration (this is the default).\n"
-                "  Note: if this is being run on Apple Silicon then please check README for --gpu!!\n"
-            )
+            nogpuhelp = "R|Disable use of GPU acceleration, default is to use GPU acceleration.\n"
+            gpuhelp = "R|Use GPU acceleration (this is the default).\n"
         else:
             nogpuhelp = "R|Disable use of GPU acceleration, this is the default as currently ffmpeg has issues on Apple Silicon with GPU acceleration.\n"
             gpuhelp = (
