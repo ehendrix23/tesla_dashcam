@@ -125,9 +125,6 @@ PLATFORM = sys.platform
 
 PROCESSOR = platform_processor()
 if PLATFORM == "darwin" and PROCESSOR == "i386":
-    _LOGGER.debug(
-        f"Platform is {PLATFORM} and processor is {PROCESSOR}, running sysctl to check processor."
-    )
     sysctl = run(
         ["sysctl", "-n", "machdep.cpu.brand_string"], capture_output=True, text=True
     )
@@ -135,7 +132,7 @@ if PLATFORM == "darwin" and PROCESSOR == "i386":
         if search("Apple", sysctl.stdout, re_IGNORECASE) is not None:
             PROCESSOR = "arm"
     else:
-        _LOGGER.debug(f"Error running sysctl: {sysctl.returncode} - {sysctl.stderr}")
+        print("Error running sysctl: {sysctl.returncode} - {sysctl.stderr}")
 
 # Allow setting for testing.
 # PROCESSOR = "arm"
@@ -3785,6 +3782,13 @@ def main() -> int:
             f"within PATH environment or provide full path using parameter --ffmpeg."
         )
         return 1
+
+    if internal_ffmpeg and PLATFORM == "darwin" and PROCESSOR == "arm":
+        print(
+            "Internal ffmpeg version is used which has been compiled for Intel Macs. Better results in both "
+            "performance and size can be achieved by downloading an Apple Silicon compiled ffmpeg from: https://www.osxexperts.net "
+            "and providing it leveraging the --ffmpeg parameter."
+        )
 
     if args.layout == "PERSPECTIVE":
         layout_settings = FullScreen()
