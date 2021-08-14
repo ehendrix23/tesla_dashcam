@@ -6,6 +6,7 @@ import argparse
 import logging
 import os
 import sys
+from platform import processor as platform_processor
 import json
 from datetime import datetime, timedelta, timezone
 from glob import glob, iglob
@@ -36,7 +37,7 @@ _LOGGER = logging.getLogger(__name__)
 #  different ones to be created based on where it should go to (stdout,
 #  log file, ...).
 
-VERSION = {"major": 0, "minor": 1, "patch": 17, "beta": 4}
+VERSION = {"major": 0, "minor": 1, "patch": 17, "beta": 5}
 VERSION_STR = f"v{VERSION['major']}.{VERSION['minor']}.{VERSION['patch']}"
 
 if VERSION["beta"] > -1:
@@ -115,6 +116,16 @@ EVENT_REASON = {
 TOASTER_INSTANCE = None
 
 display_ts = False
+
+PLATFORM = sys.platform
+# Allow setting for testing.
+# PLATFORM = "darwin"
+# PLATFORM = "win32"
+# PLATFORM = "linux"
+
+PROCESSOR = platform_processor()
+# Allow setting for testing.
+# PROCESSOR = "arm"
 
 
 class Camera_Clip(object):
@@ -3021,11 +3032,11 @@ def notify_linux(title, subtitle, message):
 
 def notify(title, subtitle, message):
     """ Call function to send notification based on OS """
-    if sys.platform == "darwin":
+    if PLATFORM == "darwin":
         notify_macos(title, subtitle, message)
-    elif sys.platform == "win32":
+    elif PLATFORM == "win32":
         notify_windows(title, subtitle, message)
-    elif sys.platform == "linux":
+    elif PLATFORM == "linux":
         notify_linux(title, subtitle, message)
 
 
@@ -3037,9 +3048,9 @@ def main() -> int:
     )
 
     internal_ffmpeg = getattr(sys, "frozen", None) is not None
-    ffmpeg_default = resource_path(FFMPEG.get(sys.platform, "ffmpeg"))
+    ffmpeg_default = resource_path(FFMPEG.get(PLATFORM, "ffmpeg"))
 
-    movie_folder = os.path.join(str(Path.home()), MOVIE_HOMEDIR.get(sys.platform), "")
+    movie_folder = os.path.join(str(Path.home()), MOVIE_HOMEDIR.get(PLATFORM), "")
 
     global display_ts
 
@@ -3047,7 +3058,7 @@ def main() -> int:
     # provided.
     if not os.path.isfile(ffmpeg_default):
         internal_ffmpeg = False
-        ffmpeg_default = FFMPEG.get(sys.platform, "ffmpeg")
+        ffmpeg_default = FFMPEG.get(PLATFORM, "ffmpeg")
 
     epilog = (
         "This program leverages ffmpeg which is included. See https://ffmpeg.org/ for more information on ffmpeg"
@@ -3300,7 +3311,7 @@ def main() -> int:
         "--font",
         required=False,
         type=str,
-        default=DEFAULT_FONT.get(sys.platform, None),
+        default=DEFAULT_FONT.get(PLATFORM, None),
         help="Fully qualified filename (.ttf) to the font to be chosen for timestamp.",
     )
     text_overlay_group.add_argument(
@@ -3492,27 +3503,55 @@ def main() -> int:
         title="Advanced encoding settings", description="Advanced options for encoding"
     )
 
-    mac_gpu_help = (
-        "R|Disable use of GPU acceleration.\n"
-        " All MACs with Haswell CPU or later support this (Macs after 2013).\n"
-        "      See following link as well: \n"
-        "         https://en.wikipedia.org/wiki/List_of_Macintosh_models_grouped_by_CPU_type#Haswell\n"
-        " Note: ffmpeg currently seems to have issues on Apple Silicon with GPU acceleration, --no-gpu might need to be set to produce video.\n"
-    )
+    if PLATFORM == "darwin":
+        if PROCESSOR != "arm":
+            nogpuhelp = (
+                "R|Disable use of GPU acceleration, default is to use GPU acceleration.\n"
+                "  Note: if this is being run on Apple Silicon then please check README for --no-gpu!!\n"
+            )
+            gpuhelp = (
+                "R|Use GPU acceleration (this is the default).\n"
+                "  Note: if this is being run on Apple Silicon then please check README for --gpu!!\n"
+            )
+        else:
+            nogpuhelp = "R|Disable use of GPU acceleration, this is the default as currently ffmpeg has issues on Apple Silicon with GPU acceleration.\n"
+            gpuhelp = (
+                "R|Use GPU acceleration.\n"
+                "  Note: ffmpeg currently seems to have issues on Apple Silicon with GPU acceleration resulting in corrupt video.\n"
+            )
 
-    nonmac_gpu_help = (
-        "R|Use GPU acceleration, only enable if supported by hardware.\n"
-        " --gpu_type has to be provided as well when enabling this parameter"
-    )
-
-    PRINT_ALL = True
-    if sys.platform == "darwin" or PRINT_ALL:
         advancedencoding_group.add_argument(
-            "--no-gpu", dest="gpu", action="store_true", help=mac_gpu_help
+            "--no-gpu",
+            dest="gpu",
+            action="store_false",
+            default=argparse.SUPPRESS,
+            help=nogpuhelp,
         )
-    if sys.platform != "darwin" or PRINT_ALL:
+
         advancedencoding_group.add_argument(
-            "--gpu", dest="gpu", action="store_true", help=nonmac_gpu_help
+            "--gpu",
+            dest="gpu",
+            action="store_true",
+            default=argparse.SUPPRESS,
+            help=gpuhelp,
+        )
+
+    elif PLATFORM != "darwin":
+        advancedencoding_group.add_argument(
+            "--no-gpu",
+            dest="gpu",
+            action="store_false",
+            default=argparse.SUPPRESS,
+            help="R|Disable use of GPU acceleration, this is the default.\n",
+        )
+
+        advancedencoding_group.add_argument(
+            "--gpu",
+            dest="gpu",
+            action="store_true",
+            default=argparse.SUPPRESS,
+            help="R|Use GPU acceleration, only enable if supported by hardware.\n"
+            " --gpu_type has to be provided as well when enabling this parameter",
         )
 
         advancedencoding_group.add_argument(
@@ -3733,7 +3772,7 @@ def main() -> int:
     ffmpeg = ffmpeg_default if getattr(args, "ffmpeg", None) is None else args.ffmpeg
     if which(ffmpeg) is None:
         print(
-            f"{get_current_timestamp()}ffmpeg is a requirement, unable to find {ffmpeg} executable. Please ensure it exist and is located"
+            f"{get_current_timestamp()}ffmpeg is a requirement, unable to find {ffmpeg} executable. Please ensure it exist and is located "
             f"within PATH environment or provide full path using parameter --ffmpeg."
         )
 
@@ -3938,7 +3977,7 @@ def main() -> int:
     if not args.no_timestamp and text_overlay_format is not None:
         if layout_settings.font.font is None:
             print(
-                f"{get_current_timestamp()}Unable to get a font file for platform {sys.platform}. Please provide valid font file using "
+                f"{get_current_timestamp()}Unable to get a font file for platform {PLATFORM}. Please provide valid font file using "
                 f"--font or disable timestamp using --no-timestamp."
             )
             return 0
@@ -3946,7 +3985,7 @@ def main() -> int:
         # noinspection PyPep8
         temp_font_file = (
             f"c:\{layout_settings.font.font}"
-            if sys.platform == "win32"
+            if PLATFORM == "win32"
             else layout_settings.font.font
         )
         if not os.path.isfile(temp_font_file):
@@ -3954,7 +3993,7 @@ def main() -> int:
                 f"{get_current_timestamp()}Font file {temp_font_file} does not exist. Provide a valid font file using --font or"
                 f" disable timestamp using --no-timestamp"
             )
-            if sys.platform == "linux":
+            if PLATFORM == "linux":
                 print(
                     f"{get_current_timestamp()}You can also install the fonts using for example: "
                     f"apt-get install ttf-freefont"
@@ -4002,7 +4041,11 @@ def main() -> int:
 
     ffmpeg_params = ["-preset", args.compression, "-crf", MOVIE_QUALITY[args.quality]]
 
-    use_gpu = not args.gpu if sys.platform == "darwin" else args.gpu
+    use_gpu = (
+        getattr(args, "gpu", True)
+        if PLATFORM == "darwin" and PROCESSOR != "arm"
+        else getattr(args, "gpu", False)
+    )
 
     video_encoding = []
     if not "enc" in args:
@@ -4015,7 +4058,7 @@ def main() -> int:
         # GPU acceleration enabled
         if use_gpu:
             print(f"{get_current_timestamp()}GPU acceleration is enabled")
-            if sys.platform == "darwin":
+            if PLATFORM == "darwin":
                 video_encoding = video_encoding + ["-allow_sw", "1"]
                 encoding = encoding + "_mac"
 

@@ -286,16 +286,12 @@ Usage
     Advanced encoding settings:
       Advanced options for encoding
 
-      --no-gpu              Disable use of GPU acceleration.
-                            All MACs with Haswell CPU or later support this (Macs after 2013).
-                                  See following link as well: 
-                                    https://en.wikipedia.org/wiki/List_of_Macintosh_models_grouped_by_CPU_type#Haswell
+      --no-gpu              Disable use of GPU acceleration. Default on Apple Silicon Mac and on Non-MACs.                            
+      --gpu                 Use GPU acceleration. Default on Intel Macs.
                             Note: ffmpeg currently seems to have issues on Apple Silicon with GPU acceleration, --no-gpu might need to be set to produce video.
-                            (default: False)
-      --gpu                 Use GPU acceleration, only enable if supported by hardware.
-                            --gpu_type has to be provided as well when enabling this parameter (default: False)
+                            --gpu_type has to be provided as well on Non-Macs when enabling this parameter (default: False)
       --gpu_type {nvidia,intel,rpi}
-                            Type of graphics card (GPU) in the system. This determines the encoder that will be used.This parameter is mandatory if --gpu is provided. (default: None)
+                            Type of graphics card (GPU) in the system. This determines the encoder that will be used.This parameter is mandatory if --gpu is provided on Non-Macs. (default: None)
       --no-faststart        Do not enable flag faststart on the resulting video files. Use this when using a network share and errors occur during encoding. (default: False)
       --quality {LOWEST,LOWER,LOW,MEDIUM,HIGH}
                             Define the quality setting for the video, higher quality means bigger file size but might not be noticeable. (default: LOWER)
@@ -871,13 +867,27 @@ The following parameters are more advanced settings to determine how ffmpeg shou
 
 *--no-gpu*
 
-  For MacOS only! Disables GPU acceleration. If not provided GPU acceleration will be used.
+  Disables GPU acceleration. 
+  Intel Macs: GPU acceleration is enabled by default, use this parameter to disable it.
+  Apple Silicon Macs: GPU acceleration is disabled by default due to current issues with ffmpeg.
+  Non-Macs: GPU acceleration is disabled by default.
+
+  If this parameter is used in combination with --gpu then the first one will have preference.
+
+  Note: we can only detect Apple Silicon if Python deployed is the Universal2 binary OR the tesla_dashcam executable is for Apple Silicon.
+  If running on Apple Silicon but using the x64 executable or x64 Python then tesla_dashcam will not be able to detect it is running on Apple Silicon.
 
 *--gpu*
 
-  All platforms except Macs. Enables GPU acceleration.
+  Enables GPU acceleration.
+  Intel Macs: this is already enabled by default
+  Apple Silicon Macs: to enable GPU acceleration. Note that current ffmpeg produces a corrupt video when doing this but newer versions of ffmpeg might work.
+  Non-Macs: to enable GPU acceleration, parameter parameter --gpu_type has to be provided as well then to identify the hardware.
 
-  Note: When providing this parameter to enable GPU you also have to provide parameter --gpu_type.
+  If this parameter is used in combination with --no-gpu then the first one will have preference.
+
+  Note: we can only detect Apple Silicon if Python deployed is the Universal2 binary OR the tesla_dashcam executable is for Apple Silicon.
+  If running on Apple Silicon but using the x64 executable or x64 Python then tesla_dashcam will not be able to detect it is running on Apple Silicon.
 
 *--gpu_type*
 
@@ -887,7 +897,7 @@ The following parameters are more advanced settings to determine how ffmpeg shou
 
     nvidia: if NVIDIA GPU is installed
 
-    RPi: on Raspberry Pi systems
+    rpi: on Raspberry Pi systems
 
 *--no-faststart*
 
@@ -1469,6 +1479,7 @@ Release Notes
     - New: Metadata tag title in video file is now set to reason for event (if exist) and timestamp or start/end timestamp
     - New: Metadata tag creation_time in video files created is now set to start timestamp of that particular video.
     - New: When scanning folders a message will be printed after every 10 folders scanned to show progress.
+    - New: --gpu and --no-gpu are now valid arguments irrespective of platform.     
     - Changed: Improvement for Docker file size and stability. Contributed by magicalyak
     - Changed: Choice values for parameters (i.e. FULLSCREEN, intel, black) are now case-insensitive.
     - Changed: Updated supporting libraries to latest available.
