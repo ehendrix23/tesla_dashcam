@@ -128,7 +128,9 @@ if PLATFORM == "darwin" and PROCESSOR == "i386":
     _LOGGER.debug(
         f"Platform is {PLATFORM} and processor is {PROCESSOR}, running sysctl to check processor."
     )
-    sysctl = run(["sysctl", "-n", "machdep.cpu.vendor"], capture_output=True, text=True)
+    sysctl = run(
+        ["sysctl", "-n", "machdep.cpu.brand_string"], capture_output=True, text=True
+    )
     if sysctl.returncode == 0:
         if search("Apple", sysctl.stdout, re_IGNORECASE) is not None:
             PROCESSOR = "arm"
