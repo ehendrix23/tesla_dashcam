@@ -3047,15 +3047,15 @@ def main() -> int:
         (logging.getLevelName(level), level) for level in [10, 20, 30, 40, 50]
     )
 
-    internal_ffmpeg = getattr(sys, "frozen", None) is not None
-    ffmpeg_default = resource_path(FFMPEG.get(PLATFORM, "ffmpeg"))
-
     movie_folder = os.path.join(str(Path.home()), MOVIE_HOMEDIR.get(PLATFORM), "")
 
     global display_ts
 
     # Check if ffmpeg exist, if not then hope it is in default path or
     # provided.
+    internal_ffmpeg = getattr(sys, "frozen", None) is not None
+    ffmpeg_default = resource_path(FFMPEG.get(PLATFORM, "ffmpeg"))
+
     if not os.path.isfile(ffmpeg_default):
         internal_ffmpeg = False
         ffmpeg_default = FFMPEG.get(PLATFORM, "ffmpeg")
@@ -3675,6 +3675,8 @@ def main() -> int:
     )
 
     _LOGGER.debug(f"{get_current_timestamp()}Arguments : {args}")
+    _LOGGER.debug(f"{get_current_timestamp()}Platform is {PLATFORM}")
+    _LOGGER.debug(f"{get_current_timestamp()}Processor is {PROCESSOR}")
 
     # Check that any mutual exclusive items are not both provided.
     if "speed_up" in args and "slow_down" in args:
@@ -3775,6 +3777,7 @@ def main() -> int:
             f"{get_current_timestamp()}ffmpeg is a requirement, unable to find {ffmpeg} executable. Please ensure it exist and is located "
             f"within PATH environment or provide full path using parameter --ffmpeg."
         )
+        return 1
 
     if args.layout == "PERSPECTIVE":
         layout_settings = FullScreen()

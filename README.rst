@@ -67,7 +67,7 @@ For more information on ffmpeg license please see: https://www.ffmpeg.org/legal.
 
 Windows binary of ffmpeg was downloaded from: https://ffmpeg.zeranoe.com/builds/
 
-MacOS binary of ffmpeg was downloaded from: https://evermeet.cx/ffmpeg/
+MacOS binary of ffmpeg was downloaded from: https://www.osxexperts.net
 
 
 Notes

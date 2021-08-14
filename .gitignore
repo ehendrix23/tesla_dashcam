@@ -104,7 +104,6 @@ venv.bak/
 /site
 
 # mypy
-.mypy_cache/
 .DS_Store
 tesla_dashcam/ffmpeg
 tesla_dashcam/ffmpeg.exe
