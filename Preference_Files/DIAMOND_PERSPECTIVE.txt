@@ -24,3 +24,9 @@
 
 # Encode with x265
 --encoding x265
+
+# Set end offset to 120 seconds
+--end_offset -120
+
+# Merge files together
+--merge

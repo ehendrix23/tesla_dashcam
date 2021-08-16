@@ -24,3 +24,7 @@
 
 # Encode with x265
 --encoding x265
+
+# Merge files together
+--merge "{layout} {event_timestamp} - {reason} - {city}"
+
