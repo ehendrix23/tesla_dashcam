@@ -14,7 +14,7 @@ from pathlib import Path
 from re import match, search, IGNORECASE as re_IGNORECASE
 from shlex import split as shlex_split
 from shutil import which
-from subprocess import CalledProcessError, run
+from subprocess import CalledProcessError, TimeoutExpired, run
 from tempfile import mkstemp
 from time import sleep, time as timestamp, mktime
 from typing import List, Optional
@@ -125,14 +125,21 @@ PLATFORM = sys.platform
 
 PROCESSOR = platform_processor()
 if PLATFORM == "darwin" and PROCESSOR == "i386":
-    sysctl = run(
-        ["sysctl", "-n", "machdep.cpu.brand_string"], capture_output=True, text=True
-    )
-    if sysctl.returncode == 0:
-        if search("Apple", sysctl.stdout, re_IGNORECASE) is not None:
-            PROCESSOR = "arm"
+    try:
+        sysctl = run(
+            ["sysctl", "-n", "machdep.cpu.brand_string"],
+            capture_output=True,
+            timeout=120,
+            text=True,
+        )
+    except TimeoutExpired:
+        print("Timeout running sysctl")
     else:
-        print("Error running sysctl: {sysctl.returncode} - {sysctl.stderr}")
+        if sysctl.returncode == 0:
+            if search("Apple", sysctl.stdout, re_IGNORECASE) is not None:
+                PROCESSOR = "arm"
+        else:
+            print("Error running sysctl: {sysctl.returncode} - {sysctl.stderr}")
 
 # Allow setting for testing.
 # PROCESSOR = "arm"
