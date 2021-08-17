@@ -35,7 +35,7 @@
 --sentry_offset
 
 # Merge files together
---merge "{layout} {event_timestamp} - {reason} - {city}"
+--merge "{layout} {event_timestamp} - {event_reason} - {event_city}"
 
 # Set timestamp to be year/month
 --merge_timestamp_format "%Y-%m"

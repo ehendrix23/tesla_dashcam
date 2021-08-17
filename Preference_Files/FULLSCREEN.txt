@@ -23,7 +23,7 @@
 --encoding x265
 
 # Merge files together
---merge "{layout} {end_timestamp} - {reason} - {city}"
+--merge "{layout} {end_timestamp} - {event_reason} - {event_city}"
 
 # Create map
 --title_screen_map

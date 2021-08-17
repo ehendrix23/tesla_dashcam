@@ -14,7 +14,7 @@
 --halign LEFT --valign BOTTOM
 
 # Output event reason, event date/time, event city, # seconds till event, and date/time
---text_overlay_fmt "Reason: {reason}\nEvent: {event_timestamp}\nCity: {city}\nCountdown: {event_timestamp_countdown_rolling}\nDate/Time: {local_timestamp_rolling}"
+--text_overlay_fmt "Reason: {event_reason}\nEvent: {event_timestamp}\nCity: {event_city}\nCountdown: {event_timestamp_countdown_rolling}\nDate/Time: {local_timestamp_rolling}"
 
 
 # Set timestamp format to: Weekday abbreviated, day (without leading zero) Month abbreviated Year at Hour:Minute:SecondAM(or PM)
@@ -36,7 +36,7 @@
 --set_moviefile_timestamp SENTRY
 
 # Merge files together
---merge "{layout} {start_timestamp} - {reason} - {city}"
+--merge "{layout} {start_timestamp} - {event_reason} - {event_city}"
 
 # --merge_timestamp_format "%Y-%m-%d"
 --merge_timestamp_format "%Y-%m"

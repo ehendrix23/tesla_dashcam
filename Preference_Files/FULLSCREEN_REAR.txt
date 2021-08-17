@@ -26,5 +26,5 @@
 --encoding x265
 
 # Merge files together
---merge "{layout} {event_timestamp} - {reason} - {city}"
+--merge "{layout} {event_timestamp} - {event_reason} - {event_city}"
 
