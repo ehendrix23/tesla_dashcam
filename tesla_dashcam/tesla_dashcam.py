@@ -2161,7 +2161,7 @@ def create_title_screen(events, video_settings):
         # Line
         m.add_line(staticmap.Line(coordinates, "#0036FF", 12))
 
-    image = m.render(zoom=13)
+    image = m.render()
 
     return image
 
@@ -2199,17 +2199,20 @@ def create_movie(
             _, title_video_filename = mkstemp(suffix=".mp4", text=False)
             _LOGGER.debug(f"Creating movie for title image to {title_video_filename}")
             ffmpeg_params = [
-                "-y",
+                "-loop",
+                "1",
                 "-framerate",
-                "1/3",
+                # "1/3",
+                str(video_settings["fps"]),
+                "-t",
+                "3",
                 "-i",
                 title_image_filename,
                 "-vf",
                 f"fps={video_settings['fps']},"
                 f"scale={video_settings['video_layout'].video_width}x{video_settings['video_layout'].video_height}",
-                "-pix_fmt",
-                "yuv420p",
-                title_video_filename,
+                #                "-pix_fmt",
+                #                "yuv420p",
             ]
 
             ffmpeg_command = (
@@ -2218,6 +2221,8 @@ def create_movie(
                 + ffmpeg_params
                 + video_settings["other_params"]
             )
+
+            ffmpeg_command = ffmpeg_command + ["-y", title_video_filename]
 
             _LOGGER.debug(f"FFMPEG Command: {ffmpeg_command}")
             try:
