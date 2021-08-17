@@ -2079,7 +2079,7 @@ def create_intermediate_movie(
 
     ffmpeg_command = (
         [video_settings["ffmpeg_exec"]]
-        + ["-loglevel", "error"]
+        + ["-loglevel", "info"]
         + ffmpeg_left_command
         + ffmpeg_front_command
         + ffmpeg_right_command
@@ -2094,7 +2094,9 @@ def create_intermediate_movie(
     _LOGGER.debug(f"FFMPEG Command: {ffmpeg_command}")
     # Run the command.
     try:
-        run(ffmpeg_command, capture_output=True, check=True)
+        ffmpeg_output = run(
+            ffmpeg_command, capture_output=True, check=True, universal_newlines=True
+        )
     except CalledProcessError as exc:
         print(
             f"{get_current_timestamp()}\t\t\tError trying to create clip for "
@@ -2104,6 +2106,8 @@ def create_intermediate_movie(
             f"{get_current_timestamp()}\t\t\tError: {exc.stderr}\n\n"
         )
         return False
+    _LOGGER.debug("FFMPEG output:\n %s", ffmpeg_output.stdout)
+    _LOGGER.debug("FFMPEG error output:\n %s", ffmpeg_output.stderr)
 
     clip_info.filename = temp_movie_name
     clip_info.start_timestamp = starting_timestamp
@@ -2162,7 +2166,9 @@ def create_title_screen(events, video_settings):
     return image
 
 
-def create_movie(movie, event_info, movie_filename, video_settings, chapter_offset):
+def create_movie(
+    movie, event_info, movie_filename, video_settings, chapter_offset, title_screen_map
+):
     """ Concatenate provided movie files into 1."""
     # Just return if there are no clips.
     if movie.count <= 0:
@@ -2170,7 +2176,7 @@ def create_movie(movie, event_info, movie_filename, video_settings, chapter_offs
         return True
 
     title_video_filename = None
-    if video_settings["video_layout"].title_screen_map:
+    if title_screen_map:
         title_image = create_title_screen(
             events=event_info, video_settings=video_settings
         )
@@ -2200,7 +2206,7 @@ def create_movie(movie, event_info, movie_filename, video_settings, chapter_offs
                 title_image_filename,
                 "-vf",
                 f"fps={video_settings['fps']},"
-                f"scale={video_settings['video_layout'].video_width}:{video_settings['video_layout'].video_height}",
+                f"scale={video_settings['video_layout'].video_width}x{video_settings['video_layout'].video_height}",
                 "-pix_fmt",
                 "yuv420p",
                 title_video_filename,
@@ -2208,14 +2214,19 @@ def create_movie(movie, event_info, movie_filename, video_settings, chapter_offs
 
             ffmpeg_command = (
                 [video_settings["ffmpeg_exec"]]
-                + ["-loglevel", "error"]
+                + ["-loglevel", "info"]
                 + ffmpeg_params
                 + video_settings["other_params"]
             )
 
             _LOGGER.debug(f"FFMPEG Command: {ffmpeg_command}")
             try:
-                run(ffmpeg_command, capture_output=True, check=True)
+                ffmpeg_output = run(
+                    ffmpeg_command,
+                    capture_output=True,
+                    check=True,
+                    universal_newlines=True,
+                )
             except CalledProcessError as exc:
                 print(
                     f"{get_current_timestamp()}\t\t\tError trying to create title clip. RC: {exc.returncode}\n"
@@ -2230,110 +2241,119 @@ def create_movie(movie, event_info, movie_filename, video_settings, chapter_offs
                 except:
                     _LOGGER.debug(f"Failed to remove {title_image_filename}")
                     pass
+            else:
+                _LOGGER.debug("FFMPEG output:\n %s", ffmpeg_output.stdout)
+                _LOGGER.debug("FFMPEG error output:\n %s", ffmpeg_output.stderr)
 
     # Go through the list of clips to create the command and content for chapter meta file.
-    ffmpeg_join_filehandle, ffmpeg_join_filename = mkstemp(suffix=".txt", text=True)
     total_clips = 0
     meta_content = ""
+    file_content = ""
     meta_start = 0
     total_videoduration = 0
     start_timestamp = None
     end_timestamp = None
     chapter_offset = chapter_offset * 1000000000
-    with os.fdopen(ffmpeg_join_filehandle, "w") as fp:
-        if title_video_filename:
-            fp.write(
-                f"file 'file:{title_video_filename.replace(os.sep, '/')}'{os.linesep}"
-            )
-            total_videoduration += 3 * 1000000000
-            meta_start += 3 * 1000000000 + 1
-        # Loop through the list sorted by video timestamp.
-        for movie_item in movie.sorted:
-            video_clip = movie.item(movie_item)
-            # Check that this item was included for processing or not.
-            if video_clip.filename is None:
-                continue
 
-            if not os.path.isfile(video_clip.filename):
-                print(
-                    f"{get_current_timestamp()}\t\tFile {video_clip.filename} does not exist anymore, skipping."
-                )
-                continue
-            _LOGGER.debug(
-                f"Video file {video_clip.filename} will be added to "
-                f"{movie_filename}"
-            )
-            # Add this file in our join list.
-            # NOTE: Recent ffmpeg changes requires Windows paths in this file to look like
-            # file 'file:<actual path>'
-            # https://trac.ffmpeg.org/ticket/2702
-            fp.write(
-                f"file 'file:{video_clip.filename.replace(os.sep, '/')}'{os.linesep}"
-            )
-            total_clips = total_clips + 1
-            title = video_clip.start_timestamp.astimezone(get_localzone())
-            # For duration need to also calculate if video was sped-up or slowed down.
-            video_duration = int(video_clip.duration * 1000000000)
-            total_videoduration += video_duration
-            chapter_start = meta_start
-            if video_duration > abs(chapter_offset):
-                if chapter_offset < 0:
-                    chapter_start = meta_start + video_duration + chapter_offset
-                elif chapter_offset > 0:
-                    chapter_start = chapter_start + chapter_offset
+    if title_video_filename:
+        file_content = (
+            f"file 'file:{title_video_filename.replace(os.sep, '/')}'{os.linesep}"
+        )
+        total_videoduration += 3 * 1000000000
+        meta_start += 3 * 1000000000 + 1
 
-            # We need to add an initial chapter if our "1st" chapter is not at the beginning of the movie.
-            if total_clips == 1 and chapter_start > 0:
-                meta_content = (
-                    "[CHAPTER]{linesep}"
-                    "TIMEBASE=1/1000000000{linesep}"
-                    "START={start}{linesep}"
-                    "END={end}{linesep}"
-                    "title={title}{linesep}".format(
-                        linesep=os.linesep,
-                        start=0,
-                        end=chapter_start - 1,
-                        title="Start",
-                    )
-                )
+    # Loop through the list sorted by video timestamp.
+    for movie_item in movie.sorted:
+        video_clip = movie.item(movie_item)
+        # Check that this item was included for processing or not.
+        if video_clip.filename is None:
+            continue
 
+        if not os.path.isfile(video_clip.filename):
+            print(
+                f"{get_current_timestamp()}\t\tFile {video_clip.filename} does not exist anymore, skipping."
+            )
+            continue
+        _LOGGER.debug(
+            f"Video file {video_clip.filename} will be added to " f"{movie_filename}"
+        )
+        # Add this file in our join list.
+        # NOTE: Recent ffmpeg changes requires Windows paths in this file to look like
+        # file 'file:<actual path>'
+        # https://trac.ffmpeg.org/ticket/2702
+        file_content = (
+            file_content
+            + f"file 'file:{video_clip.filename.replace(os.sep, '/')}'{os.linesep}"
+        )
+        total_clips = total_clips + 1
+        title = video_clip.start_timestamp.astimezone(get_localzone())
+        # For duration need to also calculate if video was sped-up or slowed down.
+        video_duration = int(video_clip.duration * 1000000000)
+        total_videoduration += video_duration
+        chapter_start = meta_start
+        if video_duration > abs(chapter_offset):
+            if chapter_offset < 0:
+                chapter_start = meta_start + video_duration + chapter_offset
+            elif chapter_offset > 0:
+                chapter_start = chapter_start + chapter_offset
+
+        # We need to add an initial chapter if our "1st" chapter is not at the beginning of the movie.
+        if total_clips == 1 and chapter_start > 0:
             meta_content = (
-                meta_content + f"[CHAPTER]{os.linesep}"
-                f"TIMEBASE=1/1000000000{os.linesep}"
-                f"START={chapter_start}{os.linesep}"
-                f"END={meta_start + video_duration}{os.linesep}"
-                f"title={title.strftime(video_settings['timestamp_format'])}{os.linesep}"
+                "[CHAPTER]{linesep}"
+                "TIMEBASE=1/1000000000{linesep}"
+                "START={start}{linesep}"
+                "END={end}{linesep}"
+                "title={title}{linesep}".format(
+                    linesep=os.linesep, start=0, end=chapter_start - 1, title="Start"
+                )
             )
-            meta_start = meta_start + 1 + video_duration
 
-            if start_timestamp is None:
-                start_timestamp = video_clip.start_timestamp
-            else:
-                start_timestamp = (
-                    video_clip.start_timestamp
-                    if start_timestamp > video_clip.start_timestamp
-                    else start_timestamp
-                )
+        meta_content = (
+            meta_content + f"[CHAPTER]{os.linesep}"
+            f"TIMEBASE=1/1000000000{os.linesep}"
+            f"START={chapter_start}{os.linesep}"
+            f"END={meta_start + video_duration}{os.linesep}"
+            f"title={title.strftime(video_settings['timestamp_format'])}{os.linesep}"
+        )
+        meta_start = meta_start + 1 + video_duration
 
-            if end_timestamp is None:
-                end_timestamp = video_clip.end_timestamp
-            else:
-                end_timestamp = (
-                    video_clip.end_timestamp
-                    if end_timestamp < video_clip.end_timestamp
-                    else end_timestamp
-                )
+        if start_timestamp is None:
+            start_timestamp = video_clip.start_timestamp
+        else:
+            start_timestamp = (
+                video_clip.start_timestamp
+                if start_timestamp > video_clip.start_timestamp
+                else start_timestamp
+            )
+
+        if end_timestamp is None:
+            end_timestamp = video_clip.end_timestamp
+        else:
+            end_timestamp = (
+                video_clip.end_timestamp
+                if end_timestamp < video_clip.end_timestamp
+                else end_timestamp
+            )
 
     if total_clips == 0:
         print(f"{get_current_timestamp()}\t\tError: No valid clips to merge found.")
         return True
 
+    # Write out the video files file
+    ffmpeg_join_filehandle, ffmpeg_join_filename = mkstemp(suffix=".txt", text=True)
+    with os.fdopen(ffmpeg_join_filehandle, "w") as fp:
+        fp.write(file_content)
+
+    _LOGGER.debug("Video file contains:\n%s", file_content)
     # Write out the meta data file.
     meta_content = ";FFMETADATA1" + os.linesep + meta_content
 
     ffmpeg_meta_filehandle, ffmpeg_meta_filename = mkstemp(suffix=".txt", text=True)
     with os.fdopen(ffmpeg_meta_filehandle, "w") as fp:
         fp.write(meta_content)
+
+    _LOGGER.debug("Meta file contains:\n%s", meta_content)
 
     ffmpeg_params = [
         "-f",
@@ -2387,7 +2407,7 @@ def create_movie(movie, event_info, movie_filename, video_settings, chapter_offs
 
     ffmpeg_command = (
         [video_settings["ffmpeg_exec"]]
-        + ["-loglevel", "error"]
+        + ["-loglevel", "info"]
         + ffmpeg_params
         + ffmpeg_metadata
         + ["-y", movie_filename]
@@ -2395,7 +2415,9 @@ def create_movie(movie, event_info, movie_filename, video_settings, chapter_offs
 
     _LOGGER.debug(f"FFMPEG Command: {ffmpeg_command}")
     try:
-        run(ffmpeg_command, capture_output=True, check=True)
+        ffmpeg_output = run(
+            ffmpeg_command, capture_output=True, check=True, universal_newlines=True
+        )
     except CalledProcessError as exc:
         print(
             f"{get_current_timestamp()}\t\t\tError trying to create movie {movie_filename}. RC: {exc.returncode}\n"
@@ -2403,6 +2425,8 @@ def create_movie(movie, event_info, movie_filename, video_settings, chapter_offs
             f"{get_current_timestamp()}\t\t\tError: {exc.stderr}\n\n"
         )
     else:
+        _LOGGER.debug("FFMPEG output:\n %s", ffmpeg_output.stdout)
+        _LOGGER.debug("FFMPEG error output:\n %s", ffmpeg_output.stderr)
         # Get actual duration of our new video, required for chapters when concatenating.
         metadata = get_metadata(video_settings["ffmpeg_exec"], [movie_filename])
         movie.duration = metadata[0]["duration"] if metadata else None
@@ -2448,7 +2472,8 @@ def create_movie(movie, event_info, movie_filename, video_settings, chapter_offs
         pass
 
     # Remove image video
-    if title_video_filename:
+    # Erik DEBUG
+    if not title_video_filename:
         # noinspection PyBroadException,PyPep8
         try:
             os.remove(title_video_filename)
@@ -2755,7 +2780,12 @@ def process_folders(source_folders, video_settings, delete_source):
         )
 
         if create_movie(
-            event_info, [event_info], event_movie_filename, video_settings, 0
+            event_info,
+            [event_info],
+            event_movie_filename,
+            video_settings,
+            0,
+            video_settings["video_layout"].title_screen_map,
         ):
             if event_info.filename is not None:
                 key = event_info.template(
@@ -2842,12 +2872,19 @@ def process_folders(source_folders, video_settings, delete_source):
                     f"{get_current_timestamp()}\tCreating movie {movie_filename}, please be patient."
                 )
 
+                # Only set title screen map if requested and # of events for this movie is greater then 1
+                title_screen_map = (
+                    video_settings["video_layout"].title_screen_map
+                    and movies.get(movie).count > 1
+                )
+
                 if create_movie(
                     movies.get(movie),
                     movies.get(movie).items_sorted,
                     movie_filename,
                     video_settings,
                     video_settings["chapter_offset"],
+                    title_screen_map,
                 ):
 
                     if movies.get(movie).filename is not None:
