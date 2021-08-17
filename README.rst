@@ -274,6 +274,15 @@ Usage
       --merge [MERGE_GROUP_TEMPLATE]
                             Merge the video files from different folders (events) into 1 big video file.
                             Optionally add a template string to group events in different video files based on the template.
+                            Valid format variables:
+                                {layout} - Layout of the created movie (see --layout)
+                                {start_timestamp} - Local time the event started at
+                                {end_timestamp} - Local time the event ends at        
+                                {event_timestamp} - Timestamp from events.json (if provided), string
+                                {event_city} - City name from events.json (if provided), string
+                                {event_reason} - Recording reason from events.json (if provided), string
+                                {event_latitude} - Latitude from events.json (if provided), float
+                                {event_longitude} - Longitude from events.json (if provided), float        
       --merge_timestamp_format MERGE_TIMESTAMP_FORMAT
                             Format for timestamps in merge_template.
                             Determines how timestamps should be represented within merge_template. Any valid value from strftime is accepted.Default is set '%Y-%m-%d_%H_%M'More info: https://strftime.org (default: %Y-%m-%d_%H_%M)

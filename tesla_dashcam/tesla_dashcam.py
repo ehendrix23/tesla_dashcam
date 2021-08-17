@@ -437,14 +437,16 @@ class Event(object):
             "event_timestamp": self.start_timestamp.astimezone(
                 get_localzone()
             ).strftime(timestamp_format),
-            "city": self.metadata.get("city", "") if self.metadata is not None else "",
-            "reason": self.metadata.get("reason", "")
+            "event_city": self.metadata.get("city", "")
             if self.metadata is not None
             else "",
-            "latitude": self.metadata.get("latitude", "")
+            "event_reason": self.metadata.get("reason", "")
             if self.metadata is not None
             else "",
-            "longitude": self.metadata.get("longitude", "")
+            "event_latitude": self.metadata.get("latitude", "")
+            if self.metadata is not None
+            else "",
+            "event_longitude": self.metadata.get("longitude", "")
             if self.metadata is not None
             else "",
         }
@@ -3444,7 +3446,16 @@ def main() -> int:
         const="",
         default=argparse.SUPPRESS,
         help="R|Merge the video files from different folders (events) into 1 big video file.\n"
-        "Optionally add a template string to group events in different video files based on the template.",
+        "Optionally add a template string to group events in different video files based on the template.\n"
+        "Valid format variables:\n"
+        "    {layout} - Layout of the created movie (see --layout)\n"
+        "    {start_timestamp} - Local time the event started at\n"
+        "    {end_timestamp} - Local time the event ends at\n"
+        "    {event_timestamp} - Timestamp from events.json (if provided), string\n"
+        "    {event_city} - City name from events.json (if provided), string\n"
+        "    {event_reason} - Recording reason from events.json (if provided), string\n"
+        "    {event_latitude} - Latitude from events.json (if provided), float\n"
+        "    {event_longitude} - Longitude from events.json (if provided), float\n",
     )
 
     output_group.add_argument(
