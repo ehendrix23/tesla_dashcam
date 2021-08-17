@@ -3782,7 +3782,8 @@ def main() -> int:
         else:
             print(f"{get_current_timestamp()} Did not retrieve latest version info.")
 
-    ffmpeg = ffmpeg_default if getattr(args, "ffmpeg", None) is None else args.ffmpeg
+    internal_ffmpeg = getattr(args, "ffmpeg", None) is None and internal_ffmpeg
+    ffmpeg =  getattr(args, "ffmpeg", ffmpeg_default)
     if which(ffmpeg) is None:
         print(
             f"{get_current_timestamp()}ffmpeg is a requirement, unable to find {ffmpeg} executable. Please ensure it exist and is located "
