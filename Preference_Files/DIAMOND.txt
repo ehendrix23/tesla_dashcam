@@ -14,7 +14,7 @@
 --halign RIGHT --valign TOP
 
 # Output city and timestamp
---text_overlay_fmt "City: {event_city}\nDate/Time: {local_timestamp}"
+--text_overlay_fmt "City: {event_city}\nDate/Time: {local_timestamp_rolling}"
 
 # Fast forward through portions where there is no motion detected
 --motion_only
