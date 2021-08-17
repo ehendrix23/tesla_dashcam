@@ -3783,7 +3783,7 @@ def main() -> int:
             print(f"{get_current_timestamp()} Did not retrieve latest version info.")
 
     internal_ffmpeg = getattr(args, "ffmpeg", None) is None and internal_ffmpeg
-    ffmpeg =  getattr(args, "ffmpeg", ffmpeg_default)
+    ffmpeg = getattr(args, "ffmpeg", ffmpeg_default)
     if which(ffmpeg) is None:
         print(
             f"{get_current_timestamp()}ffmpeg is a requirement, unable to find {ffmpeg} executable. Please ensure it exist and is located "
@@ -4229,13 +4229,13 @@ def main() -> int:
         "right_camera": ffmpeg_right_camera,
         "rear_camera": ffmpeg_rear_camera,
         "start_timestamp": start_timestamp,
-        "start_offset": 30
+        "start_offset": 60
         if args.start_offset is None and args.sentry_offset
         else args.start_offset,
-        "end_timestamp": 60
-        if args.start_offset is None and args.sentry_offset
-        else args.start_offset,
-        "end_offset": args.end_offset,
+        "end_timestamp": end_timestamp,
+        "end_offset": 30
+        if args.end_offset is None and args.sentry_offset
+        else args.end_offset,
         "sentry_offset": args.sentry_offset,
         "skip_existing": args.skip_existing,
     }
