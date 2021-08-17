@@ -2048,6 +2048,7 @@ def create_intermediate_movie(
         user_formatted_text = "Bad string format: Invalid variable {stderr}".format(
             stderr=str(e)
         )
+        _LOGGER.warning(user_formatted_text)
 
     # Escape characters ffmpeg needs
     user_formatted_text = user_formatted_text.replace(":", "\:")
@@ -4239,6 +4240,8 @@ def main() -> int:
         "sentry_offset": args.sentry_offset,
         "skip_existing": args.skip_existing,
     }
+
+    # Confirm the merge variables provided are accurate.
     dummy_event = Event(folder="dummy")
     if (
         dummy_event.template(
@@ -4251,8 +4254,33 @@ def main() -> int:
         # Invalid merge template provided, exiting.
         return 1
 
-    _LOGGER.debug(f"{get_current_timestamp()}Video Settings {video_settings}")
-    _LOGGER.debug(f"{get_current_timestamp()}Layout Settings {layout_settings}")
+    replacement_strings = {
+        "start_timestamp": "start_timestamp",
+        "end_timestamp": "end_timestamp",
+        "local_timestamp_rolling": "local_timestamp_rolling",
+        "event_timestamp_countdown": "event_timestamp_countdown",
+        "event_timestamp_countdown_rolling": "event_timestamp_countdown_rolling",
+        "event_timestamp": "event_timestamp",
+        "event_city": "event_city",
+        "event_reason": "event_reason",
+        "event_latitude": "event_latitude",
+        "event_longitude": "event_longitude",
+    }
+
+    user_formatted_text = video_settings["text_overlay_format"]
+    try:
+        # Try to replace strings!
+        _ = video_settings["text_overlay_format"].format(**replacement_strings)
+    except KeyError as e:
+        _LOGGER.error(
+            "Bad string format: Invalid variable %s provided in --text_overlay_format".format(
+                str(e)
+            )
+        )
+        return 1
+
+    _LOGGER.debug(f"Video Settings {video_settings}")
+    _LOGGER.debug(f"Layout Settings {layout_settings}")
 
     # If we constantly run and monitor for drive added or not.
     if video_settings["run_type"] in ["MONITOR", "MONITOR_ONCE"]:
