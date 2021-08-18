@@ -437,16 +437,16 @@ class Event(object):
             "event_timestamp": self.start_timestamp.astimezone(
                 get_localzone()
             ).strftime(timestamp_format),
-            "event_city": self.metadata.get("city", "")
+            "event_city": self.metadata.get("city", "") or ""
             if self.metadata is not None
             else "",
-            "event_reason": self.metadata.get("reason", "")
+            "event_reason": self.metadata.get("reason", "") or ""
             if self.metadata is not None
             else "",
-            "event_latitude": self.metadata.get("latitude", "")
+            "event_latitude": self.metadata.get("latitude", "") or ""
             if self.metadata is not None
             else "",
-            "event_longitude": self.metadata.get("longitude", "")
+            "event_longitude": self.metadata.get("longitude", "") or ""
             if self.metadata is not None
             else "",
         }
@@ -2142,6 +2142,14 @@ def create_title_screen(events, video_settings):
             )
             continue
 
+        # Sometimes event info has a very small (i.e. 2.35754e-311) or 0 value, we ignore if both are 0.
+        # 0,0 is in the ocean near Africa.
+        if round(lon, 5) == 0 and round(lat, 5) == 0:
+            _LOGGER.debug(
+                f"Skipping as longitude {lon} and/or latidude {lat} are invalid."
+            )
+            continue
+
         coordinate = [lon, lat]
         coordinates.append(coordinate)
 
@@ -2418,6 +2426,14 @@ def create_movie(
         except:
             pass
         else:
+            # Sometimes event info has a very small (i.e. 2.35754e-311) or 0 value, we ignore if both are 0.
+            # 0,0 is in the ocean near Africa.
+            if round(lon, 5) == 0 and round(lat, 5) == 0:
+                _LOGGER.debug(
+                    f"Skipping as longitude {lon} and/or latidude {lat} are invalid."
+                )
+                continue
+
             location = f"{lat:+.4f}{lon:+.4f}"
             ffmpeg_metadata.extend(
                 [
