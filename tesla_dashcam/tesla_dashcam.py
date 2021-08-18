@@ -2528,25 +2528,13 @@ def create_movie(
 
 def make_folder(parameter, folder):
     # Create folder if not already existing.
-    if not os.path.isdir(folder):
-        current_path, add_folder = os.path.split(folder)
-        if add_folder == "":
-            current_path, add_folder = os.path.split(current_path)
-
-        # If path does not exist in which to create folder then exit.
-        if not os.path.isdir(current_path):
-            print(
-                f"{get_current_timestamp()}Path {current_path} for parameter {parameter} does not exist, please provide a valid path."
-            )
-            return False
-
-        try:
-            os.mkdir(folder)
-        except OSError:
-            print(
-                f"{get_current_timestamp()}Error creating folder {add_folder} at location {current_path} for parameter {parameter}"
-            )
-            return False
+    try:
+        os.makedirs(folder, exist_ok=True)
+    except OSError:
+        print(
+            f"{get_current_timestamp()}Error creating folder {folder} for parameter {parameter}"
+        )
+        return False
 
     return True
 
@@ -2640,27 +2628,13 @@ def process_folders(source_folders, video_settings, delete_source):
 
         # No processing, add to list of movies to merge if what was provided is just a file
         if event_info.isfile:
-            if (
-                movies.get(
-                    event_info.template(
-                        merge_group_template, timestamp_format, video_settings
-                    )
-                )
-                is None
-            ):
-                movies.update(
-                    {
-                        event_info.template(
-                            merge_group_template, timestamp_format, video_settings
-                        ): Movie()
-                    }
-                )
+            key = event_info.template(
+                merge_group_template, timestamp_format, video_settings
+            )
+            if movies.get(key) is None:
+                movies.update({key: Movie()})
 
-            movies.get(
-                event_info.template(
-                    merge_group_template, timestamp_format, video_settings
-                )
-            ).set_event(event_info)
+            movies.get(key).set_event(event_info)
             continue
 
         # Determine the starting and ending timestamps for the clips in this folder based on start/end timestamps
