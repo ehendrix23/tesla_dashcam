@@ -2410,6 +2410,25 @@ def create_movie(
         f"title={title}",
     ]
 
+    # Go through the events and add the 1st valid coordinations for location to metadata
+    for event in event_info:
+        try:
+            lon = float(event_info[0].metadata["longitude"])
+            lat = float(event_info[0].metadata["latitude"])
+        except:
+            pass
+        else:
+            location = f"{lat:+.4f}{lon:+.4f}"
+            ffmpeg_metadata.extend(
+                [
+                    "-metadata",
+                    f"location={location}",
+                    "-metadata",
+                    f"location-eng={location}",
+                ]
+            )
+            break
+
     ffmpeg_command = (
         [video_settings["ffmpeg_exec"]]
         + ["-loglevel", "info"]
@@ -2477,8 +2496,7 @@ def create_movie(
         pass
 
     # Remove image video
-    # Erik DEBUG
-    if not title_video_filename:
+    if title_video_filename:
         # noinspection PyBroadException,PyPep8
         try:
             os.remove(title_video_filename)

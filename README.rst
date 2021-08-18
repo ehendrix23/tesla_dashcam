@@ -1476,7 +1476,7 @@ Release Notes
     - New: Option --text_overlay_fmt to set the overlay text for the video. Contributed by JakeShirley
     - New: Option --timestamp_format for formatting timestamps.
     - New: Option --sentry_offset to set the start and end offset based on Sentry event timestamp.
-    - New: Option --merge_template to allow merging of video files grouped based on this. Resulting movie filename be based on this template.
+    - New: Option --merge_template to allow merging of video files grouped based on this. Resulting movie filename will be based on this template.
     - New: Option --set_moviefile_timestamp to set the video file timestamp on the OS to start, end, or time of Sentry event.
     - New: Option --keep-events to keep event video files after they have been merged into a video.
     - New: Option --display_ts to show timestamps in the text output. This does not impact video output but is handy when using a monitor option. Contributed by croadfeldt
@@ -1488,7 +1488,8 @@ Release Notes
     - New: Metadata tag title in video file is now set to reason for event (if exist) and timestamp or start/end timestamp
     - New: Metadata tag creation_time in video files created is now set to start timestamp of that particular video.
     - New: When scanning folders a message will be printed after every 10 folders scanned to show progress.
-    - New: --gpu and --no-gpu are now valid arguments irrespective of platform.     
+    - New: --gpu and --no-gpu are now valid arguments irrespective of platform.  
+    - New: event and final movie files will now include GPS coordinates with the location for an event. For movies this will be for the 1st event within the movie.
     - Changed: Improvement for Docker file size and stability. Contributed by magicalyak
     - Changed: Choice values for parameters (i.e. FULLSCREEN, intel, black) are now case-insensitive.
     - Changed: Updated supporting libraries to latest available.
