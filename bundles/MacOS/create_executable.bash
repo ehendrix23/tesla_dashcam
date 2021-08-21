@@ -19,6 +19,10 @@ if [ ! -d bundles/MacOS/tesla_dashcam ]; then
   mkdir bundles/MacOS/tesla_dashcam
 fi
 
+echo "Installing Python requirements"
+pip install -r requirements_create_executable.txt --upgrade
+
+echo "Creating tesla_dashcam executable"
  pyinstaller --clean \
 	--distpath bundles/MacOS/tesla_dashcam \
 	--workpath build/MacOS \
@@ -41,10 +45,19 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
+echo "Creating README.html"
+rst2html.py README.rst bundles/MacOS/tesla_dashcam/Tesla_Dashcam\ -\ README.html
+if [ $? -ne 0 ]; then
+  echo "Failed to create README.html."
+  exit 1
+fi
+
 # codesign -s "com.ehendrix23.tesla_dashcam" bundles/MacOS/tesla_dashcam/tesla_dashcam.app
 # if [ $? -ne 0 ]; then
 #  echo "Failed to sign the app however executable should still function."
 #  exit 1
 # fi
+
+./bundles/MacOS/tesla_dashcam/tesla_dashcam --version
 
 echo All done.
