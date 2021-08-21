@@ -2,3 +2,4 @@
 
 wheel>=0.37.0
 pyinstaller>=4.5.1
+sphinx>=4.1.2
