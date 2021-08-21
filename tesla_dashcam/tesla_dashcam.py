@@ -37,7 +37,7 @@ _LOGGER = logging.getLogger(__name__)
 #  different ones to be created based on where it should go to (stdout,
 #  log file, ...).
 
-VERSION = {"major": 0, "minor": 1, "patch": 17, "beta": 6}
+VERSION = {"major": 0, "minor": 1, "patch": 17, "beta": -1}
 VERSION_STR = f"v{VERSION['major']}.{VERSION['minor']}.{VERSION['patch']}"
 
 if VERSION["beta"] > -1:
