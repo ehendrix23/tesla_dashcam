@@ -1497,7 +1497,8 @@ Release Notes
     - Fixed: Added x265 compatibility tag for QuickTime. Contributed by dburkland
     - Fixed: Event file will now be removed when providing an output file and only 1 event is processed, leaving only 1 movie file.
     - Fixed: Providing a mount as a source resulted in it no files found. Now when a mount is provided it will be handled same as folders.
-
+0.1.18:
+    - Fixed: Traceback when running executable without providing --ffmpeg option.
 
 
 TODO
