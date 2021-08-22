@@ -37,7 +37,7 @@ _LOGGER = logging.getLogger(__name__)
 #  different ones to be created based on where it should go to (stdout,
 #  log file, ...).
 
-VERSION = {"major": 0, "minor": 1, "patch": 17, "beta": -1}
+VERSION = {"major": 0, "minor": 1, "patch": 18, "beta": -1}
 VERSION_STR = f"v{VERSION['major']}.{VERSION['minor']}.{VERSION['patch']}"
 
 if VERSION["beta"] > -1:
@@ -3653,6 +3653,7 @@ def main() -> int:
             "--ffmpeg",
             required=False,
             type=str,
+            default=argparse.SUPPRESS,
             help="Full path and filename for alternative " "ffmpeg.",
         )
     else:
@@ -3811,8 +3812,8 @@ def main() -> int:
             print(f"{get_current_timestamp()} Did not retrieve latest version info.")
 
     internal_ffmpeg = getattr(args, "ffmpeg", None) is None and internal_ffmpeg
-    ffmpeg = getattr(args, "ffmpeg", ffmpeg_default)
-    if which(ffmpeg) is None:
+    ffmpeg = getattr(args, "ffmpeg", ffmpeg_default) or ""
+    if not internal_ffmpeg and (ffmpeg == "" or which(ffmpeg) is None):
         print(
             f"{get_current_timestamp()}ffmpeg is a requirement, unable to find {ffmpeg} executable. Please ensure it exist and is located "
             f"within PATH environment or provide full path using parameter --ffmpeg."
