@@ -55,5 +55,8 @@ for preferencefile in ${PreferenceFolder}/*; do
 	echo "Using Preference File ${filename}"
 	echo "${Command} ${InputFolders} ${LogLevel} ${OutputFolder} @${preferencefile}  ${StartTimestamp} ${EndTimestamp}"
 	${Command} ${InputFolders} ${LogLevel} ${OutputFolder} @${preferencefile} ${StartTimestamp} ${EndTimestamp}
+	if [ $? -ne 0 ]; then
+		exit 1
+	fi
 done
 

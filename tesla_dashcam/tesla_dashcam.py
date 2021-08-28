@@ -17,7 +17,7 @@ from shutil import which
 from subprocess import CalledProcessError, TimeoutExpired, run
 from tempfile import mkstemp
 from time import sleep, time as timestamp, mktime
-from typing import List, Optional
+from typing import Any, List, Optional
 
 import requests
 from dateutil.parser import isoparse
@@ -37,7 +37,7 @@ _LOGGER = logging.getLogger(__name__)
 #  different ones to be created based on where it should go to (stdout,
 #  log file, ...).
 
-VERSION = {"major": 0, "minor": 1, "patch": 18, "beta": -1}
+VERSION = {"major": 0, "minor": 1, "patch": 19, "beta": -1}
 VERSION_STR = f"v{VERSION['major']}.{VERSION['minor']}.{VERSION['patch']}"
 
 if VERSION["beta"] > -1:
@@ -304,7 +304,7 @@ class Event(object):
         self._folder = folder
         self._isFile = isfile
         self._filename = filename
-        self._metadata = None
+        self._metadata: dict[str, Any] = {}
         self._start_timestamp = None
         self._end_timestamp = None
         self._duration = None
@@ -328,10 +328,10 @@ class Event(object):
 
     @property
     def metadata(self):
-        return self._metadata
+        return self._metadata or {}
 
     @metadata.setter
-    def metadata(self, value):
+    def metadata(self, value: dict):
         self._metadata = value
 
     @property
@@ -437,24 +437,13 @@ class Event(object):
             "event_timestamp": self.start_timestamp.astimezone(
                 get_localzone()
             ).strftime(timestamp_format),
-            "event_city": self.metadata.get("city", "") or ""
-            if self.metadata is not None
-            else "",
-            "event_reason": self.metadata.get("reason", "") or ""
-            if self.metadata is not None
-            else "",
-            "event_latitude": self.metadata.get("latitude", "") or ""
-            if self.metadata is not None
-            else "",
-            "event_longitude": self.metadata.get("longitude", "") or ""
-            if self.metadata is not None
-            else "",
+            "event_city": self.metadata.get("city", "") or "",
+            "event_reason": self.metadata.get("reason", "") or "",
+            "event_latitude": self.metadata.get("latitude", "") or "",
+            "event_longitude": self.metadata.get("longitude", "") or "",
         }
 
-        if (
-            self.metadata is not None
-            and self.metadata.get("event_timestamp") is not None
-        ):
+        if self.metadata.get("event_timestamp") is not None:
             replacement_strings["event_timestamp"] = (
                 self.metadata.get("event_timestamp")
                 .astimezone(get_localzone())
@@ -1547,7 +1536,7 @@ def get_movie_files(source_folder, video_settings):
 
             _LOGGER.debug(f"Found {event_info.count} clips in folder {event_folder}")
             # We have clips for this event, get the event meta data.
-            event_metadata = None
+            event_metadata = {}
             event_metadata_file = os.path.join(event_folder, "event.json")
             if os.path.isfile(event_metadata_file):
                 _LOGGER.debug(f"Folder {event_folder} has an event file.")
@@ -1995,33 +1984,28 @@ def create_intermediate_movie(
         "event_longitude": 0.0,
     }
 
-    if event_info.metadata is not None:
-        if event_info.metadata["event_timestamp"] is not None:
-            event_epoch_timestamp = int(
-                event_info.metadata["event_timestamp"].timestamp()
-            )
-            replacement_strings["event_timestamp"] = (
-                event_info.metadata["event_timestamp"]
-                .astimezone(get_localzone())
-                .strftime(user_timestamp_format)
-            )
+    if event_info.metadata.get("event_timestamp") is not None:
+        event_epoch_timestamp = int(event_info.metadata["event_timestamp"].timestamp())
+        replacement_strings["event_timestamp"] = (
+            event_info.metadata["event_timestamp"]
+            .astimezone(get_localzone())
+            .strftime(user_timestamp_format)
+        )
 
-            # Calculate the time until the event
-            replacement_strings["event_timestamp_countdown"] = (
-                starting_epoch_timestamp - event_epoch_timestamp
-            )
-            replacement_strings[
-                "event_timestamp_countdown_rolling"
-            ] = "%{{pts:hms:{event_timestamp_countdown}}}".format(
-                event_timestamp_countdown=replacement_strings[
-                    "event_timestamp_countdown"
-                ]
-            )
+        # Calculate the time until the event
+        replacement_strings["event_timestamp_countdown"] = (
+            starting_epoch_timestamp - event_epoch_timestamp
+        )
+        replacement_strings[
+            "event_timestamp_countdown_rolling"
+        ] = "%{{pts:hms:{event_timestamp_countdown}}}".format(
+            event_timestamp_countdown=replacement_strings["event_timestamp_countdown"]
+        )
 
-        replacement_strings["event_city"] = event_info.metadata["city"] or "n/a"
-        replacement_strings["event_reason"] = event_info.metadata["reason"] or "n/a"
-        replacement_strings["event_latitude"] = event_info.metadata["latitude"] or 0.0
-        replacement_strings["event_longitude"] = event_info.metadata["longitude"] or 0.0
+    replacement_strings["event_city"] = event_info.metadata.get("city") or "n/a"
+    replacement_strings["event_reason"] = event_info.metadata.get("reason") or "n/a"
+    replacement_strings["event_latitude"] = event_info.metadata.get("latitude") or 0.0
+    replacement_strings["event_longitude"] = event_info.metadata.get("longitude") or 0.0
 
     try:
         # Try to replace strings!
@@ -2053,18 +2037,14 @@ def create_intermediate_movie(
     )
 
     title_timestamp = (
-        event_info.metadata["event_timestamp"]
-        .astimezone(get_localzone())
-        .strftime(user_timestamp_format)
-        if event_info.metadata["reason"] == "SENTRY"
-        and event_info.metadata["event_timestamp"] is not None
-        else starting_timestamp.astimezone(get_localzone()).strftime(
-            user_timestamp_format
-        )
+        replacement_strings["event_timestamp"]
+        if event_info.metadata.get("reason") == "SENTRY"
+        and replacement_strings["event_timestamp"] != "n/a"
+        else replacement_strings["start_timestamp"]
     )
     title = (
-        f"{event_info.metadata.get('reason')}: {title_timestamp}"
-        if event_info.metadata.get("reason") is not None
+        f"{replacement_strings['event_reason']}: {title_timestamp}"
+        if replacement_strings["event_reason"] != "n/a"
         else title_timestamp
     )
 
@@ -2133,6 +2113,12 @@ def create_title_screen(events, video_settings):
 
     coordinates = []
     for event in events:
+        if (
+            event.metadata.get("longitude") is None
+            or event.metadata.get("latitude") is None
+        ):
+            continue
+
         try:
             lon = float(event.metadata["longitude"])
             lat = float(event.metadata["latitude"])
@@ -2393,16 +2379,13 @@ def create_movie(
             .metadata["event_timestamp"]
             .astimezone(get_localzone())
             .strftime(user_timestamp_format)
-            if event_info[0].metadata["reason"] == "SENTRY"
+            if event_info[0].metadata.get("reason") == "SENTRY"
+            and event_info[0].metadata.get("event_timestamp") is not None
             else start_timestamp.astimezone(get_localzone()).strftime(
                 user_timestamp_format
             )
         )
-        title = (
-            f"{event_info[0].metadata.get('reason')}: {title_timestamp}"
-            if event_info[0].metadata.get("reason") is not None
-            else title_timestamp
-        )
+        title = f"{event_info[0].metadata.get('reason', title_timestamp) or title_timestamp}: {title_timestamp}"
     else:
         title = (
             f"{start_timestamp.astimezone(get_localzone()).strftime(user_timestamp_format)} - "
@@ -2420,9 +2403,16 @@ def create_movie(
 
     # Go through the events and add the 1st valid coordinations for location to metadata
     for event in event_info:
+
+        if (
+            event.metadata.get("longitude") is None
+            or event.metadata.get("latitude") is None
+        ):
+            continue
+
         try:
-            lon = float(event_info[0].metadata["longitude"])
-            lat = float(event_info[0].metadata["latitude"])
+            lon = float(event.metadata["longitude"])
+            lat = float(event.metadata["latitude"])
         except:
             pass
         else:
@@ -2485,7 +2475,7 @@ def create_movie(
                 and event_info[0].metadata.get("timestamp") is not None
             ):
                 moviefile_timestamp = (
-                    event_info[0].metadata.get("timestamp").astimezone(get_localzone())
+                    event_info[0].metadata["timestamp"].astimezone(get_localzone())
                 )
 
             _LOGGER.debug(
@@ -2644,8 +2634,8 @@ def process_folders(source_folders, video_settings, delete_source):
         event_end_timestamp = last_clip_tmstp
         if video_settings["sentry_offset"]:
             if (
-                event_info.metadata["reason"] == "SENTRY"
-                and event_info.metadata["event_timestamp"] is not None
+                event_info.metadata.get("reason") == "SENTRY"
+                and event_info.metadata.get("event_timestamp") is not None
             ):
                 if video_settings["start_offset"] is not None:
                     # Recording reason is for Sentry so will use the event timestamp.
