@@ -1499,11 +1499,15 @@ Release Notes
     - Fixed: Providing a mount as a source resulted in it no files found. Now when a mount is provided it will be handled same as folders.
 0.1.18:
     - Fixed: Traceback when running executable without providing --ffmpeg option.
+0.1.19:
+    - Fixed: Tracebacks when there is no events.json file `Issue #168 <https://github.com/ehendrix23/tesla_dashcam/issues/168>`_
 
 
 TODO
 ----
 
+* Implement Jinja2 for templates
+* Implement templates for other options
 * Implement option to crop individual camera output
 * Option for end-user layout
 * Monitor path for new folders/files as trigger option
