@@ -775,6 +775,7 @@ Offsets are calculated in the following manner and order:
   Sentry Event and sentry timestamp is available for event:
 
       --sentry_<start|end>_offset provided: sentry timestamp + sentry_<start|end>_offset
+      
       --sentry_offset provided: sentry timestamp + <start|end>_offset. start_offset will default to 60, end_offset default to 30 
   
 
