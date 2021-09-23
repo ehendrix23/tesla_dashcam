@@ -2600,7 +2600,7 @@ def process_folders(source_folders, video_settings, delete_source):
         ):
             # Clips from this folder are from before start timestamp requested.
             _LOGGER.debug(
-                f"Clips in folder end at {last_clip_tmstp.astimezone(get_localzone())} which is still before "
+                f"Clips in folder end at {last_clip_tmstp} which is still before "
                 f'start timestamp {video_settings["start_timestamp"]}'
             )
             continue
@@ -2611,7 +2611,7 @@ def process_folders(source_folders, video_settings, delete_source):
         ):
             # Clips from this folder are from after end timestamp requested.
             _LOGGER.debug(
-                f"Clips in folder start at {first_clip_tmstp.astimezone(get_localzone())} which is after "
+                f"Clips in folder start at {first_clip_tmstp} which is after "
                 f'end timestamp {video_settings["end_timestamp"]}'
             )
             continue
@@ -2627,80 +2627,129 @@ def process_folders(source_folders, video_settings, delete_source):
             movies.get(key).set_event(event_info)
             continue
 
+        _LOGGER.debug(
+            f"Processing event with start timestamp {first_clip_tmstp} and end timestamp {last_clip_tmstp}"
+        )
+
         # Determine the starting and ending timestamps for the clips in this folder based on start/end timestamps
         # provided and offsets.
         # If set for Sentry then offset is only used for clips with reason Sentry and having a event timestamp.
-        event_start_timestamp = first_clip_tmstp
-        event_end_timestamp = last_clip_tmstp
-        if video_settings["sentry_offset"]:
+        start_offset: int | None = None
+        end_offset: int | None = None
+        offset_start_timestamp = first_clip_tmstp
+        offset_end_timestamp = last_clip_tmstp
+
+        # Determine offset to use.
+        if (
+            event_info.metadata.get("reason") == "SENTRY"
+            and event_info.metadata.get("event_timestamp") is not None
+        ):
+            # This is a sentry event and we have an event timestamp.
+
+            # Are either --sentry_start_offset or --sentry_end_offset provided?
             if (
-                event_info.metadata.get("reason") == "SENTRY"
-                and event_info.metadata.get("event_timestamp") is not None
+                video_settings["sentry_start_offset"] is not None
+                or video_settings["sentry_end_offset"] is not None
             ):
-                if video_settings["start_offset"] is not None:
-                    # Recording reason is for Sentry so will use the event timestamp.
-                    event_start_timestamp = event_info.metadata[
-                        "event_timestamp"
-                    ] + timedelta(seconds=video_settings["start_offset"])
-                    # make sure that we do not end up at an earlier timestamp then what the clip itself is.
-                    _LOGGER.debug(
-                        f"Clip starting timestamp changed to "
-                        f"{event_start_timestamp.astimezone(get_localzone()).strftime('%Y-%m-%dT%H-%M-%S')} "
-                        f"from {first_clip_tmstp.astimezone(get_localzone()).strftime('%Y-%m-%dT%H-%M-%S')} "
-                        f"due to Sentry event and start offset off {video_settings['start_offset']}"
-                    )
-
-                # If end offset is 0 then it means don't cut it short.
-                if video_settings["end_offset"] is not None:
-                    event_end_timestamp = event_info.metadata[
-                        "event_timestamp"
-                    ] + timedelta(seconds=video_settings["end_offset"])
-                    _LOGGER.debug(
-                        f"Clip end timestamp changed to "
-                        f"{event_end_timestamp.astimezone(get_localzone()).strftime('%Y-%m-%dT%H-%M-%S')}"
-                        f" from {last_clip_tmstp.astimezone(get_localzone()).strftime('%Y-%m-%dT%H-%M-%S')} "
-                        f"due to Sentry event and end offset off {video_settings['end_offset']}"
-                    )
-        else:
-            if video_settings["start_offset"] is not None:
-                # Not using Sentry timestamp but just offset based on clips instead.
-                event_start_timestamp = first_clip_tmstp + timedelta(
-                    seconds=abs(video_settings["start_offset"])
-                )
+                # They were, start and end offset are set to their values.
+                start_offset = video_settings["sentry_start_offset"]
+                end_offset = video_settings["sentry_end_offset"]
+                offset_start_timestamp = event_info.metadata["event_timestamp"]
+                offset_end_timestamp = event_info.metadata["event_timestamp"]
                 _LOGGER.debug(
-                    f"Clip starting timestamp changed to "
-                    f"{event_start_timestamp.astimezone(get_localzone()).strftime('%Y-%m-%dT%H-%M-%S')} from "
-                    f"{first_clip_tmstp.astimezone(get_localzone()).strftime('%Y-%m-%dT%H-%M-%S')} due to "
-                    f"start offset off {video_settings['start_offset']}"
+                    f"Offsets based on sentry event with sentry start offset {start_offset}, sentry end offset {end_offset} and sentry event timestamp {offset_start_timestamp}"
                 )
-
-            if video_settings["end_offset"] is not None:
-                # Figure out potential end timestamp for clip based on offset and end timestamp.
-                event_end_timestamp = last_clip_tmstp - timedelta(
-                    seconds=abs(video_settings["end_offset"])
-                )
+            elif video_settings["sentry_offset"]:
+                # Otherwise, was it set to use
+                # with the --sentry_offset legacy parameter?
+                start_offset = video_settings["start_offset"] or 60
+                end_offset = video_settings["end_offset"] or 30
+                offset_start_timestamp = event_info.metadata["event_timestamp"]
+                offset_end_timestamp = event_info.metadata["event_timestamp"]
                 _LOGGER.debug(
-                    f"Clip end timestamp changed to "
-                    f"{event_end_timestamp.astimezone(get_localzone()).strftime('%Y-%m-%dT%H-%M-%S')} from "
-                    f"{last_clip_tmstp.astimezone(get_localzone()).strftime('%Y-%m-%dT%H-%M-%S')} due to "
-                    f"end offset off {video_settings['end_offset']}"
+                    f"Offsets for sentry event based on standard offsets with start offset {start_offset}, end offset {end_offset} and sentry event timestamp {offset_start_timestamp}"
                 )
 
-        if event_start_timestamp < first_clip_tmstp:
-            event_start_timestamp = first_clip_tmstp
+        # Do we not yet have a start_offset but --start_offset was provided?
+        if start_offset is None and video_settings["start_offset"] is not None:
+            # We do, then it means we're going to use that.
+            start_offset = video_settings["start_offset"] or 0
+            # Set offset timestamp to start if offset is positive otherwise to end.
+            offset_start_timestamp = (
+                first_clip_tmstp if start_offset >= 0 else last_clip_tmstp
+            )
             _LOGGER.debug(
-                f"Clip start timestamp changed back to "
-                f"{first_clip_tmstp.astimezone(get_localzone()).strftime('%Y-%m-%dT%H-%M-%S')} as "
-                f"updated offset timestamp was before clip start timestamp"
+                f"Starting offset {start_offset} and timestamp {offset_start_timestamp}"
             )
 
-        # make sure that we do not end up at a later timestamp then what the clip itself is.
-        if event_end_timestamp > last_clip_tmstp:
+        # Do we not yet have a start_offset but --start_offset was provided?
+        if end_offset is None and video_settings["end_offset"] is not None:
+            # We do, then it means we're going to use that.
+            end_offset = video_settings["end_offset"] or 0
+            # Set offset timestamp to start if offset is positive otherwise to end.
+            offset_end_timestamp = (
+                first_clip_tmstp if end_offset >= 0 else last_clip_tmstp
+            )
+            _LOGGER.debug(
+                f"Ending offset {end_offset} and timestamp {offset_end_timestamp}"
+            )
+
+        event_start_timestamp = (
+            offset_start_timestamp + timedelta(seconds=start_offset)
+            if start_offset is not None
+            else first_clip_tmstp
+        )
+        event_end_timestamp = (
+            offset_end_timestamp + timedelta(seconds=end_offset)
+            if end_offset is not None
+            else last_clip_tmstp
+        )
+
+        if event_start_timestamp != first_clip_tmstp:
+            _LOGGER.debug(
+                f"Clip starting timestamp changed to {event_start_timestamp} "
+                f"from {first_clip_tmstp} due to start offset {start_offset} and offset timestamp {offset_start_timestamp}"
+            )
+
+        if event_end_timestamp != last_clip_tmstp:
+            _LOGGER.debug(
+                f"Clip ending timestamp changed to {event_end_timestamp} "
+                f"from {last_clip_tmstp} due to end offset {end_offset} and offset timestamp {offset_end_timestamp}"
+            )
+
+        # Make sure that our event start timestamp is not after our end timestamp
+        if event_start_timestamp > event_end_timestamp:
+            # Start timestamp is greater then end timestamp, we'll switch them
+            _LOGGER.debug(
+                f"Clip start timestamp {event_start_timestamp} "
+                f" was after clip end timestamp {event_end_timestamp} "
+                ", swapping them."
+            )
+            event_start_timestamp, event_end_timestamp = (
+                event_end_timestamp,
+                event_start_timestamp,
+            )
+
+        # Make sure that our event start timestamp is equal to or after
+        # our clip start timestamp and before our event end timestamp.
+        if not (first_clip_tmstp <= event_start_timestamp <= last_clip_tmstp):
+            # Event start timestamp is either before clip start timestamp or after clip end timestamp
+            # Setting it back to clip start timestamp
+            event_start_timestamp = first_clip_tmstp
+            _LOGGER.debug(
+                f"Clip start timestamp changed back to {first_clip_tmstp} as "
+                f"updated offset timestamp was before clip start timestamp or after clip end timestamp"
+            )
+
+        # Make sure that our event end timestamp is equal to or after
+        # our clip start timestamp and before our event end timestamp.
+        if not (first_clip_tmstp <= event_end_timestamp <= last_clip_tmstp):
+            # Event end timestamp is either before clip start timestamp or after clip end timestamp
+            # Setting it back to clip end timestamp
             event_end_timestamp = last_clip_tmstp
             _LOGGER.debug(
-                f"Clip end timestamp changed back to "
-                f"{last_clip_tmstp.astimezone(get_localzone()).strftime('%Y-%m-%dT%H-%M-%S')} as "
-                f"updated offset timestamp was after clip end timestamp"
+                f"Clip end timestamp changed back to {last_clip_tmstp} as "
+                f"updated offset timestamp was before clip start timestamp or after clip end timestamp"
             )
 
         # Put them together to create the filename for the folder.
@@ -3416,23 +3465,36 @@ def main() -> int:
         "--start_offset",
         dest="start_offset",
         type=int,
-        help="Skip x number of seconds from start of event for resulting video. Default is 0 seconds, 60 seconds if "
-        "--sentry_offset is provided.",
+        help="Set starting time for resulting video. Default is 0 seconds, 60 seconds if --sentry_offset is provided.",
     )
     offset_group.add_argument(
         "--end_offset",
         dest="end_offset",
         type=int,
-        help="Ignore the last x seconds of the event for resulting video. Default is 0 seconds, 30 seconds if "
-        "--sentry_offset is provided.",
+        help="Set ending time for resulting video. Default is 0 seconds, 30 seconds if --sentry_offset is provided.",
     )
 
     offset_group.add_argument(
         "--sentry_offset",
         dest="sentry_offset",
         action="store_true",
-        help="start_offset and end_offset will be based on when timestamp of object detection occurred for Sentry"
-        "events instead of start/end of event.",
+        help="R|start_offset and end_offset will be based on when timestamp of object detection occurred for Sentry"
+        "events instead of start/end of event.\n"
+        "Ignored if either --sentry_start_offset or --senty_end_offset are provided.\n"
+        "Note, legacy option that will be removed in future.",
+    )
+
+    offset_group.add_argument(
+        "--sentry_start_offset",
+        dest="sentry_start_offset",
+        type=int,
+        help="Set starting time for resulting video. Default is 0 seconds, 60 seconds if --sentry_offset is provided.",
+    )
+    offset_group.add_argument(
+        "--sentry_end_offset",
+        dest="sentry_end_offset",
+        type=int,
+        help="Set ending time for resulting video. Default is 0 seconds, 30 seconds if --sentry_offset is provided.",
     )
 
     output_group = parser.add_argument_group(
@@ -4248,13 +4310,11 @@ def main() -> int:
         "right_camera": ffmpeg_right_camera,
         "rear_camera": ffmpeg_rear_camera,
         "start_timestamp": start_timestamp,
-        "start_offset": 60
-        if args.start_offset is None and args.sentry_offset
-        else args.start_offset,
         "end_timestamp": end_timestamp,
-        "end_offset": 30
-        if args.end_offset is None and args.sentry_offset
-        else args.end_offset,
+        "start_offset": getattr(args, "start_offset", None),
+        "end_offset": getattr(args, "end_offset", None),
+        "sentry_start_offset": getattr(args, "sentry_start_offset", None),
+        "sentry_end_offset": getattr(args, "sentry_end_offset", None),
         "sentry_offset": args.sentry_offset,
         "skip_existing": args.skip_existing,
     }

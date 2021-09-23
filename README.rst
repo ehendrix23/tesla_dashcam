@@ -122,7 +122,7 @@ Usage
                             [--swap_frontrear] [--background BACKGROUND] [--title_screen_map] [--no-front] [--no-left] [--no-right] [--no-rear] [--no-timestamp]
                             [--halign {LEFT,CENTER,RIGHT}] [--valign {TOP,MIDDLE,BOTTOM}] [--font FONT] [--fontsize FONTSIZE] [--fontcolor FONTCOLOR]
                             [--text_overlay_fmt TEXT_OVERLAY_FMT] [--timestamp_format TIMESTAMP_FORMAT] [--start_timestamp START_TIMESTAMP] [--end_timestamp END_TIMESTAMP]
-                            [--start_offset START_OFFSET] [--end_offset END_OFFSET] [--sentry_offset] [--output OUTPUT] [--motion_only] [--slowdown SLOW_DOWN] [--speedup SPEED_UP]
+                            [--start_offset START_OFFSET] [--end_offset END_OFFSET] [--sentry_offset] [--sentry_start_offset START_OFFSET] [--sentry_end_offset END_OFFSET] [--output OUTPUT] [--motion_only] [--slowdown SLOW_DOWN] [--speedup SPEED_UP]
                             [--chapter_offset CHAPTER_OFFSET] [--merge [MERGE_GROUP_TEMPLATE]] [--merge_timestamp_format MERGE_TIMESTAMP_FORMAT] [--keep-intermediate] [--keep-events]
                             [--set_moviefile_timestamp {START,STOP,SENTRY,RENDER}] [--no-gpu] [--gpu] [--gpu_type {nvidia,intel,rpi}] [--no-faststart]
                             [--quality {LOWEST,LOWER,LOW,MEDIUM,HIGH}] [--compression {ultrafast,superfast,veryfast,faster,fast,medium,slow,slower,veryslow}] [--fps FPS]
@@ -255,10 +255,15 @@ Usage
       Start and/or end offsets for events
 
       --start_offset START_OFFSET
-                            Skip x number of seconds from start of event for resulting video. Default is 0 seconds, 60 seconds if --sentry_offset is provided. (default: None)
+                            Set starting time for resulting video. Default is 0 seconds, 60 seconds if --sentry_offset is provided. (default: None)
       --end_offset END_OFFSET
-                            Ignore the last x seconds of the event for resulting video. Default is 0 seconds, 30 seconds if --sentry_offset is provided. (default: None)
+                            Set ending time for resulting video. Default is 0 seconds, 30 seconds if --sentry_offset is provided. (default: None)
       --sentry_offset       start_offset and end_offset will be based on when timestamp of object detection occurred for Sentryevents instead of start/end of event. (default: False)
+                            Legacy setting, will be removed in future.
+      --sentry_start_offset START_OFFSET
+                            Set starting time for resulting video of Sentry events only based on object detected for Sentryevents. (default: None)
+      --sentry_end_offset END_OFFSET
+                            Set ending time for resulting video of Sentry events only based on object detected for Sentryevents. (default: None)
 
     Video Output:
       Options related to resulting video creation.
@@ -761,10 +766,40 @@ methodology is applied for ending offset and end timestamp.
 
 When enabling --sentry_offset then the offsets only operate on events that were recorded due to a Sentry event.
 The offsets are then based on the event timestamp (timestamp that triggered Sentry to save the event) and not the start/end timestamp of the event.
-For this it is possible to provide positive or negative values. When providing a negative value for start_offset then the clip
-will start before the event timestamp. When providing a positive value then it will be after the event start.
-Similar, when providing a negative value for end_offset the ending of the clip will be before the event, and with
-a positive value it will be after the event.
+
+Offsets can be a positive or negative value. For sentry offsets the offset is added to the sentry event timestamp. 
+For non-sentry if the offset is positive then it will be based on the start timestamp and if negative then on the end timestamp.
+
+Offsets are calculated in the following manner and order:
+
+  Sentry Event and sentry timestamp is available for event:
+
+      --sentry_<start|end>_offset provided: sentry timestamp + sentry_<start|end>_offset
+      --sentry_offset provided: sentry timestamp + <start|end>_offset. start_offset will default to 60, end_offset default to 30 
+  
+
+  Non-Sentry Events, sentry timestamp is not available for event, or <start|end> offset not set yet for Sentry:
+
+        <start|end>_offset > 0:
+          event start timestamp + <start|end>
+        <start|end>_offset < 0:
+          event end timestamp + <start|end>    
+
+  If resulting starting timestamp is after end timestamp then both will be swapped.
+
+  If start timestamp is before the event start timestamp then it will be set to event start timestamp      
+  
+  If end timestamp is after the event end timestamp then it will be set to event end timestamp      
+
+For example:
+  --sentry_start_offset=0 --sentry_end_offset=30 --start_offset=-30
+      For sentry events will start the clip at the sentry timestamp and end it 30 seconds after the sentry timestamp. For all others it will start the clip 30 seconds before end time
+  --sentry_start_offset=-10 --end_offset=-20 --start_offset=-60
+      For sentry events will start the clip 10 seconds before the sentry timestamp and end it 20 seconds before end time. For all others it will start the clip 60 seconds before end time and end 20 seconds before end time           
+  --sentry_start_offset=-10 --sentry_end_offset=0 --end_offset=-20 --start_offset=-60
+      For sentry events will start the clip 10 seconds before the sentry timestamp and go to the end. For all others it will start the clip 60 seconds before end time and end 20 seconds before end time                      
+  --start_offset=60 --end_offset=-20 --sentry_offset
+      For sentry events will start the clip 20 seconds before the sentry timestamp and end 60 seconds after the sentry timestamp (start and end timestamps are being swapped here). For all others it will start the clip 60 seconds after start time and end 20 seconds before end time                        
 
 *--start_offset <offset>*
 
@@ -778,7 +813,16 @@ a positive value it will be after the event.
 
   Default: False
 
-  Start and end offsets will be based on the timestamp that triggered the Sentry event instead of the start and end timestamps of the event.
+*--sentry_start_offset <offset>*
+
+  Starting offset within the event for sentry events. <offset> is in seconds.
+
+*--sentry_end_offset <offset>*
+
+  Ending offset within the event for sentry events. <offset> is in seconds.
+
+  
+  
   
 Video Output
 ------------
@@ -1501,6 +1545,10 @@ Release Notes
     - Fixed: Traceback when running executable without providing --ffmpeg option.
 0.1.19:
     - Fixed: Tracebacks when there is no events.json file `Issue #168 <https://github.com/ehendrix23/tesla_dashcam/issues/168>`_
+0.1.20:
+    - New: Option --sentry_start_offset to set the starting offset specifically for sentry based events
+    - New: Option --sentry_end_offset to set the starting offset specifically for sentry based events
+    - Changed (BREAKING): How offsets are calculated has been changed and can impact result if negative values were being provided for start_offset and/or end_offset!
 
 
 TODO
