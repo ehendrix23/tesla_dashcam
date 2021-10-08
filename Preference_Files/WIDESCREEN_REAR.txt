@@ -1,0 +1,26 @@
+# Execute using:
+# tesla_dashcam <Location of video files> --output <Location to store encoded video files> @WIDESCREEN_REAR.txt
+
+# Skip if encoded file already exist.
+--skip_existing
+
+# Delete processed files when video file is encoded.
+# --delete_source
+
+# WIDESCREEN Layout
+--layout WIDESCREEN
+
+# Show left & right cameras as looking backwards instead of through a mirror
+--rear
+
+# Put clip info bottom center
+--halign CENTER --valign BOTTOM
+
+# Output only rolling timestamp
+--text_overlay_fmt "Date/Time: {local_timestamp_rolling}"
+
+# Fast forward through portions where there is no motion detected
+--motion_only
+
+# Encode with x265
+--encoding x265

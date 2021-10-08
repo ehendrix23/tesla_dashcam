@@ -9,6 +9,8 @@ __pycache__/
 # Distribution / packaging
 .Python
 build/
+.build/
+_build/
 develop-eggs/
 dist/
 downloads/
@@ -24,7 +26,6 @@ wheels/
 .installed.cfg
 *.egg
 MANIFEST
-bundles/
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -87,7 +88,7 @@ celerybeat-schedule
 .venv
 env/
 venv/
-venv3.7/
+venv*/
 .idea/
 ENV/
 env.bak/
@@ -103,8 +104,7 @@ venv.bak/
 # mkdocs documentation
 /site
 
-# mypy
-.mypy_cache/
+# tesla_dashcam
 .DS_Store
 tesla_dashcam/ffmpeg
 tesla_dashcam/ffmpeg.exe
@@ -114,3 +114,13 @@ tesla_dashcam/ffmpeg.exe
 *.bak
 *.scratch
 /.vscode
+ffmpeg
+ffmpeg_x64
+ffmpeg_arm
+ffmpeg.exe
+tesla_dashcam.exe
+bundles/MacOS/tesla_dashcam/tesla_dashcam
+tesla_dashcam*.dmg
+*.zip
+bundles/MacOS/tesla_dashcam/Tesla_Dashcam - README.html
+bundles/Windows/tesla_dashcam/Tesla_Dashcam - README.html

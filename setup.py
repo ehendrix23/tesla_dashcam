@@ -19,7 +19,7 @@ DESCRIPTION = "Python program to merge video files created by Tesla " "dashcam"
 URL = "https://github.com/ehendrix23/tesla_dashcam"
 EMAIL = "hendrix_erik@hotmail.com"
 AUTHOR = "Erik Hendrix"
-REQUIRES_PYTHON = ">=3.7.0"
+REQUIRES_PYTHON = ">=3.8.6"
 VERSION = None
 
 # What packages are required for this module to be executed?
@@ -28,6 +28,7 @@ REQUIRED = [  # type: ignore
     "requests",
     "psutil",
     "python-dateutil",
+    "staticmap",
 ]
 
 # The rest you shouldn't have to touch too much :)
