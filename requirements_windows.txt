@@ -1,0 +1,2 @@
+-r requirements.txt
+win10toast==0.9

@@ -1,0 +1,45 @@
+# Execute using:
+# tesla_dashcam <Location of video files> --output <Location to store encoded video files> @CROSS.txt
+
+# Skip if encoded file already exist.
+# --skip_existing
+
+# Delete processed files when video file is encoded.
+# --delete_source
+
+# CROSS Layout
+--layout CROSS
+
+# Put clip info bottom left
+--halign LEFT --valign BOTTOM
+
+# Output event reason, event date/time, event city, # seconds till event, and date/time
+--text_overlay_fmt "Reason: {event_reason}\nEvent: {event_timestamp}\nCity: {event_city}\nCountdown: {event_timestamp_countdown_rolling}\nDate/Time: {local_timestamp_rolling}"
+
+
+# Set timestamp format to: Weekday abbreviated, day (without leading zero) Month abbreviated Year at Hour:Minute:SecondAM(or PM)
+--timestamp_format "%a, %d %b %Y at %I:%M:%S%p"
+
+# Fast forward through portions where there is no motion detected
+--motion_only
+
+# Encode with x265
+--encoding x265
+
+# Set start offset to 60 seconds before the event
+--start_offset -60
+
+# Make it so that offset is only for Sentry and based on when the sentry event occurred.
+--sentry_offset
+
+# Set the movie timestamp to SENTRY event
+--set_moviefile_timestamp SENTRY
+
+# Merge files together
+--merge "{layout} {start_timestamp} - {event_reason} - {event_city}"
+
+# --merge_timestamp_format "%Y-%m-%d"
+--merge_timestamp_format "%Y-%m"
+
+# Create map
+--title_screen_map
