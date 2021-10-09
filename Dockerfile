@@ -1,4 +1,4 @@
-FROM linuxserver/ffmpeg as build-stage
+FROM jrottenberg/ffmpeg:4.3-alpine38 as build-stage
 FROM python:3-alpine
 
 COPY --from=build-stage /usr/local/bin /usr/local/bin
