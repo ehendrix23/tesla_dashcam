@@ -12,6 +12,8 @@ RUN apt-get update -y \
     && apt-get install -y \
         fonts-freefont-ttf \
         libnotify-bin \
+        libva2 \
+        libva-drm2 \
     && apt-get remove --purge --auto-remove -y && rm -rf /var/lib/apt/lists/*
 
 ENV LIBRARY_PATH=/lib:/usr/lib
