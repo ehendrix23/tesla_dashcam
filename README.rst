@@ -1540,7 +1540,7 @@ Release Notes
     - New: --gpu and --no-gpu are now valid arguments irrespective of platform.  
     - New: event and final movie files will now include GPS coordinates with the location for an event. For movies this will be for the 1st event within the movie.
     - Changed: Improvement for Docker file size and stability. Contributed by magicalyak
-    - Changed: Choice values for parameters (i.e. FULLSCREEN, intel, black) are now case-insensitive.
+    - Changed: Choice values forrparameters (i.e. FULLSCREEN, intel, black) are now case-insensitive.
     - Changed: Updated supporting libraries to latest available.
     - Fixed: When providing an invalid start or end timestamp will now result in a error instead of a traceback.
     - Fixed: Added x265 compatibility tag for QuickTime. Contributed by dburkland
