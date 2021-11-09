@@ -8,7 +8,7 @@ COPY --from=build-stage /usr/local/lib /usr/local/lib
 
 ENV LIBRARY_PATH=/lib:/usr/lib:/usr/local/lib
 
-WORKDIR /usr/src/app/tesla_dashcam
+ARG DEBIAN_FRONTEND=noninteractive
 
 RUN apk add --no-cache --update \
     gcc \
@@ -24,12 +24,7 @@ RUN apk add --no-cache --update \
  && mkdir /usr/share/fonts/truetype \
  && ln -s /usr/share/fonts/TTF /usr/share/fonts/truetype/freefont
 
-COPY . /usr/src/app/tesla_dashcam
-RUN pip install -r requirements.txt
-
-# Enable Logs to show on run
-ENV PYTHONUNBUFFERED=true 
-# Provide a default timezone
+ENV PYTHONUNBUFFERED=true
 ENV TZ=America/New_York
 
 ENTRYPOINT [ "python3", "tesla_dashcam/tesla_dashcam.py" ]

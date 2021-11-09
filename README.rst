@@ -124,7 +124,7 @@ Usage
                             [--text_overlay_fmt TEXT_OVERLAY_FMT] [--timestamp_format TIMESTAMP_FORMAT] [--start_timestamp START_TIMESTAMP] [--end_timestamp END_TIMESTAMP]
                             [--start_offset START_OFFSET] [--end_offset END_OFFSET] [--sentry_offset] [--sentry_start_offset START_OFFSET] [--sentry_end_offset END_OFFSET] [--output OUTPUT] [--motion_only] [--slowdown SLOW_DOWN] [--speedup SPEED_UP]
                             [--chapter_offset CHAPTER_OFFSET] [--merge [MERGE_GROUP_TEMPLATE]] [--merge_timestamp_format MERGE_TIMESTAMP_FORMAT] [--keep-intermediate] [--keep-events]
-                            [--set_moviefile_timestamp {START,STOP,SENTRY,RENDER}] [--no-gpu] [--gpu] [--gpu_type {nvidia,intel,rpi}] [--no-faststart]
+                            [--set_moviefile_timestamp {START,STOP,SENTRY,RENDER}] [--no-gpu] [--gpu] [--gpu_type {nvidia,intel,qsv,rpi,vaapi}] [--no-faststart]
                             [--quality {LOWEST,LOWER,LOW,MEDIUM,HIGH}] [--compression {ultrafast,superfast,veryfast,faster,fast,medium,slow,slower,veryslow}] [--fps FPS]
                             [--ffmpeg FFMPEG] [--encoding {x264,x265}] [--enc ENC] [--check_for_update] [--no-check_for_update] [--include_test]
                             [source [source ...]]
@@ -304,7 +304,7 @@ Usage
       --gpu                 Use GPU acceleration. Default on Intel Macs.
                             Note: ffmpeg currently seems to have issues on Apple Silicon with GPU acceleration, --no-gpu might need to be set to produce video.
                             --gpu_type has to be provided as well on Non-Macs when enabling this parameter (default: False)
-      --gpu_type {nvidia,intel,rpi}
+      --gpu_type {nvidia,intel,qsv,rpi,vaapi}
                             Type of graphics card (GPU) in the system. This determines the encoder that will be used.This parameter is mandatory if --gpu is provided on Non-Macs. (default: None)
       --no-faststart        Do not enable flag faststart on the resulting video files. Use this when using a network share and errors occur during encoding. (default: False)
       --quality {LOWEST,LOWER,LOW,MEDIUM,HIGH}
@@ -609,7 +609,7 @@ Following parameters are to change settings for the text that is being added to 
 
   Default: {local_timestamp_rolling}
 
-  Sets the format string for the text overlayed in the video. Use \n to specify a newline.
+  Sets the format string for the text overlayed in the video. Use \\n to specify a newline.
   Valid format specifiers:
   
   `{local_timestamp_rolling}`: Local time which continuously updates, string
@@ -945,13 +945,17 @@ The following parameters are more advanced settings to determine how ffmpeg shou
 
 *--gpu_type*
 
-  All platforms except Macs. Provide the GPU type installed in the system.
+  All platforms except Macs. Provide the GPU type installed in the system. Available options depend on platform!
 
-    intel: if INTEL GPU is installed
+    intel: if INTEL GPU is installed, uses qsv GPU acceleration (Windows/Linux)
 
-    nvidia: if NVIDIA GPU is installed
+    nvidia: if NVIDIA GPU is installed (Windows/Linux)
 
-    rpi: on Raspberry Pi systems
+    qsv: If INTEL GPU is installed but will specify the hardware device to use (/dev/dri/renderD128) to avoid default device initialization failure when multiple devices are usable (Linux)
+
+    rpi: on Raspberry Pi systems (Linux)
+
+    vaapi: if newer INTEL GPU is installed and ffmpeg binary provided has Intel VAAPI support. (Windows/Linux)
 
 *--no-faststart*
 
@@ -1256,7 +1260,7 @@ Layout so front is shown top middle with side cameras below it and font size of 
 
     python3 tesla_dashcam.py --layout FULLSCREEN --fontsize 24 /home/me/Tesla/2019-02-27_14-02-03
 
-Specify location of ffmpeg binay (in case ffmpeg is not in path):
+Specify location of ffmpeg binary (in case ffmpeg is not in path):
 
 * Windows:
 
@@ -1549,7 +1553,9 @@ Release Notes
 0.1.20:
     - New: Option --sentry_start_offset to set the starting offset specifically for sentry based events
     - New: Option --sentry_end_offset to set the starting offset specifically for sentry based events
+    - New: Added support for Intel VAAPI GPU acceleration (https://trac.ffmpeg.org/wiki/Hardware/VAAPI). Contributed by timrettop.
     - Changed (BREAKING): How offsets are calculated has been changed and can impact result if negative values were being provided for start_offset and/or end_offset!
+    - Fixed: Resolved issue on Linux with default device initialization failure when using Intel GPU acceleration and multiple usable devices by adding new qsv gpu_type (https://trac.ffmpeg.org/ticket/7649). Contributed by timrettop.
 
 
 TODO
