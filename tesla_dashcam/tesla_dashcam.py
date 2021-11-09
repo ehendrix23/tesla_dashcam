@@ -84,6 +84,8 @@ MOVIE_ENCODING = {
     "x264_nvidia": "h264_nvenc",
     "x264_mac": "h264_videotoolbox",
     "x264_intel": "h264_qsv",
+    "x264_qsv": "h264_qsv",
+    "x264_vaapi": "h264_vaapi",
     "x264_rpi": "h264_omx",
     "x265": "libx265",
     "x265_nvidia": "hevc_nvenc",
@@ -2034,6 +2036,7 @@ def create_intermediate_movie(
         + ffmpeg_text
         + video_settings["ffmpeg_speed"]
         + video_settings["ffmpeg_motiononly"]
+        + video_settings["ffmpeg_hwupload"]
     )
 
     title_timestamp = (
@@ -2060,6 +2063,8 @@ def create_intermediate_movie(
     ffmpeg_command = (
         [video_settings["ffmpeg_exec"]]
         + ["-loglevel", "info"]
+        + video_settings["ffmpeg_hwdev"]
+        + video_settings["ffmpeg_hwout"]
         + ffmpeg_left_command
         + ffmpeg_front_command
         + ffmpeg_right_command
@@ -2212,6 +2217,8 @@ def create_movie(
             ffmpeg_command = (
                 [video_settings["ffmpeg_exec"]]
                 + ["-loglevel", "info"]
+                + video_settings["ffmpeg_hwdev"]
+                + video_settings["ffmpeg_hwout"]
                 + ffmpeg_params
                 + video_settings["other_params"]
             )
@@ -3647,7 +3654,9 @@ def main() -> int:
 
         advancedencoding_group.add_argument(
             "--gpu_type",
-            choices=["nvidia", "intel", "rpi"],
+            choices=["nvidia", "intel", "qsv", "rpi", "vaapi"]
+            if PLATFORM == "linux"
+            else ["nvidia", "intel", "vaapi"],
             type=str.lower,
             help="Type of graphics card (GPU) in the system. This determines the encoder that will be used."
             "This parameter is mandatory if --gpu is provided.",
@@ -4151,6 +4160,9 @@ def main() -> int:
     )
 
     video_encoding = []
+    ffmpeg_hwdev = []
+    ffmpeg_hwout = []
+    ffmpeg_hwupload = ""
     if not "enc" in args:
         encoding = args.encoding if "encoding" in args else "x264"
 
@@ -4160,8 +4172,8 @@ def main() -> int:
 
         # GPU acceleration enabled
         if use_gpu:
-            print(f"{get_current_timestamp()}GPU acceleration is enabled")
             if PLATFORM == "darwin":
+                print(f"{get_current_timestamp()}GPU acceleration is enabled")
                 video_encoding = video_encoding + ["-allow_sw", "1"]
                 encoding = encoding + "_mac"
 
@@ -4173,7 +4185,43 @@ def main() -> int:
                     )
                     return 0
 
-                encoding = encoding + "_" + args.gpu_type
+                # Confirm that GPU acceleration with this encoding is supported.
+                if MOVIE_ENCODING.get(encoding + "_" + args.gpu_type) is None:
+                    # It is not, defaulting then to no GPU
+                    print(
+                        f"{get_current_timestamp()}GPU acceleration not available for encoding {encoding} and GPU type {args.gpu_type}. GPU acceleration disabled."
+                    )
+                else:
+                    print(f"{get_current_timestamp()}GPU acceleration is enabled.")
+                    encoding = encoding + "_" + args.gpu_type
+
+                    # If using vaapi hw acceleration this takes the decoding and filter processing done in software
+                    # and passes it up to the GPU for hw accelerated encoding.
+                    if args.gpu_type == "vaapi":
+                        ffmpeg_hwupload = filter_string.format(
+                            input_clip=input_clip,
+                            filter=f"format=nv12,hwupload",
+                            filter_counter=filter_counter,
+                        )
+                        input_clip = f"tmp{filter_counter}"
+                        filter_counter += 1
+
+                        if PLATFORM == "linux":
+                            ffmpeg_hwdev = ffmpeg_hwdev + [
+                                "-vaapi_device",
+                                "/dev/dri/renderD128",
+                            ]
+                            ffmpeg_hwout = ffmpeg_hwout + [
+                                "-hwaccel_output_format",
+                                "vaapi",
+                            ]
+                    elif args.gpu_type == "qvc":
+                        if PLATFORM == "linux":
+                            ffmpeg_hwdev = ffmpeg_hwdev + [
+                                "-qsv_device",
+                                "/dev/dri/renderD128",
+                            ]
+                            ffmpeg_hwout = ffmpeg_hwout + ["-hwaccel", "qsv"]
 
             bit_rate = str(int(10000 * layout_settings.scale)) + "K"
             video_encoding = video_encoding + ["-b:v", bit_rate]
@@ -4294,6 +4342,8 @@ def main() -> int:
         "movie_quality": args.quality,
         "background": ffmpeg_black_video,
         "ffmpeg_exec": ffmpeg,
+        "ffmpeg_hwdev": ffmpeg_hwdev,
+        "ffmpeg_hwout": ffmpeg_hwout,
         "base": ffmpeg_base,
         "video_layout": layout_settings,
         "clip_positions": ffmpeg_video_position,
@@ -4302,6 +4352,7 @@ def main() -> int:
         "timestamp_format": timestamp_format,
         "ffmpeg_speed": ffmpeg_speed,
         "ffmpeg_motiononly": ffmpeg_motiononly,
+        "ffmpeg_hwupload": ffmpeg_hwupload,
         "movflags_faststart": not args.faststart,
         "input_clip": input_clip,
         "other_params": ffmpeg_params,
