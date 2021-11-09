@@ -1552,7 +1552,7 @@ Release Notes
     - Fixed: Tracebacks when there is no events.json file `Issue #168 <https://github.com/ehendrix23/tesla_dashcam/issues/168>`_
 0.1.20:
     - New: Option --sentry_start_offset to set the starting offset specifically for sentry based events
-    - New: Option --sentry_end_offset to set the starting offset specifically for sentry based events
+    - New: Option --sentry_end_offset to set the ending offset specifically for sentry based events
     - New: Added support for Intel VAAPI GPU acceleration (https://trac.ffmpeg.org/wiki/Hardware/VAAPI). Contributed by timrettop.
     - New: Two new docketfiles have been added. One to support NVIDIA and other one to support VAAPI. Contributed by magicalyak
     - Changed (BREAKING): How offsets are calculated has been changed and can impact result if negative values were being provided for start_offset and/or end_offset!
