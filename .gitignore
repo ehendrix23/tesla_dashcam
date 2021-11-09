@@ -106,6 +106,8 @@ venv.bak/
 
 # tesla_dashcam
 .DS_Store
+tesla_dashcam/ffmpeg
+tesla_dashcam/ffmpeg.exe
 ffmpeg
 ffmpeg_x64
 ffmpeg_arm
@@ -116,3 +118,10 @@ tesla_dashcam*.dmg
 *.zip
 bundles/MacOS/tesla_dashcam/Tesla_Dashcam - README.html
 bundles/Windows/tesla_dashcam/Tesla_Dashcam - README.html
+
+# extra
+*.old
+*.bak
+*.scratch
+.vscode/
+examples/
