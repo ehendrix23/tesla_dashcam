@@ -609,7 +609,7 @@ Following parameters are to change settings for the text that is being added to 
 
   Default: {local_timestamp_rolling}
 
-  Sets the format string for the text overlayed in the video. Use \n to specify a newline.
+  Sets the format string for the text overlayed in the video. Use \\n to specify a newline.
   Valid format specifiers:
   
   `{local_timestamp_rolling}`: Local time which continuously updates, string
