@@ -4215,7 +4215,7 @@ def main() -> int:
                                 "-hwaccel_output_format",
                                 "vaapi",
                             ]
-                    elif args.gpu_type == "qvc":
+                    elif args.gpu_type == "qsv":
                         if PLATFORM == "linux":
                             ffmpeg_hwdev = ffmpeg_hwdev + [
                                 "-qsv_device",
