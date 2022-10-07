@@ -1558,6 +1558,10 @@ Release Notes
     - Changed (BREAKING): How offsets are calculated has been changed and can impact result if negative values were being provided for start_offset and/or end_offset!
     - Changed: Updated Docketfile. Contributed by magicalyak
     - Fixed: Resolved issue on Linux with default device initialization failure when using Intel GPU acceleration and multiple usable devices by adding new qsv gpu_type (https://trac.ffmpeg.org/ticket/7649). Contributed by timrettop.
+0.1.21:
+    - Fixed: Issue with GPU type check of qsv for Linux. Contributed by cjwang18
+    - Fixed: ffmpeg error when swapping front/rear and excluding front or rear
+    - Fixed: ffmpeg error when swapping left/right and excluding left or right
 
 
 TODO
