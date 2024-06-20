@@ -1540,7 +1540,7 @@ Release Notes
     - New: --gpu and --no-gpu are now valid arguments irrespective of platform.  
     - New: event and final movie files will now include GPS coordinates with the location for an event. For movies this will be for the 1st event within the movie.
     - Changed: Improvement for Docker file size and stability. Contributed by magicalyak
-    - Changed: Choice values for parameters (i.e. FULLSCREEN, intel, black) are now case-insensitive.
+    - Changed: Choice values forrparameters (i.e. FULLSCREEN, intel, black) are now case-insensitive.
     - Changed: Updated supporting libraries to latest available.
     - Fixed: When providing an invalid start or end timestamp will now result in a error instead of a traceback.
     - Fixed: Added x265 compatibility tag for QuickTime. Contributed by dburkland
@@ -1552,10 +1552,18 @@ Release Notes
     - Fixed: Tracebacks when there is no events.json file `Issue #168 <https://github.com/ehendrix23/tesla_dashcam/issues/168>`_
 0.1.20:
     - New: Option --sentry_start_offset to set the starting offset specifically for sentry based events
-    - New: Option --sentry_end_offset to set the starting offset specifically for sentry based events
+    - New: Option --sentry_end_offset to set the ending offset specifically for sentry based events
     - New: Added support for Intel VAAPI GPU acceleration (https://trac.ffmpeg.org/wiki/Hardware/VAAPI). Contributed by timrettop.
+    - New: Two new dockerfiles have been added. One to support NVIDIA and other one to support VAAPI. Contributed by magicalyak
     - Changed (BREAKING): How offsets are calculated has been changed and can impact result if negative values were being provided for start_offset and/or end_offset!
+    - Changed: Updated Docketfile. Contributed by magicalyak
     - Fixed: Resolved issue on Linux with default device initialization failure when using Intel GPU acceleration and multiple usable devices by adding new qsv gpu_type (https://trac.ffmpeg.org/ticket/7649). Contributed by timrettop.
+0.1.21:
+    - New: Option --camera_position to provide coordinates where the camera clip should be positioned in the video providing very granular custom layout options. Using this option results in ignoring the layout option.
+    - New: Option --camera_order to define the order the cameras should be processed. This allows to overlay one camera over another one and define which one should be on top.
+    - Fixed: Issue with GPU type check of qsv for Linux. Contributed by cjwang18
+    - Fixed: ffmpeg error when swapping front/rear and excluding front or rear
+    - Fixed: ffmpeg error when swapping left/right and excluding left or right
 
 
 TODO
