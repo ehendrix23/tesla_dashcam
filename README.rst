@@ -372,7 +372,7 @@ or so.
   Upon completion a notification is provided on the screen that processing is completed. Use this parameter to
   disable this notification.
 
-  *--display_ts*
+*--display_ts*
 
   Add timestamp to the text output procuded.
 
