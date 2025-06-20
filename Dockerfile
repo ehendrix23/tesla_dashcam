@@ -1,35 +1,28 @@
-FROM jrottenberg/ffmpeg:4.4-alpine312 as build-stage
-FROM python:3-alpine
+FROM jrottenberg/ffmpeg:7-scratch AS ffmpeg
+FROM python:3-slim
 
-COPY --from=build-stage /usr/local/bin /usr/local/bin
-COPY --from=build-stage /usr/local/share /usr/local/share
-COPY --from=build-stage /usr/local/include /usr/local/include
-COPY --from=build-stage /usr/local/lib /usr/local/lib
-
-ENV LIBRARY_PATH=/lib:/usr/lib:/usr/local/lib
-
-ARG DEBIAN_FRONTEND=noninteractive
+COPY --from=ffmpeg /bin/ffmpeg /bin/ffprobe /usr/local/bin/
+COPY --from=ffmpeg /lib /lib
+COPY --from=ffmpeg /share /share
 
 WORKDIR /usr/src/app/tesla_dashcam
 
-RUN apk add --no-cache --update \
-    gcc \
-    libc-dev \
-    linux-headers \
-    tzdata \
-    ttf-freefont \
-    libnotify \
-    jpeg-dev \
-    zlib-dev \
-    openssl-dev \
-    # ffmpeg-libs \
- && mkdir /usr/share/fonts/truetype \
- && ln -s /usr/share/fonts/TTF /usr/share/fonts/truetype/freefont
+RUN apt-get update -y \
+    && apt-get install -y \
+    fonts-freefont-ttf \
+    libnotify-bin \
+    libva2 \
+    libva-drm2 \
+    && apt-get remove --purge --auto-remove -y && rm -rf /var/lib/apt/lists/*
+
+ENV LIBRARY_PATH=/lib:/usr/lib
 
 COPY . /usr/src/app/tesla_dashcam
 RUN pip install -r requirements.txt
 
+# Enable Logs to show on run
 ENV PYTHONUNBUFFERED=true
+# Provide a default timezone
 ENV TZ=America/New_York
 
 ENTRYPOINT [ "python3", "tesla_dashcam/tesla_dashcam.py" ]
