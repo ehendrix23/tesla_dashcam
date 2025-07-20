@@ -11,12 +11,12 @@ tesla_dashcam
 Python program that provides an easy method to merge saved Tesla Dashcam footage into a single video.
 
 When saving Tesla Dashcam footage a folder is created on the USB drive for each event and within it multiple MP4 video files are
-created. Currently the dashcam leverages four (4) cameras (front, rear, left repeater, and right repeater) and will create a
+created. Currently the dashcam leverages up to six (6) cameras (front, rear, left repeater, right repeater, left pillar, and right pillar) and will create a
 file for each of them. Every minute is stored into a separate file as well. This means that when saving dashcam footage
 there is a total of 40 files video files for every 10 minutes, each event of 10 minutes is put into a separate folder.
 
 Using this program, one can combine the 40 video files of an event into one (1), and combine video of multiple events together.
-The layout of the four (4) different cameras within the resulting video can be determined by choosing one of the available layouts.
+The layout of the six (6) different cameras within the resulting video can be determined by choosing one of the available layouts.
 
 This program has multiple options providing a high level of flexibility on the videos to process, cameras to include,
 layout of the resulting videos, location, format, encoding, .... See usage section below to read upon all the possibilities.
@@ -73,7 +73,7 @@ MacOS binary of ffmpeg was downloaded from: https://www.osxexperts.net
 Notes
 -----
 
-The video files for the same minute between the 4 cameras are not always the same length. If there is a difference in
+The video files for the same minute between the cameras are not always the same length. If there is a difference in
 their duration then the background color (black by default) will be shown for the camera which video ended before the
 others (within the minute).
 It is thus possible within a video to see the background color for one of the cameras, and then when that minute has passed
@@ -118,8 +118,8 @@ Usage
 
     usage: tesla_dashcam.py [-h] [--version] [--loglevel {DEBUG,INFO,WARNING,ERROR,CRITICAL}] [--temp_dir TEMP_DIR] [--no-notification] [--display_ts] [--skip_existing]
                             [--delete_source] [--exclude_subdirs] [--monitor] [--monitor_once] [--monitor_trigger MONITOR_TRIGGER]
-                            [--layout {WIDESCREEN,FULLSCREEN,PERSPECTIVE,CROSS,DIAMOND}] [--perspective] [--scale CLIP_SCALE [CLIP_SCALE ...]] [--mirror] [--rear] [--swap] [--no-swap]
-                            [--swap_frontrear] [--background BACKGROUND] [--title_screen_map] [--no-front] [--no-left] [--no-right] [--no-rear] [--no-timestamp]
+                            [--layout {WIDESCREEN,FULLSCREEN,PERSPECTIVE,CROSS,DIAMOND,HORIZONTAL}] [--perspective] [--scale CLIP_SCALE [CLIP_SCALE ...]] [--mirror] [--rear] [--swap] [--no-swap]
+                            [--swap_frontrear] [--background BACKGROUND] [--title_screen_map] [--no-front] [--no-left] [--no-right] [--no-rear] [--no-left-pillar] [--no-right-pillar] [--no-timestamp]
                             [--halign {LEFT,CENTER,RIGHT}] [--valign {TOP,MIDDLE,BOTTOM}] [--font FONT] [--fontsize FONTSIZE] [--fontcolor FONTCOLOR]
                             [--text_overlay_fmt TEXT_OVERLAY_FMT] [--timestamp_format TIMESTAMP_FORMAT] [--start_timestamp START_TIMESTAMP] [--end_timestamp END_TIMESTAMP]
                             [--start_offset START_OFFSET] [--end_offset END_OFFSET] [--sentry_offset] [--sentry_start_offset START_OFFSET] [--sentry_end_offset END_OFFSET] [--output OUTPUT] [--motion_only] [--slowdown SLOW_DOWN] [--speedup SPEED_UP]
@@ -162,13 +162,14 @@ Usage
     Video Layout:
       Set what the layout of the resulting video should be
 
-      --layout {WIDESCREEN,FULLSCREEN,PERSPECTIVE,CROSS,DIAMOND}
+      --layout {WIDESCREEN,FULLSCREEN,PERSPECTIVE,CROSS,DIAMOND,HORIZONTAL}
                             Layout of the created video.
                                 FULLSCREEN: Front camera center top, side cameras underneath it with rear camera between side camera.
                                 WIDESCREEN: Front camera on top with side and rear cameras smaller underneath it.
                                 PERSPECTIVE: Similar to FULLSCREEN but then with side cameras in perspective.
                                 CROSS: Front camera center top, side cameras underneath, and rear camera center bottom.
                                 DIAMOND: Front camera center top, side cameras below front camera left and right of front, and rear camera center bottom.
+                                HORIZONTAL: All cameras in horizontal line: left, left pillar, front, rear, right pillar, right.
                             (default: FULLSCREEN)
       --perspective         Show side cameras in perspective. (default: False)
       --scale CLIP_SCALE [CLIP_SCALE ...]
@@ -184,6 +185,7 @@ Usage
                                 FULLSCREEN: 1/2 (640x480, video is 1920x960)
                                 CROSS: 1/2 (640x480, video is 1280x1440)
                                 DIAMOND: 1/2 (640x480, video is 1920x976)
+                                HORIZONTAL: 1/2 (640x480, video is 3840x480)
                             (default: None)
       --mirror              Video from side and rear cameras as if being viewed through the mirror. Default when not providing parameter --no-front. Cannot be used in combination with
                             --rear. (default: None)
@@ -203,6 +205,8 @@ Usage
       --no-left             Exclude left camera from video. (default: False)
       --no-right            Exclude right camera from video. (default: False)
       --no-rear             Exclude rear camera from video. (default: False)
+      --no-left-pillar      Exclude left pillar camera from video. (default: False)
+      --no-right-pillar     Exclude right pillar camera from video. (default: False)
 
     Text Overlay:
       Options on how to show text in resulting video:
@@ -504,6 +508,16 @@ Video example: https://youtu.be/nPleIhVxyhQ
     +---------------+----------------+----------------+
 
 
+* HORIZONTAL: Resolution: 3840x480
+
+::
+
+    +----------+-----------+-----------+-----------+-----------+----------+
+    |   Left   |   Left    |   Front   |   Rear    |   Right   |  Right   |
+    |  Camera  |  Pillar   |  Camera   |  Camera   |  Pillar   |  Camera  |
+    +----------+-----------+-----------+-----------+-----------+----------+
+
+
 *--perspective*
 
   Default: False
@@ -573,7 +587,7 @@ Video example: https://youtu.be/nPleIhVxyhQ
 Camera Exclusion
 ----------------
 
-By default the output from all 4 cameras is shown within the merged video if existing. Using these parameters one can
+By default the output from all 6 cameras is shown within the merged video if existing. Using these parameters one can
 exclude one or more cameras from the resulting video.
 
 *--no-front*
@@ -599,6 +613,18 @@ exclude one or more cameras from the resulting video.
   Default: False
 
   Exclude the rear camera from the resulting video.
+
+*--no-left-pillar*
+
+  Default: False
+
+  Exclude the left pillar camera from the resulting video.
+
+*--no-right-pillar*
+
+  Default: False
+
+  Exclude the right pillar camera from the resulting video.
 
 Text Overlay
 ------------
@@ -1580,7 +1606,7 @@ TODO
 * Support drag&drop of video folder (supported in Windows now, MacOS not yet)
 * Add object detection (i.e. people) and possible output when object was detected
 * Saving of options
-* Use timestamp in video to ensure full synchronization between the 4 cameras
+* Use timestamp in video to ensure full synchronization between the cameras
 * Add option for source/output to be S3 bucket (with temp folder for creating temporary files)
 * Develop Web Front-End
 * Develop method to have run in AWS, allowing user to upload video files and interact using Web Front-End
