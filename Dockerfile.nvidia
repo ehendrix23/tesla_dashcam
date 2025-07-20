@@ -1,20 +1,18 @@
-FROM jrottenberg/ffmpeg:4.4-nvidia2004 as build-stage
-FROM python:3-bullseye
+FROM jrottenberg/ffmpeg:7-nvidia AS ffmpeg
+FROM python:3-slim
 
-COPY --from=build-stage /usr/local/bin /usr/local/bin
-COPY --from=build-stage /usr/local/share /usr/local/share
-COPY --from=build-stage /usr/local/include /usr/local/include
-COPY --from=build-stage /usr/local/lib /usr/local/lib
-COPY --from=build-stage /usr/local/cuda /usr/local/cuda
+COPY --from=ffmpeg /bin/ffmpeg /bin/ffprobe /usr/local/bin/
+COPY --from=ffmpeg /lib /lib
+COPY --from=ffmpeg /share /share
 
 WORKDIR /usr/src/app/tesla_dashcam
 
 RUN apt-get update -y \
     && apt-get install -y \
-        fonts-freefont-ttf \
-        libnotify-bin \
-        libva2 \
-        libva-drm2 \
+    fonts-freefont-ttf \
+    libnotify-bin \
+    libva2 \
+    libva-drm2 \
     && apt-get remove --purge --auto-remove -y && rm -rf /var/lib/apt/lists/*
 
 ENV LIBRARY_PATH=/lib:/usr/lib
@@ -24,7 +22,7 @@ COPY . /usr/src/app/tesla_dashcam
 RUN pip install -r requirements.txt
 
 # Enable Logs to show on run
-ENV PYTHONUNBUFFERED=true 
+ENV PYTHONUNBUFFERED=true
 # Provide a default timezone
 ENV TZ=America/New_York
 
