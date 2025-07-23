@@ -126,3 +126,5 @@ bundles/Windows/tesla_dashcam/Tesla_Dashcam - README.html
 .vscode/
 examples/
 *-workspace
+.vscode/settings.json
+=*
