@@ -11,15 +11,15 @@ import os
 import sys
 from shutil import rmtree
 
-from setuptools import find_packages, setup, Command  # type: ignore
+from setuptools import Command, find_packages, setup  # type: ignore
 
 # Package meta-data.
 NAME = "tesla_dashcam"
-DESCRIPTION = "Python program to merge video files created by Tesla " "dashcam"
+DESCRIPTION = "Python program to merge video files created by Tesla dashcam"
 URL = "https://github.com/ehendrix23/tesla_dashcam"
 EMAIL = "hendrix_erik@hotmail.com"
 AUTHOR = "Erik Hendrix"
-REQUIRES_PYTHON = ">=3.8.6"
+REQUIRES_PYTHON = ">=3.13.0"
 VERSION = None
 
 # What packages are required for this module to be executed?
@@ -124,9 +124,7 @@ class TestUploadCommand(Command):
         os.system("{0} setup.py sdist bdist_wheel --universal".format(sys.executable))
 
         self.status("Uploading the package to TestPyPi via Twine…")
-        os.system(
-            "twine upload --repository-url " "https://test.pypi.org/legacy/ dist/*"
-        )
+        os.system("twine upload --repository-url https://test.pypi.org/legacy/ dist/*")
 
         self.status("Pushing git tags…")
         os.system("git tag v{0}".format(ABOUT["__version__"]))
@@ -166,9 +164,7 @@ class TestUploadCommand(Command):
         os.system("{0} setup.py sdist bdist_wheel --universal".format(sys.executable))
 
         self.status("Uploading the package to TestPyPi via Twine…")
-        os.system(
-            "twine upload --repository-url " "https://test.pypi.org/legacy/ dist/*"
-        )
+        os.system("twine upload --repository-url https://test.pypi.org/legacy/ dist/*")
 
         self.status("Pushing git tags…")
         os.system("git tag v{0}".format(ABOUT["__version__"]))
