@@ -1,1 +1,2 @@
 doc8
+pytest
