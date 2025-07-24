@@ -608,8 +608,8 @@ class Font(object):
 
     @property
     def size(self):
-        if hasattr(self._layout, "_font_size"):
-            return getattr(self._layout, "_font_size")()
+        if (overriden := self._get_overridden("font_size")) is not None:
+            return overriden
 
         return (
             int(max(16, 16 * self._layout.scale)) if self._size is None else self._size
@@ -629,10 +629,9 @@ class Font(object):
 
     @property
     def halign(self):
-        if hasattr(self._layout, "_font_halign"):
-            return getattr(self._layout, "_font_halign")()
-
-        return HALIGN.get(self._halign, self._halign)
+        return self._get_overridden("font_halign") or HALIGN.get(
+            self._halign, self._halign
+        )
 
     @halign.setter
     def halign(self, value):
@@ -640,10 +639,9 @@ class Font(object):
 
     @property
     def valign(self):
-        if hasattr(self._layout, "_font_valign"):
-            return getattr(self._layout, "_font_valign")()
-
-        return VALIGN.get(self._valign, self._valign)
+        return self._get_overridden("font_valign") or VALIGN.get(
+            self._valign, self._valign
+        )
 
     @valign.setter
     def valign(self, value):
@@ -664,6 +662,12 @@ class Font(object):
     @ypos.setter
     def ypos(self, value):
         self._ypos = value
+
+    def _get_overridden(self, attr):
+        try:
+            getattr(self._layout, f"{attr}", None)()
+        except (AttributeError, TypeError):
+            return None
 
 
 class Camera(object):
@@ -709,10 +713,8 @@ class Camera(object):
     @property
     def width(self):
         return (
-            getattr(self._layout, "_" + self._camera + "_width")()
-            if hasattr(self._layout, "_" + self._camera + "_width")
-            else int(self._width * self.scale * self.include)
-        )
+            self._get_overridden("width") or int(self._width * self.scale)
+        ) * self.include
 
     @width.setter
     def width(self, value):
@@ -721,10 +723,8 @@ class Camera(object):
     @property
     def height(self):
         return (
-            getattr(self._layout, "_" + self._camera + "_height")()
-            if hasattr(self._layout, "_" + self._camera + "_height")
-            else int(self._height * self.scale * self.include)
-        )
+            self._get_overridden("height") or int(self._height * self.scale)
+        ) * self.include
 
     @height.setter
     def height(self, value):
@@ -732,11 +732,10 @@ class Camera(object):
 
     @property
     def xpos(self):
-        if not self._xpos_override and hasattr(
-            self._layout, "_" + self._camera + "_xpos"
-        ):
-            return getattr(self._layout, "_" + self._camera + "_xpos")() * self.include
-
+        if not self._xpos_override:
+            override = self._get_overridden("xpos")
+            if override is not None:
+                return override * self.include
         return self._xpos * self.include
 
     @xpos.setter
@@ -749,11 +748,10 @@ class Camera(object):
 
     @property
     def ypos(self):
-        if not self._ypos_override and hasattr(
-            self._layout, "_" + self._camera + "_ypos"
-        ):
-            return getattr(self._layout, "_" + self._camera + "_ypos")() * self.include
-
+        if not self._ypos_override:
+            override = self._get_overridden("ypos")
+            if override is not None:
+                return override * self.include
         return self._ypos * self.include
 
     @ypos.setter
@@ -788,6 +786,12 @@ class Camera(object):
     @options.setter
     def options(self, value):
         self._options = value
+
+    def _get_overridden(self, attr):
+        try:
+            return getattr(self._layout, f"{self.camera}_{attr}", None)()
+        except (AttributeError, TypeError):
+            return None
 
 
 class MovieLayout(object):
@@ -961,22 +965,22 @@ class MovieLayout(object):
     def center_ypos(self):
         return int(self.video_height / 2)
 
-    def _rear_xpos(self):
+    def rear_xpos(self):
         return self.cameras("front").xpos + self.cameras("front").width
 
-    def _left_pillar_ypos(self):
+    def left_pillar_ypos(self):
         return max(
             self.cameras("front").ypos + self.cameras("front").height,
             self.cameras("rear").ypos + self.cameras("rear").height,
         )
 
-    def _right_pillar_xpos(self):
+    def right_pillar_xpos(self):
         return self.cameras("left_pillar").xpos + self.cameras("left_pillar").width
 
-    def _right_pillar_ypos(self):
+    def right_pillar_ypos(self):
         return self.cameras("left_pillar").ypos
 
-    def _left_ypos(self):
+    def left_ypos(self):
         return max(
             self.cameras("front").ypos + self.cameras("front").height,
             self.cameras("rear").ypos + self.cameras("rear").height,
@@ -984,10 +988,10 @@ class MovieLayout(object):
             self.cameras("right_pillar").ypos + self.cameras("right_pillar").height,
         )
 
-    def _right_xpos(self):
+    def right_xpos(self):
         return self.cameras("left").xpos + self.cameras("left").width
 
-    def _right_ypos(self):
+    def right_ypos(self):
         return self.cameras("left").ypos
 
 
@@ -1065,82 +1069,72 @@ class FullScreen(MovieLayout):
         return self._top_row_height
 
     # We can't use video width or center_xpos as they use the positions to calculate.
-    def _left_pillar_xpos(self):
+    def left_pillar_xpos(self):
         # left_pillar is put on the left but ensuring that the row is centered
-        return self._top_row_xpos * self.cameras("left_pillar").include
+        return self._top_row_xpos
 
-    def _front_xpos(self):
+    def front_xpos(self):
         # front is placed next to left_pillar, we need to use width as left pillar might not be included
-        return (self._top_row_xpos + self.cameras("left_pillar").width) * self.cameras(
-            "front"
-        ).include
+        return self._top_row_xpos + self.cameras("left_pillar").width
 
-    def _right_pillar_xpos(self):
+    def right_pillar_xpos(self):
         # right_pillar is placed next to front, we need to use width as left pillar or front might not be included
         return (
             self._top_row_xpos
             + self.cameras("left_pillar").width
             + self.cameras("front").width
-        ) * self.cameras("right_pillar").include
+        )
 
     # We can't use video width or center_xpos as they use the positions to calculate.
-    def _left_xpos(self):
+    def left_xpos(self):
         # left is put on the left but ensuring that the row is centered
-        return self._bottom_row_xpos * self.cameras("left").include
+        return self._bottom_row_xpos
 
-    def _rear_xpos(self):
+    def rear_xpos(self):
         # rear is placed next to left, we need to use width as left might not be included
-        return (self._bottom_row_xpos + self.cameras("left").width) * self.cameras(
-            "rear"
-        ).include
+        return self._bottom_row_xpos + self.cameras("left").width
 
-    def _right_xpos(self):
+    def right_xpos(self):
         # right is placed next to rear, we need to use width as left and rear might not be included
         return (
             self._bottom_row_xpos
             + self.cameras("left").width
             + self.cameras("rear").width
-        ) * self.cameras("right").include
+        )
 
-    def _front_height(self):
+    def front_height(self):
         # For height keep same ratio of 4/3
         return int(self.cameras("front").width / 4 * 3)
 
-    def _left_pillar_ypos(self):
-        return (
-            self._top_row_ypos
-            + int((self._top_row_height - self.cameras("left_pillar").height) / 2)
-        ) * self.cameras("left_pillar").include
+    def left_pillar_ypos(self):
+        return self._top_row_ypos + int(
+            (self._top_row_height - self.cameras("left_pillar").height) / 2
+        )
 
-    def _front_ypos(self):
-        return (
-            self._top_row_ypos
-            + int((self._top_row_height - self.cameras("front").height) / 2)
-        ) * self.cameras("front").include
+    def front_ypos(self):
+        return self._top_row_ypos + int(
+            (self._top_row_height - self.cameras("front").height) / 2
+        )
 
-    def _right_pillar_ypos(self):
-        return (
-            self._top_row_ypos
-            + int((self._top_row_height - self.cameras("right_pillar").height) / 2)
-        ) * self.cameras("right_pillar").include
+    def right_pillar_ypos(self):
+        return self._top_row_ypos + int(
+            (self._top_row_height - self.cameras("right_pillar").height) / 2
+        )
 
-    def _left_ypos(self):
-        return (
-            self._bottom_row_ypos
-            + int((self._bottom_row_height - self.cameras("left").height) / 2)
-        ) * self.cameras("left").include
+    def left_ypos(self):
+        return self._bottom_row_ypos + int(
+            (self._bottom_row_height - self.cameras("left").height) / 2
+        )
 
-    def _rear_ypos(self):
-        return (
-            self._bottom_row_ypos
-            + int((self._bottom_row_height - self.cameras("rear").height) / 2)
-        ) * self.cameras("rear").include
+    def rear_ypos(self):
+        return self._bottom_row_ypos + int(
+            (self._bottom_row_height - self.cameras("rear").height) / 2
+        )
 
-    def _right_ypos(self):
-        return (
-            self._bottom_row_ypos
-            + int((self._bottom_row_height - self.cameras("right").height) / 2)
-        ) * self.cameras("right").include
+    def right_ypos(self):
+        return self._bottom_row_ypos + int(
+            (self._bottom_row_height - self.cameras("right").height) / 2
+        )
 
 
 # noinspection PyProtectedMember
@@ -1166,7 +1160,7 @@ class WideScreen(FullScreen):
     @property
     def _front_normal_scale(self):
         scale = self.cameras("front").scale or 0.5
-        return int(self.cameras("front")._width * scale * self.cameras("front").include)
+        return int(self.cameras("front")._width * scale)
 
     @property
     def _min_top_row_width(self):
@@ -1179,7 +1173,7 @@ class WideScreen(FullScreen):
     @property
     def _rear_normal_scale(self):
         scale = self.cameras("rear").scale or 0.5
-        return int(self.cameras("rear")._width * scale * self.cameras("rear").include)
+        return int(self.cameras("rear")._width * scale)
 
     @property
     def _min_bottom_row_width(self):
@@ -1190,7 +1184,7 @@ class WideScreen(FullScreen):
         )
 
     # Adjust front width if bottom row is wider then top row
-    def _front_width(self):
+    def front_width(self):
         if self.cameras("front").scale is None:
             # Front width should be:
             #  max(bottom_row_width, min_top_width) - pillar_widths
@@ -1199,35 +1193,33 @@ class WideScreen(FullScreen):
                 target_width
                 - self.cameras("left_pillar").width
                 - self.cameras("right_pillar").width
-            ) * self.cameras("front").include
+            )
         else:
             # Use normal scale calculation if front camera scale was explicitly set
             return self._front_normal_scale
 
-    def _front_height(self):
+    def front_height(self):
         # We need to set this as by default scale is none in which case we need to return 0.5
         scale = self.cameras("front").scale or 0.5
-        return int(
-            self.cameras("front")._height * scale * self.cameras("front").include
-        )
+        return int(self.cameras("front")._height * scale)
 
     # Adjust rear width if bottom row is wider then top row
-    def _rear_width(self):
+    def rear_width(self):
         if self.cameras("rear").scale is None:
             # Rear width should be:
             #  max(bottom_row_width, min_top_width) - pillar_widths
             target_width = max(self._min_bottom_row_width, self._min_top_row_width)
             return (
                 target_width - self.cameras("left").width - self.cameras("right").width
-            ) * self.cameras("rear").include
+            )
         else:
             # Use normal scale calculation if front camera scale was explicitly set
             return self._rear_normal_scale
 
-    def _rear_height(self):
+    def rear_height(self):
         # We need to set this as by default scale is none in which case we need to return 0.5
         scale = self.cameras("rear").scale or 0.5
-        return int(self.cameras("rear")._height * scale * self.cameras("rear").include)
+        return int(self.cameras("rear")._height * scale)
 
 
 class Cross(MovieLayout):
@@ -1286,57 +1278,45 @@ class Cross(MovieLayout):
     def _repeater_row_ypos(self):
         return self.cameras("front").height + self._pillar_row_height
 
-    def _front_xpos(self):
-        return (
-            int(self._row_width / 2) - int(self.cameras("front").width / 2)
-        ) * self.cameras("front").include
+    def front_xpos(self):
+        return int(self._row_width / 2) - int(self.cameras("front").width / 2)
 
-    def _left_pillar_xpos(self):
-        return self._pillar_row_xpos * self.cameras("left_pillar").include
+    def left_pillar_xpos(self):
+        return self._pillar_row_xpos
 
-    def _right_pillar_xpos(self):
-        return (
-            self._pillar_row_xpos + self.cameras("left_pillar").width
-        ) * self.cameras("right_pillar").include
+    def right_pillar_xpos(self):
+        return self._pillar_row_xpos + self.cameras("left_pillar").width
 
-    def _left_xpos(self):
-        return self._repeater_row_xpos * self.cameras("left").include
+    def left_xpos(self):
+        return self._repeater_row_xpos
 
-    def _right_xpos(self):
-        return (self._repeater_row_xpos + self.cameras("left").width) * self.cameras(
-            "right"
-        ).include
+    def right_xpos(self):
+        return self._repeater_row_xpos + self.cameras("left").width
 
-    def _rear_xpos(self):
-        return (
-            int(self._row_width / 2) - int(self.cameras("rear").width / 2)
-        ) * self.cameras("rear").include
+    def rear_xpos(self):
+        return int(self._row_width / 2) - int(self.cameras("rear").width / 2)
 
-    def _left_pillar_ypos(self):
-        return (
-            self._pillar_row_ypos
-            + int((self._pillar_row_height - self.cameras("left_pillar").height) / 2)
-        ) * self.cameras("left_pillar").include
+    def left_pillar_ypos(self):
+        return self._pillar_row_ypos + int(
+            (self._pillar_row_height - self.cameras("left_pillar").height) / 2
+        )
 
-    def _right_pillar_ypos(self):
-        return (
-            self._pillar_row_ypos
-            + int((self._pillar_row_height - self.cameras("right_pillar").height) / 2)
-        ) * self.cameras("right_pillar").include
+    def right_pillar_ypos(self):
+        return self._pillar_row_ypos + int(
+            (self._pillar_row_height - self.cameras("right_pillar").height) / 2
+        )
 
-    def _left_ypos(self):
-        return (
-            self._repeater_row_ypos
-            + int((self._repeater_row_height - self.cameras("left").height) / 2)
-        ) * self.cameras("left").include
+    def left_ypos(self):
+        return self._repeater_row_ypos + int(
+            (self._repeater_row_height - self.cameras("left").height) / 2
+        )
 
-    def _right_ypos(self):
-        return (
-            self._repeater_row_ypos
-            + int((self._repeater_row_height - self.cameras("right").height) / 2)
-        ) * self.cameras("right").include
+    def right_ypos(self):
+        return self._repeater_row_ypos + int(
+            (self._repeater_row_height - self.cameras("right").height) / 2
+        )
 
-    def _rear_ypos(self):
+    def rear_ypos(self):
         return (
             self.cameras("front").height
             + self._pillar_row_height
@@ -1456,72 +1436,57 @@ class Diamond(MovieLayout):
     def _right_column_height(self):
         return self.cameras("right_pillar").height + self.cameras("right").height
 
-    def _front_xpos(self):
-        return (
-            self._left_column_width
-            + int((self._front_rear_column_width - self.cameras("front").width) / 2)
-        ) * self.cameras("front").include
+    def front_xpos(self):
+        return self._left_column_width + int(
+            (self._front_rear_column_width - self.cameras("front").width) / 2
+        )
 
-    def _left_pillar_xpos(self):
+    def left_pillar_xpos(self):
         return self._left_column_width - self.cameras("left_pillar").width
 
-    def _left_xpos(self):
+    def left_xpos(self):
         return self._left_column_width - self.cameras("left").width
 
-    def _right_pillar_xpos(self):
-        return (self._left_column_width + self._front_rear_column_width) * self.cameras(
-            "right_pillar"
-        ).include
+    def right_pillar_xpos(self):
+        return self._left_column_width + self._front_rear_column_width
 
-    def _right_xpos(self):
-        return (self._left_column_width + self._front_rear_column_width) * self.cameras(
-            "right"
-        ).include
+    def right_xpos(self):
+        return self._left_column_width + self._front_rear_column_width
 
-    def _rear_xpos(self):
-        return (
-            self._left_column_width
-            + int((self._front_rear_column_width - self.cameras("rear").width) / 2)
-        ) * self.cameras("rear").include
+    def rear_xpos(self):
+        return self._left_column_width + int(
+            (self._front_rear_column_width - self.cameras("rear").width) / 2
+        )
 
-    def _front_ypos(self):
-        return (
-            max(
-                0,
-                (
-                    max(self._left_column_height, self._right_column_height)
-                    - self._front_rear_height
-                )
-                / 2,
+    def front_ypos(self):
+        return max(
+            0,
+            (
+                max(self._left_column_height, self._right_column_height)
+                - self._front_rear_height
             )
-            * self.cameras("front").include
+            / 2,
         )
 
-    def _left_pillar_ypos(self):
-        return (
-            max(0, (self._front_rear_height - self._left_column_height) / 2)
-            * self.cameras("left_pillar").include
-        )
+    def left_pillar_ypos(self):
+        return max(0, (self._front_rear_height - self._left_column_height) / 2)
 
-    def _left_ypos(self):
+    def left_ypos(self):
         return (
             max(0, (self._front_rear_height - self._left_column_height) / 2)
             + self.cameras("left_pillar").height
-        ) * self.cameras("left").include
-
-    def _right_pillar_ypos(self):
-        return (
-            max(0, (self._front_rear_height - self._right_column_height) / 2)
-            * self.cameras("right_pillar").include
         )
 
-    def _right_ypos(self):
+    def right_pillar_ypos(self):
+        return max(0, (self._front_rear_height - self._right_column_height) / 2)
+
+    def right_ypos(self):
         return (
             max(0, (self._front_rear_height - self._right_column_height) / 2)
             + self.cameras("right_pillar").height
-        ) * self.cameras("right").include
+        )
 
-    def _rear_ypos(self):
+    def rear_ypos(self):
         return (
             max(
                 0,
@@ -1532,7 +1497,7 @@ class Diamond(MovieLayout):
                 / 2,
             )
             + self.cameras("front").height
-        ) * self.cameras("rear").include
+        )
 
 
 class Horizontal(MovieLayout):
@@ -1546,18 +1511,7 @@ class Horizontal(MovieLayout):
         self.scale = 1 / 2
 
     @property
-    def video_width(self):
-        return (
-            self.cameras("left").width
-            + self.cameras("left_pillar").width
-            + self.cameras("front").width
-            + self.cameras("rear").width
-            + self.cameras("right_pillar").width
-            + self.cameras("right").width
-        )
-
-    @property
-    def video_height(self):
+    def _row_height(self):
         return max(
             self.cameras("left").height,
             self.cameras("left_pillar").height,
@@ -1567,76 +1521,53 @@ class Horizontal(MovieLayout):
             self.cameras("right").height,
         )
 
-    def _left_xpos(self):
-        return 0
+    def left_ypos(self):
+        return int((self._row_height - self.cameras("left").height) / 2)
 
-    def _left_ypos(self):
-        return (
-            int((self.video_height - self.cameras("left").height) / 2)
-            * self.cameras("left").include
-        )
+    def left_pillar_xpos(self):
+        return self.cameras("left").width
 
-    def _left_pillar_xpos(self):
-        return self.cameras("left").width * self.cameras("left_pillar").include
+    def left_pillar_ypos(self):
+        return int((self._row_height - self.cameras("left_pillar").height) / 2)
 
-    def _left_pillar_ypos(self):
-        return (
-            int((self.video_height - self.cameras("left_pillar").height) / 2)
-            * self.cameras("left_pillar").include
-        )
+    def front_xpos(self):
+        return self.cameras("left").width + self.cameras("left_pillar").width
 
-    def _front_xpos(self):
-        return (
-            self.cameras("left").width + self.cameras("left_pillar").width
-        ) * self.cameras("front").include
+    def front_ypos(self):
+        return int((self._row_height - self.cameras("front").height) / 2)
 
-    def _front_ypos(self):
-        return (
-            int((self.video_height - self.cameras("front").height) / 2)
-            * self.cameras("front").include
-        )
-
-    def _rear_xpos(self):
+    def rear_xpos(self):
         return (
             self.cameras("left").width
             + self.cameras("left_pillar").width
             + self.cameras("front").width
-        ) * self.cameras("rear").include
-
-    def _rear_ypos(self):
-        return (
-            int((self.video_height - self.cameras("rear").height) / 2)
-            * self.cameras("rear").include
         )
 
-    def _right_pillar_xpos(self):
+    def rear_ypos(self):
+        return int((self._row_height - self.cameras("rear").height) / 2)
+
+    def right_pillar_xpos(self):
         return (
             self.cameras("left").width
             + self.cameras("left_pillar").width
             + self.cameras("front").width
             + self.cameras("rear").width
-        ) * self.cameras("right_pillar").include
-
-    def _right_pillar_ypos(self):
-        return (
-            int((self.video_height - self.cameras("right_pillar").height) / 2)
-            * self.cameras("right_pillar").include
         )
 
-    def _right_xpos(self):
+    def right_pillar_ypos(self):
+        return int((self.video_height - self.cameras("right_pillar").height) / 2)
+
+    def right_xpos(self):
         return (
             self.cameras("left").width
             + self.cameras("left_pillar").width
             + self.cameras("front").width
             + self.cameras("rear").width
             + self.cameras("right_pillar").width
-        ) * self.cameras("right").include
-
-    def _right_ypos(self):
-        return (
-            int((self.video_height - self.cameras("right").height) / 2)
-            * self.cameras("right").include
         )
+
+    def right_ypos(self):
+        return int((self.video_height - self.cameras("right").height) / 2)
 
 
 class MyArgumentParser(argparse.ArgumentParser):
