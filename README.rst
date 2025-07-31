@@ -272,6 +272,32 @@ Usage
                                 DIAMOND: Front camera center top, side cameras below front camera left and right of front, and rear camera center bottom.
                                 HORIZONTAL: All cameras in horizontal line: left, left pillar, front, rear, right pillar, right.
                             (default: FULLSCREEN)
+      --camera_position CLIP_POS [CLIP_POS ...]
+                            Set camera clip position within video. Selecting this will override the layout selected!
+                            The camera clip scale will be set to 1280x960, use scale to adjust accordingly.
+                            Default layout is:
+                                Front: 0x0
+                                Rear: <front x-pos + width>x0
+                                Left Pillar: 0x<max(front y-pos + height,rear y-pos + height)>
+                                Right Pillar: <left pillar x-pos + width>x<max(front y-pos + height,rear ypos + height)>
+                                Left: 0x<max(<left pillar y-pos + height>, <right pillar y-pos + height>
+                                Right: <left-pillar x-pos + width>x<max(<left pillar y-pos + height>, <right pillar y-pos + height>
+                            Using this together with argument camera_order allows one to completely customize the layout
+                            Note that layout chosen also determines camera clip size and thus default position. See scale for respective sizing.
+                            Further, changing the scale of a camera clip would further impact potential positioning.for example:
+                              --camera_position camera=left 640x480                          Position left camera at 640x480
+                              --camera_position camera=right x_pos=640                        Position right camera at x-position 640, y-position based on layout
+                              --camera_position camera=front y_pos=480                        Position front camera at x-position based on layout, y-position at 480
+                              --camera_position camera=rear  1280x960                        Position rear camera at 1280x960
+                              --camera_position camera=left_pillar 0x960                     Position left pillar camera at 0x960
+                            (default: None)
+      --camera_order CLIP_ORDER
+                            Determines the order of processing the camera. Normally this is not required unless there is overlap.
+                            When using argument camera_position it is possible to overlap cameras partially or completely, by then
+                            leveraging this argument one can determine which camera will be on top and which one will be bottom. Default order is: left, right, front, rear, left_pillar, right_pillar. If there is no overlap then the order does not matter.
+                            If not all cameras are specified then default order will be followed for those not specified, and thus be more on top.for example:
+                              --camera_order front,rear,left,right,left_pillar,right_pillar    Makes it that right_pillar will be on top, then left_pillar, then right, then left, then rear, and front at the bottom.
+                            (default: front,rear,left,right,left_pillar,right_pillar)                            
       --perspective         Show side cameras in perspective. (default: False)
       --scale CLIP_SCALE [CLIP_SCALE ...]
                             Set camera clip scale for all clips, scale of 1 is 1280x960 camera clip.
@@ -295,6 +321,7 @@ Usage
       --swap                Swap left and right cameras in output, default when side and rear cameras are as if looking backwards. See --rear parameter. (default: None)
       --no-swap             Do not swap left and right cameras, default when side and rear cameras are as if looking through a mirror. Also see --mirror parameter (default: None)
       --swap_frontrear      Swap front and rear cameras in output. (default: False)
+      --swap_pillar         Swap left- and right pillar cameras in output. (default: False)
       --background BACKGROUND
                             Background color for video. Can be a color string or RGB value. Also see --fontcolor. (default: black)
       --title_screen_map    Show a map of the event location for the first 3 seconds of the event movie, when merging events it will also create map with lines linking the events (default: False)
@@ -405,9 +432,8 @@ Usage
     Advanced encoding settings:
       Advanced options for encoding
 
-      --no-gpu              Disable use of GPU acceleration. Default on Apple Silicon Mac and on Non-MACs.                            
-      --gpu                 Use GPU acceleration. Default on Intel Macs.
-                            Note: ffmpeg currently seems to have issues on Apple Silicon with GPU acceleration, --no-gpu might need to be set to produce video.
+      --no-gpu              Disable use of GPU acceleration. Default on Non-MACs.                            
+      --gpu                 Use GPU acceleration. Default on Macs.                            
                             --gpu_type has to be provided as well on Non-Macs when enabling this parameter (default: False)
       --gpu_type {nvidia,intel,qsv,rpi,vaapi}
                             Type of graphics card (GPU) in the system. This determines the encoder that will be used.This parameter is mandatory if --gpu is provided on Non-Macs. (default: None)
@@ -619,6 +645,47 @@ Video example: https://youtu.be/nPleIhVxyhQ
     +----------+-----------+-----------+-----------+-----------+----------+
 
 
+*--camera_position*
+
+  Default: None
+
+  This allows one to specify the position of each camera clip within the resulting video. This will override the layout
+  selected with --layout. The default position is based on the layout selected, but can be changed to any position
+  desired. The scale of the camera clips will be set to 1280x960, use --scale to adjust accordingly.
+
+  For example, to have the pillar, repeater, and rear cameras to overlap with the front camera,
+  with left pillar upper left, right pillar upper right, left lower left, rear camera lower center (widescreen), and right lower right.
+  Note: scale is used as well to adjust the camera clips to the desired size.
+
+  
+  \-\-scale 320x240 --camera_position camera=front 0x0 --scale camera=front 1280x960 --camera_position camera=rear 320x720 --scale camera=rear 640x240 --camera_position camera=left_pillar 0x0 --camera_position camera=right_pillar 960x0 --camera_position camera=left 0x720 --camera_position camera=right 960x720
+
+  This will then result in the following layout: 
+  Resolution: 1280x1440
+  ::
+
+    +-------------+--------------------+--------------+
+    | Left Pillar |                    | Right Pillar |
+    +-------------+                    +--------------+
+    |                  Front Camera                   |
+    +-------------+--------------------+--------------+
+    | Left Camera |    Rear Camera     | Right Camera |
+    +-------------+--------------------+--------------+
+
+*--camera_order*
+
+  Default: front,rear,left,right,left_pillar,right_pillar
+
+  This allows one to specify the order of the camera clips within the resulting video. This is especially useful when
+  using --camera_position to overlap camera clips. 
+  If not all cameras are specified then the default order will be followed for those not specified.
+
+  For example:
+
+  \-\-camera_order front,rear,left,right,left_pillar,right_pillar
+
+  This will result in the front camera being on top, then rear, then left, then right, then left pillar, and finally right pillar.
+
 *--perspective*
 
   Default: False
@@ -670,6 +737,13 @@ Video example: https://youtu.be/nPleIhVxyhQ
 
   Using this you can swap the front and the rear camera in the layouts. The front camera is normally on top with the rear
   camera being at the bottom. With this the front camera will be shown at the bottom and the rear on the top.
+
+*--swap_pillar*
+
+  Default: False
+
+  Swap the left and right pillar cameras within the layouts. Normally left pillar camera is on the left and right pillar
+  camera is on the right, using this option will swap their positions.
 
 *--background*
 
@@ -1688,6 +1762,8 @@ Release Notes
 0.1.21:
     - New: Option --camera_position to provide coordinates where the camera clip should be positioned in the video providing very granular custom layout options. Using this option results in ignoring the layout option.
     - New: Option --camera_order to define the order the cameras should be processed. This allows to overlay one camera over another one and define which one should be on top.
+    - New: Inclusion of left and right pillar cameras.
+    - New: If an event does not have files for a certain camera (i.e. pillar cameras) then resulting layout will be as if those cameras were excluded.
     - Fixed: Issue with GPU type check of qsv for Linux. Contributed by cjwang18
     - Fixed: ffmpeg error when swapping front/rear and excluding front or rear
     - Fixed: ffmpeg error when swapping left/right and excluding left or right
