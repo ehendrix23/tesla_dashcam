@@ -62,7 +62,7 @@ FFMPEG = {
 # noinspection PyPep8
 MOVIE_HOMEDIR = {
     "darwin": "Movies/Tesla_Dashcam",
-    "win32": r"Videos\Tesla_Dashcam",
+    "win32": "Videos\Tesla_Dashcam",
     "cygwin": "Videos/Tesla_Dashcam",
     "linux": "Videos/Tesla_Dashcam",
     "freebsd11": "Videos/Tesla_Dashcam",
@@ -777,10 +777,8 @@ class MovieLayout(object):
             "left": Camera(layout=self, camera="left"),
             "right": Camera(layout=self, camera="right"),
             "rear": Camera(layout=self, camera="rear"),
-            "left_pillar": Camera(layout=self, camera="left_pillar"),
-            "right_pillar": Camera(layout=self, camera="right_pillar"),
         }
-        self._clip_order = ["left", "right", "front", "rear", "left_pillar", "right_pillar"]
+        self._clip_order = ["left", "right", "front", "rear"]
         self._font = Font(layout=self)
 
         self._swap_left_right = False
@@ -803,7 +801,7 @@ class MovieLayout(object):
         self._clip_order = []
         for camera in value:
             camera = camera.lower().strip()
-            if camera in ["front", "left", "right", "rear", "left_pillar", "right_pillar"]:
+            if camera in ["front", "left", "right", "rear"]:
                 self._clip_order.append(camera)
 
         # Make sure we have all of them, if not then add based on default order.
@@ -815,10 +813,6 @@ class MovieLayout(object):
             self._clip_order.append("front")
         if "rear" not in self._clip_order:
             self._clip_order.append("rear")
-        if "left_pillar" not in self._clip_order:
-            self._clip_order.append("left_pillar")
-        if "right_pillar" not in self._clip_order:
-            self._clip_order.append("right_pillar")
 
     @property
     def font(self):
@@ -878,8 +872,6 @@ class MovieLayout(object):
         self.cameras("left").scale = scale
         self.cameras("right").scale = scale
         self.cameras("rear").scale = scale
-        self.cameras("left_pillar").scale = scale
-        self.cameras("right_pillar").scale = scale
 
     @property
     def video_width(self):
@@ -889,8 +881,6 @@ class MovieLayout(object):
                 self.cameras("left").xpos + self.cameras("left").width,
                 self.cameras("right").xpos + self.cameras("right").width,
                 self.cameras("rear").xpos + self.cameras("rear").width,
-                self.cameras("left_pillar").xpos + self.cameras("left_pillar").width,
-                self.cameras("right_pillar").xpos + self.cameras("right_pillar").width,
             )
         )
 
@@ -905,10 +895,6 @@ class MovieLayout(object):
                 perspective_adjustement * self.cameras("right").ypos
                 + self.cameras("right").height,
                 self.cameras("rear").ypos + self.cameras("rear").height,
-                perspective_adjustement * self.cameras("left_pillar").ypos
-                + self.cameras("left_pillar").height,
-                perspective_adjustement * self.cameras("right_pillar").ypos
-                + self.cameras("right_pillar").height,
             )
         )
 
@@ -920,35 +906,27 @@ class MovieLayout(object):
     def center_ypos(self):
         return int(self.video_height / 2)
 
+    @property
     def _rear_xpos(self):
         return self.cameras("front").xpos + self.cameras("front").width
 
+    @property
     def _left_ypos(self):
         return max(
             self.cameras("front").ypos + self.cameras("front").height,
             self.cameras("rear").ypos + self.cameras("rear").height,
         )
 
+    @property
     def _right_xpos(self):
         return self.cameras("left").xpos + self.cameras("left").width
 
+    @property
     def _right_ypos(self):
         return max(
             self.cameras("front").ypos + self.cameras("front").height,
             self.cameras("rear").ypos + self.cameras("rear").height,
         )
-
-    def _left_pillar_xpos(self):
-        return 0
-
-    def _left_pillar_ypos(self):
-        return self.cameras("left").ypos + self.cameras("left").height
-
-    def _right_pillar_xpos(self):
-        return self.cameras("right").xpos + self.cameras("right").width
-
-    def _right_pillar_ypos(self):
-        return self.cameras("right").ypos + self.cameras("right").height
 
 
 class FullScreen(MovieLayout):
@@ -1339,104 +1317,6 @@ class Diamond(Cross):
         ) * self.cameras("rear").include
 
 
-class Horizontal(MovieLayout):
-    """Horizontal Movie Layout
-    
-    [LEFT_CAMERA][LEFT_PILLAR][FRONT_CAMERA][REAR_CAMERA][RIGHT_PILLAR][RIGHT_CAMERA]
-    """
-
-    def __init__(self):
-        super().__init__()
-        self.scale = 1 / 2
-
-    @property
-    def video_width(self):
-        return (
-            self.cameras("left").width
-            + self.cameras("left_pillar").width
-            + self.cameras("front").width
-            + self.cameras("rear").width
-            + self.cameras("right_pillar").width
-            + self.cameras("right").width
-        )
-
-    @property
-    def video_height(self):
-        return max(
-            self.cameras("left").height,
-            self.cameras("left_pillar").height,
-            self.cameras("front").height,
-            self.cameras("rear").height,
-            self.cameras("right_pillar").height,
-            self.cameras("right").height,
-        )
-
-    def _left_xpos(self):
-        return 0
-
-    def _left_ypos(self):
-        return int(
-            (self.video_height - self.cameras("left").height) / 2
-        ) * self.cameras("left").include
-
-    def _left_pillar_xpos(self):
-        return self.cameras("left").width * self.cameras("left_pillar").include
-
-    def _left_pillar_ypos(self):
-        return int(
-            (self.video_height - self.cameras("left_pillar").height) / 2
-        ) * self.cameras("left_pillar").include
-
-    def _front_xpos(self):
-        return (
-            self.cameras("left").width + self.cameras("left_pillar").width
-        ) * self.cameras("front").include
-
-    def _front_ypos(self):
-        return int(
-            (self.video_height - self.cameras("front").height) / 2
-        ) * self.cameras("front").include
-
-    def _rear_xpos(self):
-        return (
-            self.cameras("left").width
-            + self.cameras("left_pillar").width
-            + self.cameras("front").width
-        ) * self.cameras("rear").include
-
-    def _rear_ypos(self):
-        return int(
-            (self.video_height - self.cameras("rear").height) / 2
-        ) * self.cameras("rear").include
-
-    def _right_pillar_xpos(self):
-        return (
-            self.cameras("left").width
-            + self.cameras("left_pillar").width
-            + self.cameras("front").width
-            + self.cameras("rear").width
-        ) * self.cameras("right_pillar").include
-
-    def _right_pillar_ypos(self):
-        return int(
-            (self.video_height - self.cameras("right_pillar").height) / 2
-        ) * self.cameras("right_pillar").include
-
-    def _right_xpos(self):
-        return (
-            self.cameras("left").width
-            + self.cameras("left_pillar").width
-            + self.cameras("front").width
-            + self.cameras("rear").width
-            + self.cameras("right_pillar").width
-        ) * self.cameras("right").include
-
-    def _right_ypos(self):
-        return int(
-            (self.video_height - self.cameras("right").height) / 2
-        ) * self.cameras("right").include
-
-
 class MyArgumentParser(argparse.ArgumentParser):
     def convert_arg_line_to_args(self, arg_line):
         # Remove comments.
@@ -1620,16 +1500,10 @@ def get_movie_files(source_folder, video_settings):
                 rear_filename = str(clip_timestamp) + "-back.mp4"
                 rear_path = os.path.join(event_folder, rear_filename)
 
-                left_pillar_filename = str(clip_timestamp) + "-left_pillar.mp4"
-                left_pillar_path = os.path.join(event_folder, left_pillar_filename)
-
-                right_pillar_filename = str(clip_timestamp) + "-right_pillar.mp4"
-                right_pillar_path = os.path.join(event_folder, right_pillar_filename)
-
                 # Get meta data for each camera for this timestamp to determine creation time and duration.
                 metadata = get_metadata(
                     video_settings["ffmpeg_exec"],
-                    [front_path, left_path, right_path, rear_path, left_pillar_path, right_pillar_path],
+                    [front_path, left_path, right_path, rear_path],
                 )
 
                 # Move on to next one if nothing received.
@@ -1665,16 +1539,6 @@ def get_movie_files(source_folder, video_settings):
                             camera = "front"
                         else:
                             camera = "rear"
-                    elif filename == left_pillar_filename:
-                        if video_settings["video_layout"].swap_left_right:
-                            camera = "right_pillar"
-                        else:
-                            camera = "left_pillar"
-                    elif filename == right_pillar_filename:
-                        if video_settings["video_layout"].swap_left_right:
-                            camera = "left_pillar"
-                        else:
-                            camera = "right_pillar"
                     else:
                         continue
 
@@ -2090,7 +1954,7 @@ def create_intermediate_movie(
     ffmpeg_text = video_settings["ffmpeg_text_overlay"]
     user_formatted_text = video_settings["text_overlay_format"]
     user_timestamp_format = video_settings["timestamp_format"]
-    ffmpeg_user_timestamp_format = user_timestamp_format.replace(":", r"\:")
+    ffmpeg_user_timestamp_format = user_timestamp_format.replace(":", "\\\:")
 
     # Replace variables in user provided text overlay
     replacement_strings = {
@@ -2143,7 +2007,7 @@ def create_intermediate_movie(
         _LOGGER.warning(user_formatted_text)
 
     # Escape characters ffmpeg needs
-    user_formatted_text = user_formatted_text.replace(":", r"\:")
+    user_formatted_text = user_formatted_text.replace(":", "\:")
     user_formatted_text = user_formatted_text.replace("\\n", os.linesep)
 
     ffmpeg_text = ffmpeg_text.replace("__USERTEXT__", user_formatted_text)
@@ -3373,7 +3237,7 @@ def main() -> int:
     layout_group.add_argument(
         "--layout",
         required=False,
-        choices=["WIDESCREEN", "FULLSCREEN", "PERSPECTIVE", "CROSS", "DIAMOND", "HORIZONTAL"],
+        choices=["WIDESCREEN", "FULLSCREEN", "PERSPECTIVE", "CROSS", "DIAMOND"],
         default="FULLSCREEN",
         type=str.upper,
         help="R|Layout of the created video.\n"
@@ -3383,8 +3247,7 @@ def main() -> int:
         "    PERSPECTIVE: Similar to FULLSCREEN but then with side cameras in perspective.\n"
         "    CROSS: Front camera center top, side cameras underneath, and rear camera center bottom.\n"
         "    DIAMOND: Front camera center top, side cameras below front camera left and right of front, "
-        "and rear camera center bottom.\n"
-        "    HORIZONTAL: All cameras in horizontal line: left, left pillar, front, rear, right pillar, right.\n",
+        "and rear camera center bottom.\n",
     )
     layout_group.add_argument(
         "--camera_position",
@@ -3399,8 +3262,6 @@ def main() -> int:
         "    Rear: <width front>x0\n"
         "    Left: 0xmax(<height front>, <height rear>\n"
         "    Right: <width front>xmax(<height front>, <height rear>\n"
-        "    Left Pillar: 0x<height left>\n"
-        "    Right Pillar: <width right>x<height right>\n"
         "Using this together with argument camera_order allows one to completely customize the layout\n"
         "Note that layout chosen also determines camera clip size and thus default position. See scale for respective sizing.\n"
         "Further, changing the scale of a camera clip would further impact potential positioning."
@@ -3408,8 +3269,7 @@ def main() -> int:
         "  --camera_position camera=left 640x480                          Position left camera at 640x480\n"
         "  --camera_position camera=right x_pos=640                        Position right camera at x-position 640, y-position based on layout\n"
         "  --camera_position camera=front y_pos=480                        Position front camera at x-position based on layout, y-position at 480\n"
-        "  --camera_position camera=rear  1280x960                        Position rear camera at 1280x960\n"
-        "  --camera_position camera=left_pillar 0x960                     Position left pillar camera at 0x960\n",
+        "  --camera_position camera=rear  1280x960                        Position rear camera at 1280x960\n",
     )
 
     layout_group.add_argument(
@@ -3419,12 +3279,12 @@ def main() -> int:
         help="R|Determines the order of processing the camera. Normally this is not required unless there is overlap.\n"
         "When using argument camera_position it is possible to overlap cameras partially or completely, by then\n"
         "leveraging this argument one can determine which camera will be on top and which one will be bottom."
-        " Default order is: left, right, front, rear, left_pillar, right_pillar. If there is no overlap then the order does not matter.\n"
+        " Default order is: left, front, right, rear. If there is no overlap then the order does not matter.\n"
         " If not all cameras are specified then default order will be followed for those not specified, and thus be more on top."
         "for example:\n"
-        "  --camera_order front,rear,left,right,left_pillar,right_pillar    Makes it that right_pillar will be on top, then left_pillar, then right, then left, then rear, and front at the bottom.\n",
+        "  --camera_order front,rear,left,right                    Makes it that right will be on top, then left, then rear, and front at the bottom.\n",
     )
-    layout_group.set_defaults(clip_order="front,rear,left,right,left_pillar,right_pillar")
+    layout_group.set_defaults(clip_order="front,rear,left,right")
 
     layout_group.add_argument(
         "--perspective",
@@ -3441,13 +3301,12 @@ def main() -> int:
         action="append",
         help="R|Set camera clip scale for all clips, scale of 1 is 1280x960 camera clip.\n"
         "If provided with value then it is default for all cameras, to set the scale for a specific "
-        "camera provide camera=<front, left, right, rear, left_pillar, right_pillar> <scale>\n"
+        "camera provide camera=<front, left, right,rear> <scale>\n"
         "for example:\n"
         "  --scale 0.5                                             all are 640x480\n"
         "  --scale 640x480                                         all are 640x480\n"
         "  --scale 0.5 --scale camera=front 1                      all are 640x480 except front at 1280x960\n"
         "  --scale camera=left .25 --scale camera=right 320x240    left and right are set to 320x240\n"
-        "  --scale camera=left_pillar 0.25                         left pillar camera is set to 320x240\n"
         "Defaults:\n"
         "    WIDESCREEN: 1/2 (front 1280x960, others 640x480, video is 1920x1920)\n"
         "    FULLSCREEN: 1/2 (640x480, video is 1920x960)\n"
@@ -3533,18 +3392,6 @@ def main() -> int:
         dest="no_rear",
         action="store_true",
         help="Exclude rear camera from video.",
-    )
-    camera_group.add_argument(
-        "--no-left-pillar",
-        dest="no_left_pillar",
-        action="store_true",
-        help="Exclude left pillar camera from video.",
-    )
-    camera_group.add_argument(
-        "--no-right-pillar",
-        dest="no_right_pillar",
-        action="store_true",
-        help="Exclude right pillar camera from video.",
     )
 
     text_overlay_group = parser.add_argument_group(
@@ -4085,8 +3932,6 @@ def main() -> int:
             layout_settings = Cross()
         elif args.layout == "DIAMOND":
             layout_settings = Diamond()
-        elif args.layout == "HORIZONTAL":
-            layout_settings = Horizontal()
         else:
             layout_settings = FullScreen()
 
@@ -4100,11 +3945,6 @@ def main() -> int:
 
     layout_settings.cameras("front").include = not args.no_front
     layout_settings.cameras("left").include = not args.no_left
-    
-    # Pillar cameras are only included by default for HORIZONTAL layout
-    pillar_default_include = args.layout == "HORIZONTAL"
-    layout_settings.cameras("left_pillar").include = pillar_default_include and not getattr(args, "no_left_pillar", False)
-    layout_settings.cameras("right_pillar").include = pillar_default_include and not getattr(args, "no_right_pillar", False)
     if layout_settings.swap_front_rear:
         layout_settings.cameras("front").include = not args.no_rear
         layout_settings.cameras("rear").include = not args.no_front
@@ -4120,8 +3960,6 @@ def main() -> int:
     mirror = {
         "left": ", hflip" if side_camera_as_mirror else "",
         "right": ", hflip" if side_camera_as_mirror else "",
-        "left_pillar": "",
-        "right_pillar": "",
     }
     mirror.update(
         {
@@ -4139,13 +3977,9 @@ def main() -> int:
     if layout_settings.swap_left_right:
         layout_settings.cameras("left").include = not args.no_right
         layout_settings.cameras("right").include = not args.no_left
-        layout_settings.cameras("left_pillar").include = pillar_default_include and not getattr(args, "no_right_pillar", False)
-        layout_settings.cameras("right_pillar").include = pillar_default_include and not getattr(args, "no_left_pillar", False)
     else:
         layout_settings.cameras("left").include = not args.no_left
         layout_settings.cameras("right").include = not args.no_right
-        layout_settings.cameras("left_pillar").include = pillar_default_include and not getattr(args, "no_left_pillar", False)
-        layout_settings.cameras("right_pillar").include = pillar_default_include and not getattr(args, "no_right_pillar", False)
 
     # For scale first set the main clip one if provided, this than allows camera specific ones to override for
     # that camera.
@@ -4157,13 +3991,13 @@ def main() -> int:
 
     for scale in scaling:
         camera = scale.get("camera", "").lower()
-        if camera in ["front", "left", "right", "rear", "left_pillar", "right_pillar"]:
+        if camera in ["front", "left", "right", "rear"]:
             if camera_scale := scale.get("scale"):
                 layout_settings.cameras(camera).scale = camera_scale
 
     for pos in parser.args_to_dict(args.clip_pos, "x_y_pos"):
         camera = pos.get("camera", "").lower()
-        if camera in ["front", "left", "right", "rear", "left_pillar", "right_pillar"]:
+        if camera in ["front", "left", "right", "rear"]:
             x_pos, y_pos = None, None
             if x_y_pos := pos.get("x_y_pos"):
                 x_y_pos = x_y_pos.split("x")
@@ -4262,7 +4096,7 @@ def main() -> int:
 
         # noinspection PyPep8
         temp_font_file = (
-            rf"c:\{layout_settings.font.font}"
+            f"c:\{layout_settings.font.font}"
             if PLATFORM == "win32"
             else layout_settings.font.font
         )
