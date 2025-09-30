@@ -110,6 +110,69 @@ Install from pypi is done through:
     python3 -m pip install tesla_dashcam
 
 
+Docker
+------
+
+Tesla Dashcam can also be run using Docker, which eliminates the need to install Python, ffmpeg, and other dependencies directly on your system.
+
+Three Docker images are available:
+
+- **Standard**: Basic CPU-only processing
+- **NVIDIA**: GPU-accelerated processing using NVIDIA CUDA
+- **VAAPI**: Hardware acceleration using Intel/AMD VAAPI
+
+Building Docker Images
+~~~~~~~~~~~~~~~~~~~~~~
+
+.. code:: bash
+
+    # Standard image
+    docker build -t tesla_dashcam .
+    
+    # NVIDIA GPU support
+    docker build -f Dockerfile.nvidia -t tesla_dashcam:nvidia .
+    
+    # VAAPI hardware acceleration
+    docker build -f Dockerfile.vaapi -t tesla_dashcam:vaapi .
+
+Running with Docker
+~~~~~~~~~~~~~~~~~~~
+
+Basic usage:
+
+.. code:: bash
+
+    # Process files from a USB drive mounted at /media/tesla
+    docker run --rm -v /media/tesla:/data -v $(pwd)/output:/output tesla_dashcam /data /output
+    
+    # With NVIDIA GPU acceleration
+    docker run --rm --gpus all -v /media/tesla:/data -v $(pwd)/output:/output tesla_dashcam:nvidia /data /output --gpu --gpu_type nvidia
+    
+    # With VAAPI hardware acceleration
+    docker run --rm --device /dev/dri -v /media/tesla:/data -v $(pwd)/output:/output tesla_dashcam:vaapi /data /output --gpu --gpu_type vaapi
+
+Common Docker options:
+
+- ``-v /source:/data``: Mount your TeslaCam footage directory to /data in the container
+- ``-v /output:/output``: Mount your desired output directory
+- ``--rm``: Remove container after execution
+- ``--gpus all``: Enable NVIDIA GPU access (nvidia image only)
+- ``--device /dev/dri``: Enable VAAPI device access (vaapi image only)
+
+Example with additional tesla_dashcam options:
+
+.. code:: bash
+
+    docker run --rm \
+        -v /media/tesla:/data \
+        -v $(pwd)/output:/output \
+        tesla_dashcam \
+        --layout FULLSCREEN \
+        --quality HIGH \
+        --merge \
+        /data/SavedClips \
+        /output
+
 
 Usage
 -----
