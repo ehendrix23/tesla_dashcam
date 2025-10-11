@@ -1436,7 +1436,88 @@ class Horizontal(MovieLayout):
             (self.video_height - self.cameras("right").height) / 2
         ) * self.cameras("right").include
 
+class FullscreenPlus(MovieLayout):
+    """FullscreenPlus Movie Layout: Fullscreen view including both pillar cameras.
 
+        [LEFT_PILLAR][FRONT_CAMERA][RIGHT_PILLAR]
+        [LEFT_CAMERA][REAR_CAMERA ][RIGHT_CAMERA]
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.scale = 1 / 2
+
+    @property
+    def side_width(self):
+        return max(
+            self.cameras("left_pillar").width,
+            self.cameras("left").width,
+            self.cameras("right_pillar").width,
+            self.cameras("right").width,
+        )
+
+    @property
+    def side_height(self):
+        return self.cameras("left_pillar").height + self.cameras("left").height
+
+    @property
+    def center_width(self):
+        return max(self.cameras("front").width, self.cameras("rear").width)
+
+    @property
+    def center_height(self):
+        return self.cameras("front").height + self.cameras("rear").height
+
+    @property
+    def video_width(self):
+        return int(self.side_width * 2 + self.center_width)
+
+    @property
+    def video_height(self):
+        return int(max(self.side_height, self.center_height))
+
+    def _left_pillar_xpos(self):
+        return 0 * self.cameras("left_pillar").include
+
+    def _left_pillar_ypos(self):
+        return ((self.video_height - self.side_height) // 2) * self.cameras("left_pillar").include
+
+    def _left_xpos(self):
+        return 0 * self.cameras("left").include
+
+    def _left_ypos(self):
+        return (self._left_pillar_ypos() + self.cameras("left_pillar").height) * self.cameras("left").include
+
+    def _right_pillar_xpos(self):
+        return (self.side_width + self.center_width) * self.cameras("right_pillar").include
+
+    def _right_pillar_ypos(self):
+        return ((self.video_height - self.side_height) // 2) * self.cameras("right_pillar").include
+
+    def _right_xpos(self):
+        return (self.side_width + self.center_width) * self.cameras("right").include
+
+    def _right_ypos(self):
+        return (self._right_pillar_ypos() + self.cameras("right_pillar").height) * self.cameras("right").include
+
+    def _front_xpos(self):
+        return (
+            self.side_width
+            + (self.center_width - self.cameras("front").width) // 2
+        ) * self.cameras("front").include
+
+    def _front_ypos(self):
+        return ((self.video_height - self.center_height) // 2) * self.cameras("front").include
+
+    def _rear_xpos(self):
+        return (
+            self.side_width
+            + (self.center_width - self.cameras("rear").width) // 2
+        ) * self.cameras("rear").include
+
+    def _rear_ypos(self):
+        return (self._front_ypos() + self.cameras("front").height) * self.cameras("rear").include
+        
 class MyArgumentParser(argparse.ArgumentParser):
     def convert_arg_line_to_args(self, arg_line):
         # Remove comments.
@@ -3373,7 +3454,7 @@ def main() -> int:
     layout_group.add_argument(
         "--layout",
         required=False,
-        choices=["WIDESCREEN", "FULLSCREEN", "PERSPECTIVE", "CROSS", "DIAMOND", "HORIZONTAL"],
+        choices=["WIDESCREEN", "FULLSCREEN", "PERSPECTIVE", "CROSS", "DIAMOND", "HORIZONTAL", "FULLSCREENPLUS"],
         default="FULLSCREEN",
         type=str.upper,
         help="R|Layout of the created video.\n"
@@ -3384,7 +3465,8 @@ def main() -> int:
         "    CROSS: Front camera center top, side cameras underneath, and rear camera center bottom.\n"
         "    DIAMOND: Front camera center top, side cameras below front camera left and right of front, "
         "and rear camera center bottom.\n"
-        "    HORIZONTAL: All cameras in horizontal line: left, left pillar, front, rear, right pillar, right.\n",
+        "    HORIZONTAL: All cameras in horizontal line: left, left pillar, front, rear, right pillar, right.\n"
+        "    FULLSCREENPLUS: Same as FULLSCREEN including left and right pillar camera next to front camera.\n",
     )
     layout_group.add_argument(
         "--camera_position",
@@ -4087,6 +4169,8 @@ def main() -> int:
             layout_settings = Diamond()
         elif args.layout == "HORIZONTAL":
             layout_settings = Horizontal()
+        elif args.layout == "FULLSCREENPLUS":
+            layout_settings = FullscreenPlus()
         else:
             layout_settings = FullScreen()
 
@@ -4101,8 +4185,8 @@ def main() -> int:
     layout_settings.cameras("front").include = not args.no_front
     layout_settings.cameras("left").include = not args.no_left
     
-    # Pillar cameras are only included by default for HORIZONTAL layout
-    pillar_default_include = args.layout == "HORIZONTAL"
+    # Pillar cameras are only included by default for HORIZONTAL or FULLSCREENPLUS layout
+    pillar_default_include = args.layout == "HORIZONTAL" or "FULLSCREENPLUS"
     layout_settings.cameras("left_pillar").include = pillar_default_include and not getattr(args, "no_left_pillar", False)
     layout_settings.cameras("right_pillar").include = pillar_default_include and not getattr(args, "no_right_pillar", False)
     if layout_settings.swap_front_rear:
