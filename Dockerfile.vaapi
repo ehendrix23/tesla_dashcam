@@ -9,6 +9,11 @@ RUN apt-get update -y \
     python3 \
     python3-pip \
     python3-venv \
+    libva2 \
+    libva-drm2 \
+    i965-va-driver \
+    intel-media-va-driver \
+    vainfo \
     && apt-get remove --purge --auto-remove -y && rm -rf /var/lib/apt/lists/*
 
 COPY . /usr/src/app/tesla_dashcam

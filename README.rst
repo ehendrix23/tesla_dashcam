@@ -159,6 +159,44 @@ Common Docker options:
 - ``--gpus all``: Enable NVIDIA GPU access (nvidia image only)
 - ``--device /dev/dri``: Enable VAAPI device access (vaapi image only)
 
+Troubleshooting VAAPI
+~~~~~~~~~~~~~~~~~~~~~
+
+If you encounter errors like "Failed to initialise VAAPI connection" when using the VAAPI image:
+
+1. Verify your system has Intel integrated graphics or AMD GPU with VAAPI support
+2. Check that ``/dev/dri/renderD128`` exists on your host system:
+
+   .. code:: bash
+
+       ls -l /dev/dri/
+
+3. Verify VAAPI works on your host system:
+
+   .. code:: bash
+
+       # Install vainfo on host if not present
+       sudo apt-get install vainfo
+
+       # Check VAAPI status
+       vainfo
+
+4. Ensure your user has permission to access the render device. You may need to add your user to the ``render`` or ``video`` group:
+
+   .. code:: bash
+
+       sudo usermod -a -G render $USER
+       sudo usermod -a -G video $USER
+       # Log out and back in for group changes to take effect
+
+5. If the issue persists, try running the container with extended device access:
+
+   .. code:: bash
+
+       docker run --rm --device /dev/dri:/dev/dri --group-add video \
+           -v /media/tesla:/data -v $(pwd)/output:/output \
+           tesla_dashcam:vaapi /data /output --gpu --gpu_type vaapi
+
 Example with additional tesla_dashcam options:
 
 .. code:: bash
