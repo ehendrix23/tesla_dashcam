@@ -2,12 +2,18 @@ FROM python:3-slim
 
 WORKDIR /usr/src/app/tesla_dashcam
 
-# Install FFmpeg with NVIDIA support and other dependencies
-# Note: Debian's FFmpeg is compiled with NVENC support
+# Install FFmpeg with GPU support (both VAAPI and NVIDIA) and other dependencies
+# Note: Debian's FFmpeg is compiled with both VAAPI and NVENC support
 RUN apt-get update -y \
     && apt-get install -y --no-install-recommends \
-    # FFmpeg with NVIDIA support
+    # FFmpeg with GPU support
     ffmpeg \
+    # VAAPI runtime libraries (for Intel GPUs)
+    libva2 \
+    libva-drm2 \
+    i965-va-driver \
+    intel-media-va-driver \
+    vainfo \
     # Application dependencies
     fonts-freefont-ttf \
     libnotify-bin \

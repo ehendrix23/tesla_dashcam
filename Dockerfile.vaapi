@@ -1,23 +1,28 @@
-FROM jrottenberg/ffmpeg:7-vaapi
+FROM python:3-slim
 
 WORKDIR /usr/src/app/tesla_dashcam
 
+# Install FFmpeg with VAAPI support and other dependencies
 RUN apt-get update -y \
-    && apt-get install -y \
-    fonts-freefont-ttf \
-    libnotify-bin \
-    python3 \
-    python3-pip \
-    python3-venv \
+    && apt-get install -y --no-install-recommends \
+    # FFmpeg with VAAPI support
+    ffmpeg \
+    # VAAPI runtime libraries
     libva2 \
     libva-drm2 \
     i965-va-driver \
     intel-media-va-driver \
     vainfo \
+    # Application dependencies
+    fonts-freefont-ttf \
+    libnotify-bin \
     && apt-get remove --purge --auto-remove -y && rm -rf /var/lib/apt/lists/*
 
+# Copy application code
 COPY . /usr/src/app/tesla_dashcam
-RUN pip install --break-system-packages -r requirements.txt
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Enable Logs to show on run
 ENV PYTHONUNBUFFERED=true
