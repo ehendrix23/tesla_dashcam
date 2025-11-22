@@ -9,11 +9,12 @@ RUN echo "deb http://deb.debian.org/debian sid main" > /etc/apt/sources.list.d/u
     && apt-get install -y --no-install-recommends \
     # FFmpeg with GPU support (from unstable/sid for latest version)
     ffmpeg \
-    # VAAPI runtime libraries (for Intel GPUs)
+    # VAAPI runtime libraries (for Intel and AMD GPUs)
     libva2 \
     libva-drm2 \
     i965-va-driver \
     intel-media-va-driver \
+    mesa-va-drivers \
     vainfo \
     # Application dependencies
     fonts-freefont-ttf \

@@ -8,11 +8,12 @@ RUN apt-get update -y \
     && apt-get install -y --no-install-recommends \
     # FFmpeg with GPU support
     ffmpeg \
-    # VAAPI runtime libraries (for Intel GPUs)
+    # VAAPI runtime libraries (for Intel and AMD GPUs)
     libva2 \
     libva-drm2 \
     i965-va-driver \
     intel-media-va-driver \
+    mesa-va-drivers \
     vainfo \
     # Application dependencies
     fonts-freefont-ttf \

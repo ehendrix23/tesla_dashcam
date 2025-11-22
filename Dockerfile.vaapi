@@ -12,6 +12,7 @@ RUN apt-get update -y \
     libva-drm2 \
     i965-va-driver \
     intel-media-va-driver \
+    mesa-va-drivers \
     vainfo \
     # Application dependencies
     fonts-freefont-ttf \
