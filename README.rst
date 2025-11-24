@@ -143,13 +143,13 @@ Basic usage:
 .. code:: bash
 
     # Process files from a USB drive mounted at /media/tesla
-    docker run --rm -v /media/tesla:/data -v $(pwd)/output:/output tesla_dashcam /data /output
+    docker run --rm -v /media/tesla:/data -v $(pwd)/output:/output tesla_dashcam /data --output /output
     
     # With NVIDIA GPU acceleration
-    docker run --rm --gpus all -v /media/tesla:/data -v $(pwd)/output:/output tesla_dashcam:nvidia /data /output --gpu --gpu_type nvidia
+    docker run --rm --gpus all -v /media/tesla:/data -v $(pwd)/output:/output tesla_dashcam:nvidia /data --output /output --gpu --gpu_type nvidia
     
     # With VAAPI hardware acceleration
-    docker run --rm --device /dev/dri -v /media/tesla:/data -v $(pwd)/output:/output tesla_dashcam:vaapi /data /output --gpu --gpu_type vaapi
+    docker run --rm --device /dev/dri -v /media/tesla:/data -v $(pwd)/output:/output tesla_dashcam:vaapi /data --output /output --gpu --gpu_type vaapi
 
 Common Docker options:
 
@@ -209,7 +209,7 @@ Example with additional tesla_dashcam options:
         --quality HIGH \
         --merge \
         /data/SavedClips \
-        /output
+        --output /output
 
 
 Usage
