@@ -4389,8 +4389,14 @@ def main() -> int:
                             ]
                             ffmpeg_hwout = ffmpeg_hwout + ["-hwaccel", "qsv"]
 
-            bit_rate = str(int(10000 * layout_settings.scale)) + "K"
-            video_encoding = video_encoding + ["-b:v", bit_rate]
+            # VAAPI uses CQP (Constant Quality) mode instead of bitrate
+            # Use the same quality setting (CRF/QP value) from --quality flag
+            if args.gpu_type == "vaapi":
+                qp_value = MOVIE_QUALITY[args.quality]
+                video_encoding = video_encoding + ["-rc_mode", "CQP", "-qp", qp_value]
+            else:
+                bit_rate = str(int(10000 * layout_settings.scale)) + "K"
+                video_encoding = video_encoding + ["-b:v", bit_rate]
 
         video_encoding = video_encoding + ["-c:v", MOVIE_ENCODING[encoding]]
     else:
