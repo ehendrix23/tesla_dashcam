@@ -52,10 +52,11 @@ for preferencefile in ${PreferenceFolder}/*; do
 	filename="${preferencefile##*/}"
 	folder=${filename%%.*}
 	if [ "${OutputFolder}" != "" ]; then
-		preference_OutputFolder="--output ""${OutputFolder}/${folder}""" 
+		preference_OutputFolder="${OutputFolder}/${folder}" 
 		if [ ! -d "${preference_OutputFolder}" ]; then
 			mkdir -p "${preference_OutputFolder}"
 		fi
+		preference_OutputFolder="--output ""${preference_OutputFolder}""" 
 
 	fi
 	echo "Using Preference File ${filename}"
