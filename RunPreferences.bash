@@ -35,7 +35,6 @@ if [ "${OutputFolder}" != "" ]; then
 	if [ ! -d ${OutputFolder} ]; then
 		mkdir ${OutputFolder}
 	fi
-	OutputFolder="--output ""${OutputFolder}""" 
 fi
 
 if [ "${StartTimestamp}" != "" ]; then
@@ -52,9 +51,16 @@ fi
 for preferencefile in ${PreferenceFolder}/*; do
 	filename="${preferencefile##*/}"
 	folder=${filename%%.*}
+	if [ "${OutputFolder}" != "" ]; then
+		preference_OutputFolder="--output ""${OutputFolder}/${folder}""" 
+		if [ ! -d "${preference_OutputFolder}" ]; then
+			mkdir -p "${preference_OutputFolder}"
+		fi
+
+	fi
 	echo "Using Preference File ${filename}"
-	echo "${Command} ${InputFolders} ${LogLevel} ${OutputFolder} @${preferencefile}  ${StartTimestamp} ${EndTimestamp}"
-	${Command} ${InputFolders} ${LogLevel} ${OutputFolder} @${preferencefile} ${StartTimestamp} ${EndTimestamp}
+	echo "${Command} ${InputFolders} ${LogLevel} ${preference_OutputFolder} @${preferencefile}  ${StartTimestamp} ${EndTimestamp}"
+	${Command} ${InputFolders} ${LogLevel} ${preference_OutputFolder} @${preferencefile} ${StartTimestamp} ${EndTimestamp}
 	if [ $? -ne 0 ]; then
 		exit 1
 	fi
