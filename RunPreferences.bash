@@ -3,8 +3,8 @@
 # Small script that will run tesla_dashcam leveraging all the different preferences provided in the Preference_Files folder.
 
 # Folder(s) to scan for clips
-# InputFolders='/Volumes/TeslaCam/TeslaCam/SentryClips /Volumes/TeslaCam/TeslaCam/SavedClips'
-InputFolders='/Volumes/TeslaCam/TeslaCam_Debug'
+InputFolders='/Volumes/TeslaCam/TeslaCam/SentryClips /Volumes/TeslaCam/TeslaCam/SavedClips'
+# InputFolders='/Volumes/TeslaCam/TeslaCam_Debug'
 
 # Folder to store resulting movie files.
 OutputFolder='/Volumes/TeslaCam/Movies'
