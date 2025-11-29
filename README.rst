@@ -217,7 +217,7 @@ Usage
 
 .. code:: bash
 
-    usage: tesla_dashcam.py [-h] [--version] [--loglevel {DEBUG,INFO,WARNING,ERROR,CRITICAL}] [--temp_dir TEMP_DIR] [--no-notification] [--display_ts] [--skip_existing]
+    usage: tesla_dashcam.py [-h] [--version] [--loglevel {DEBUG,INFO,WARNING,ERROR,CRITICAL}] [--ffmpeg_debug] [--temp_dir TEMP_DIR] [--no-notification] [--display_ts] [--skip_existing]
                             [--delete_source] [--exclude_subdirs] [--monitor] [--monitor_once] [--monitor_trigger MONITOR_TRIGGER]
                             [--layout {WIDESCREEN,FULLSCREEN,PERSPECTIVE,CROSS,DIAMOND,HORIZONTAL}] [--perspective] [--scale CLIP_SCALE [CLIP_SCALE ...]] [--mirror] [--rear] [--swap] [--no-swap]
                             [--swap_frontrear] [--background BACKGROUND] [--title_screen_map] [--no-front] [--no-left] [--no-right] [--no-rear] [--no-left-pillar] [--no-right-pillar] [--no-timestamp]
@@ -240,6 +240,7 @@ Usage
       --version             show program's version number and exit
       --loglevel {DEBUG,INFO,WARNING,ERROR,CRITICAL}
                             Logging level. (default: INFO)
+      --ffmpeg_debug        Will enable outputting FFMPEG messages when loglevel is set to debug
       --temp_dir TEMP_DIR   Path to store temporary files. (default: None)
       --no-notification     Do not create a notification upon completion. (default: True)
       --display_ts          Display timestamps on tesla_dashcam text output. DOES NOT AFFECT VIDEO OUTPUT. (default: False)
@@ -364,6 +365,7 @@ Usage
                                 {event_timestamp} - Timestamp from events.json (if provided), string
                                 {event_timestamp_countdown_rolling} - Local time which continuously updates (shorthand for '%{{hms:localtime:{event_timestamp}}}'), string
                                 {event_city} - City name from events.json (if provided), string
+                                {event_street} - Street name from events.json (if provided), string
                                 {event_reason} - Recording reason from events.json (if provided), string
                                 {event_latitude} - Estimated latitude from events.json (if provided), float
                                 {event_longitude} - Estimated longitude from events.json (if provided), float
@@ -417,6 +419,7 @@ Usage
                                 {end_timestamp} - Local time the event ends at        
                                 {event_timestamp} - Timestamp from events.json (if provided), string
                                 {event_city} - City name from events.json (if provided), string
+                                {event_street} - Street name from events.json (if provided), string
                                 {event_reason} - Recording reason from events.json (if provided), string
                                 {event_latitude} - Latitude from events.json (if provided), float
                                 {event_longitude} - Longitude from events.json (if provided), float        
@@ -432,8 +435,8 @@ Usage
     Advanced encoding settings:
       Advanced options for encoding
 
-      --no-gpu              Disable use of GPU acceleration. Default on Non-MACs.                            
-      --gpu                 Use GPU acceleration. Default on Macs.                            
+      --no-gpu              Disable use of GPU acceleration. Default on Non-MACs and Mac's with Apple CPU                           
+      --gpu                 Use GPU acceleration. Default on Macs with Intel CPU.                            
                             --gpu_type has to be provided as well on Non-Macs when enabling this parameter (default: False)
       --gpu_type {nvidia,intel,qsv,rpi,vaapi}
                             Type of graphics card (GPU) in the system. This determines the encoder that will be used.This parameter is mandatory if --gpu is provided on Non-Macs. (default: None)
@@ -488,6 +491,10 @@ or so.
 *--loglevel <level>*
 
   Log level for additional output. Currently only used for DEBUG, providing any other value will not change anything.
+
+*--ffmpeg_debug*
+
+  Include ffmpeg output when log level is set to DEBUG, otherwise has no effect.
 
 *--temp_dir <path>*
 
@@ -820,6 +827,8 @@ Following parameters are to change settings for the text that is being added to 
   `{event_timestamp}`: Timestamp from events.json (if provided), string
 
   `{event_city}`: City name from events.json (if provided), string
+
+  `{event_street}`: Street name from events.json (if provided), string
 
   `{event_reason}`: Recording reason from events.json (if provided), string
 
@@ -1757,16 +1766,27 @@ Release Notes
     - New: Added support for Intel VAAPI GPU acceleration (https://trac.ffmpeg.org/wiki/Hardware/VAAPI). Contributed by timrettop.
     - New: Two new dockerfiles have been added. One to support NVIDIA and other one to support VAAPI. Contributed by magicalyak
     - Changed (BREAKING): How offsets are calculated has been changed and can impact result if negative values were being provided for start_offset and/or end_offset!
-    - Changed: Updated Docketfile. Contributed by magicalyak
+    - Changed: Updated Dockerfile. Contributed by magicalyak
     - Fixed: Resolved issue on Linux with default device initialization failure when using Intel GPU acceleration and multiple usable devices by adding new qsv gpu_type (https://trac.ffmpeg.org/ticket/7649). Contributed by timrettop.
 0.1.21:
     - New: Option --camera_position to provide coordinates where the camera clip should be positioned in the video providing very granular custom layout options. Using this option results in ignoring the layout option.
     - New: Option --camera_order to define the order the cameras should be processed. This allows to overlay one camera over another one and define which one should be on top.
     - New: Inclusion of left and right pillar cameras.
     - New: If an event does not have files for a certain camera (i.e. pillar cameras) then resulting layout will be as if those cameras were excluded.
-    - Fixed: Issue with GPU type check of qsv for Linux. Contributed by cjwang18
+    - New: Added street name from events.json, this became available with Tesla 2025.38.6
+    - New: Added option --ffmpeg_debug so that when running with loglevel debug, FFMPEG output is not provided unless this is enabled as well.
+    - Changed: Many internal changes, including how layouts are calculated, typing, etc.
+    - Changed: Docker: Reduces Docker image sizes by 24-66% by switching from jrottenberg/ffmpeg to Debian's FFmpeg package on python:3-slim base. Contributed by @magicalyak
+    - Fixed: Issue with GPU type check of qsv for Linux. Contributed by @cjwang18
     - Fixed: ffmpeg error when swapping front/rear and excluding front or rear
     - Fixed: ffmpeg error when swapping left/right and excluding left or right
+    - Fixed: Traceback if duration in video clip from Tesla is N/A, now clip will be excluded. `Issue #212 <https://github.com/ehendrix23/tesla_dashcam/issues/212>`_
+    - Fixed: When using front-layout, will now use ratio of clip instead of fixed 4/3 `Issue #214 <https://github.com/ehendrix23/tesla_dashcam/issues/214>`_
+    - Fixed: Will now force SAR to be 1:1 same as Tesla clips.
+    - Fixed: Typo in qsv arg check. Contributed by @cjwang18
+    - Fixed: Docker: Add tesla_dashcam to non-accelerated container image. Contributed by @croadfeldt
+    - 
+    -  
 
 
 TODO
@@ -1775,7 +1795,6 @@ TODO
 * Implement Jinja2 for templates
 * Implement templates for other options
 * Implement option to crop individual camera output
-* Option for end-user layout
 * Monitor path for new folders/files as trigger option
 * Provide option to copy or move from source to output folder before starting to process
 * Develop method to run as a service with --monitor option
