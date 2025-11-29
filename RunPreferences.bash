@@ -3,7 +3,8 @@
 # Small script that will run tesla_dashcam leveraging all the different preferences provided in the Preference_Files folder.
 
 # Folder(s) to scan for clips
-InputFolders='/Volumes/TeslaCam/TeslaCam/SentryClips /Volumes/TeslaCam/TeslaCam/SavedClips'
+# InputFolders='/Volumes/TeslaCam/TeslaCam/SentryClips /Volumes/TeslaCam/TeslaCam/SavedClips'
+InputFolders='/Volumes/TeslaCam/TeslaCam_Debug'
 
 # Folder to store resulting movie files.
 OutputFolder='/Volumes/TeslaCam/Movies'
@@ -48,6 +49,11 @@ if [ "${LogLevel}" != "" ]; then
 	LogLevel="--loglevel ${LogLevel}"
 fi
 
+keep_events=""
+# keep_events="--keep-events"
+keep_intermediate=""
+# keep_intermediate="--keep-intermediate"
+
 for preferencefile in ${PreferenceFolder}/*; do
 	filename="${preferencefile##*/}"
 	folder=${filename%%.*}
@@ -60,8 +66,8 @@ for preferencefile in ${PreferenceFolder}/*; do
 
 	fi
 	echo "Using Preference File ${filename}"
-	echo "${Command} ${InputFolders} ${LogLevel} ${preference_OutputFolder} @${preferencefile}  ${StartTimestamp} ${EndTimestamp}"
-	${Command} ${InputFolders} ${LogLevel} ${preference_OutputFolder} @${preferencefile} ${StartTimestamp} ${EndTimestamp}
+	echo "${Command} ${InputFolders} ${LogLevel} ${preference_OutputFolder} ${keep_events} ${keep_intermediate} @${preferencefile}  ${StartTimestamp} ${EndTimestamp}"
+	${Command} ${InputFolders} ${LogLevel} ${preference_OutputFolder} ${keep_events} ${keep_intermediate} @${preferencefile} ${StartTimestamp} ${EndTimestamp}
 	if [ $? -ne 0 ]; then
 		exit 1
 	fi

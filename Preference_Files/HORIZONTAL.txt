@@ -8,22 +8,19 @@
 # --delete_source
 
 # DIAMOND Layout
---layout DIAMOND
+--layout HORIZONTAL
 
-# Put clip info top right
---halign RIGHT --valign TOP
+# Put clip info center, bottom.
+--halign CENTER --valign BOTTOM
 
 # Output city and timestamp
---text_overlay_fmt "Street: {event_street}\nCity: {event_city}\nDate/Time: {local_timestamp_rolling}"
+--text_overlay_fmt "Street: {event_street}\nCity: {event_city} - Date/Time: {local_timestamp_rolling}"
 
 # Fast forward through portions where there is no motion detected
 --motion_only
 
-# Encode with x265
---encoding x265
-
-# Disable GPU as on Mac with x265 it seems faster
---no-gpu
+# Encode with x264
+--encoding x264
 
 # Set start offset to 120 seconds
 --start_offset 120

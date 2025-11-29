@@ -2,7 +2,7 @@
 # tesla_dashcam <Location of video files> --output <Location to store encoded video files> @DIAMOND_PERSPECTIVE.txt
 
 # Skip if encoded file already exist.
---skip_existing
+# --skip_existing
 
 # Delete processed files when video file is encoded.
 # --delete_source
@@ -17,16 +17,21 @@
 --halign RIGHT --valign TOP
 
 # Output city and timestamp
---text_overlay_fmt "City: {event_city}\nDate/Time: {local_timestamp_rolling}"
+--text_overlay_fmt "Street: {event_street}\nCity: {event_city}\nDate/Time: {local_timestamp_rolling}"
 
 # Fast forward through portions where there is no motion detected
 --motion_only
 
-# Encode with x265
---encoding x265
+# Encode with x264
+--encoding x264
+
+# Disable GPU
+--no-gpu
 
 # Set end offset to 120 seconds
 --end_offset -120
 
 # Merge files together
---merge
+--merge "{layout}_PERSPECTIVE"
+
+--ffmpeg_debug
