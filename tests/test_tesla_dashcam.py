@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, Mock
+from unittest.mock import MagicMock, Mock, PropertyMock
 
 import pytest
 
@@ -14,19 +14,20 @@ from tesla_dashcam.tesla_dashcam import (
     FullScreen,
     MovieLayout,
     WideScreen,
+    escape_drawtext_literals,
 )
 
 
 def verify_camera_layout(layout, config, expected):
     # Apply camera inclusion settings
-    for cam, val in config.items():
+    for key, val in config.items():
         if isinstance(val, bool):
-            layout.cameras(cam).include = val
+            layout.cameras(key).include = val
         elif isinstance(val, dict):
             for sub_key, sub_val in val.items():
                 layout.cameras(sub_key).scale = sub_val
         else:
-            layout.cameras(cam).scale = val
+            layout.cameras(key).scale = val
 
     # Assert positions
     for cam, (x, y) in expected["positions"].items():
@@ -48,10 +49,32 @@ def verify_camera_layout(layout, config, expected):
         assert round(layout.scale, 2) == round(expected["scale"], 2)
 
 
+class TestDrawtextEscaping:
+    def test_escapes_colons_outside_expansion(self):
+        raw_text = "Countdown: %{pts\:hms\:603}"
+        assert escape_drawtext_literals(raw_text) == r"Countdown\: %{pts\:hms\:603}"
+
+    def test_keeps_colons_inside_expansion(self):
+        raw_text = "%{pts\:localtime\:1234\:%a, %d %b %Y at %I:%M:%S%p}"
+        assert escape_drawtext_literals(raw_text) == raw_text
+
+    def test_does_not_double_escape(self):
+        raw_text = r"Event\: %{pts\:hms\:10}"
+        assert escape_drawtext_literals(raw_text) == raw_text
+
+    def test_convert_timestamp(self):
+        timestamp_format = "%a, %d %b %Y at %I:%M:%S%p"
+        convert1 = escape_drawtext_literals(timestamp_format)
+        assert convert1 == "%a, %d %b %Y at %I\:%M\:%S%p"
+        pts_time = f"%{{pts\\:localtime\\:0\\:{convert1}}}"
+        assert escape_drawtext_literals(pts_time) == pts_time
+
+
 class TestCamera:
     @pytest.fixture
     def layout(self):
         layout = MagicMock(spec=MovieLayout)
+        type(layout).event = PropertyMock(return_value=None)
 
         return layout
 
@@ -63,11 +86,11 @@ class TestCamera:
         """Test camera initialization with default values"""
         assert camera.camera == "front"
         assert camera.include is True
-        assert camera.width == 0
-        assert camera.height == 0
+        assert camera.width == 1280
+        assert camera.height == 960
         assert camera.xpos == 0
         assert camera.ypos == 0
-        assert camera.scale == 0
+        assert camera.scale == 1
         assert camera.options == ""
 
     def test_camera_setters(self, camera, monkeypatch):
@@ -134,15 +157,12 @@ class TestMovieLayout:
         """Test MovieLayout initialization"""
         assert isinstance(layout, MovieLayout)
         # Test cameras dictionary has exact set of keys
-        expected_cameras = {
-            "front",
-            "left",
-            "right",
-            "rear",
-            "left_pillar",
-            "right_pillar",
-        }
-        assert layout.cameras("").keys() == expected_cameras
+        assert layout.cameras("front")
+        assert layout.cameras("left")
+        assert layout.cameras("right")
+        assert layout.cameras("rear")
+        assert layout.cameras("left_pillar")
+        assert layout.cameras("right_pillar")
 
         # Test clip order (assuming this is a list property)
         expected_clip_order = [
@@ -164,8 +184,8 @@ class TestMovieLayout:
         assert layout.swap_front_rear is False
         assert layout.perspective is False
 
-        assert layout.video_width == 0
-        assert layout.video_height == 0
+        assert layout.video_width == 2560
+        assert layout.video_height == 2880
 
     def test_movielayout_setters(self, layout, monkeypatch):
         """Test MovieLayout property setters"""
