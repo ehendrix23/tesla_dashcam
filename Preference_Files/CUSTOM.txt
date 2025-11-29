@@ -1,0 +1,60 @@
+# Execute using:
+# tesla_dashcam <Location of video files> --output <Location to store encoded video files> @DIAMOND.txt
+
+# Skip if encoded file already exist.
+--skip_existing
+
+# Delete processed files when video file is encoded.
+# --delete_source
+
+# Put clip info top center
+--halign CENTER --valign TOP
+
+# Output city and timestamp
+--text_overlay_fmt "Event: {event_reason}\nLocation: {event_street}, {event_city}\nDate/Time: {local_timestamp_rolling}"
+
+# Encode with x265
+--encoding x265
+
+# Disable GPU as on Mac with x265 it seems faster
+# --gpu
+
+# Merge files together
+--merge "{layout}"
+
+# Merge files together
+--merge_timestamp_format "%Y-%m"
+
+# Create map
+--title_screen_map
+
+# Custom layout
+# Set default scale for all camera clips to 320x240
+--scale 320x240
+
+# Set scale for front at 1280x960 (full size)
+--scale camera=front 1280x960
+
+# Set scale for rear camera at 640x240 (widescreen)
+--scale camera=rear 640x240
+
+# Front camera starting at upper left corner (will take full video)
+--camera_position camera=front 0x0
+
+# Left pillar upper left corner
+--camera_position camera=left_pillar 0x0
+
+# Right pillar upper right corner
+--camera_position camera=right_pillar 960x0
+
+# Left bottom left corner
+--camera_position camera=left 0x720
+
+# Right bottom left corner
+--camera_position camera=right 960x720
+
+# Rear bottom middle between left and right
+--camera_position camera=rear 320x720
+
+# Set the movie timestamp to SENTRY event
+--set_moviefile_timestamp SENTRY

@@ -10,8 +10,8 @@
 # DIAMOND Layout
 --layout DIAMOND
 
-# Put clip info top right
---halign RIGHT --valign TOP
+# Put clip info bottom left
+--halign LEFT --valign BOTTOM
 
 # Output city and timestamp
 --text_overlay_fmt "Street: {event_street}\nCity: {event_city}\nDate/Time: {local_timestamp_rolling}"
@@ -22,17 +22,23 @@
 # Encode with x265
 --encoding x265
 
-# Disable GPU as on Mac with x265 it seems faster
---no-gpu
-
 # Set start offset to 120 seconds
 --start_offset 120
 
 # Merge files together
---merge "{layout}"
+--merge "{layout}_SCALED"
 
 # Merge files together
 --merge_timestamp_format "%Y-%m"
 
 # Create map
 --title_screen_map
+
+# Scale pillar and repeater cameras to 1/4 normal size
+--scale camera=left_pillar 320x240
+--scale camera=right_pillar 320x240
+--scale camera=left 320x240
+--scale camera=right 320x240
+
+# Scale rear camera to 1/2 normal size
+--scale camera=rear 640x480

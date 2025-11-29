@@ -2,7 +2,7 @@
 # tesla_dashcam <Location of video files> --output <Location to store encoded video files> @WIDESCREEN_REAR.txt
 
 # Skip if encoded file already exist.
---skip_existing
+# --skip_existing
 
 # Delete processed files when video file is encoded.
 # --delete_source
@@ -24,3 +24,6 @@
 
 # Encode with x265
 --encoding x265
+
+# Disable GPU as on Mac with x265 it seems faster
+--no-gpu

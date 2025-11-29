@@ -14,7 +14,7 @@
 --halign LEFT --valign BOTTOM
 
 # Output event reason, event date/time, event city, # seconds till event, and date/time
---text_overlay_fmt "Reason: {event_reason}\nEvent: {event_timestamp}\nCity: {event_city}\nCountdown: {event_timestamp_countdown_rolling}\nDate/Time: {local_timestamp_rolling}"
+--text_overlay_fmt "Reason: {event_reason}\nEvent: {event_timestamp}\nLocation: {event_street}, {event_city}\nCountdown: {event_timestamp_countdown_rolling}\nDate/Time: {local_timestamp_rolling}"
 
 
 # Set timestamp format to: Weekday abbreviated, day (without leading zero) Month abbreviated Year at Hour:Minute:SecondAM(or PM)
@@ -23,8 +23,8 @@
 # Fast forward through portions where there is no motion detected
 --motion_only
 
-# Encode with x265
---encoding x265
+# Encode with x264
+--encoding x264
 
 # Set start offset to 60 seconds before the event
 --start_offset -60
