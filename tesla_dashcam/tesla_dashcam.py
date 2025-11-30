@@ -3158,9 +3158,7 @@ def create_intermediate_movie(
 
     # Run the command.
     try:
-        ffmpeg_output = run(
-            ffmpeg_command, capture_output=True, check=True, universal_newlines=True
-        )
+        ffmpeg_output = run(ffmpeg_command, capture_output=True, check=True, text=True)
     except CalledProcessError as exc:
         print(
             f"{get_current_timestamp()}\t\t\tError trying to create clip for "
@@ -3347,7 +3345,7 @@ def create_movie(
                     ffmpeg_command,
                     capture_output=True,
                     check=True,
-                    universal_newlines=True,
+                    text=True,
                 )
             except CalledProcessError as exc:
                 print(
@@ -3708,7 +3706,13 @@ def create_movie_ffmpeg(
                 or video_file.height != movie_scale.height
             ):
                 # This video needs to be rescaled.
-                ffmpeg_scale = f"scale={movie_scale.width}:{movie_scale.height},"
+                ffmpeg_scale = (
+                    f"scale={movie_scale.width}:{movie_scale.height}:"
+                    "force_original_aspect_ratio=decrease,"
+                    f"pad={movie_scale.width}:{movie_scale.height}:"
+                    f"({movie_scale.width}-iw)/2:"
+                    f"({movie_scale.height}-ih)/2:black,"
+                )
 
             ffmpeg_complex += (
                 f"[{file_number}:v]{ffmpeg_scale}setpts=PTS-STARTPTS, "
@@ -3807,9 +3811,7 @@ def create_movie_ffmpeg(
 
     _LOGGER.debug("FFMPEG Command: %s", ffmpeg_command)
     try:
-        ffmpeg_output = run(
-            ffmpeg_command, capture_output=True, check=True, universal_newlines=True
-        )
+        ffmpeg_output = run(ffmpeg_command, capture_output=True, check=True, text=True)
     except CalledProcessError:
         # Remove temp join file.
         if ffmpeg_join_filename is not None:
@@ -5114,23 +5116,10 @@ def main() -> int:
     )
 
     if PLATFORM == "darwin":
-        if PROCESSOR != "arm":
-            nogpuhelp = (
-                "R|Disable use of GPU acceleration, default is to use GPU "
-                "acceleration.\n"
-            )
-            gpuhelp = "R|Use GPU acceleration (this is the default).\n"
-        else:
-            nogpuhelp = (
-                "R|Disable use of GPU acceleration, this is the default as on "
-                "Apple Silicon there does not seem much difference except for x265 when"
-                " it is a lot slower with GPU acceleration.\n"
-            )
-            gpuhelp = (
-                "R|Use GPU acceleration.\n"
-                "  Note: ffmpeg currently seems to have issues on Apple Silicon with "
-                "GPU acceleration for x265 resulting in extreme slow encoding.\n"
-            )
+        nogpuhelp = (
+            "R|Disable use of GPU acceleration, default is to use GPU acceleration.\n"
+        )
+        gpuhelp = "R|Use GPU acceleration (this is the default).\n"
 
         advancedencoding_group.add_argument(
             "--no-gpu",
@@ -5715,14 +5704,8 @@ def main() -> int:
                             ]
                             ffmpeg_hwout = ffmpeg_hwout + ["-hwaccel", "qsv"]
 
-            # VAAPI uses CQP (Constant Quality) mode instead of bitrate
-            # Use the same quality setting (CRF/QP value) from --quality flag
-            if args.gpu_type == "vaapi":
-                qp_value = MOVIE_QUALITY[args.quality]
-                video_encoding = video_encoding + ["-rc_mode", "CQP", "-qp", qp_value]
-            else:
-                bit_rate = str(int(10000 * layout_settings.scale)) + "K"
-                video_encoding = video_encoding + ["-b:v", bit_rate]
+            bit_rate = str(int(10000 * layout_settings.scale)) + "K"
+            video_encoding = video_encoding + ["-b:v", bit_rate]
 
         video_encoding = video_encoding + ["-c:v", MOVIE_ENCODING[encoding]]
     else:
