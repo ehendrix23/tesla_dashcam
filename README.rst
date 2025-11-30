@@ -1793,8 +1793,6 @@ Release Notes
     - Fixed: Will now force SAR to be 1:1 same as Tesla clips.
     - Fixed: Typo in qsv arg check. Contributed by @cjwang18
     - Fixed: Docker: Add tesla_dashcam to non-accelerated container image. Contributed by @croadfeldt
-    - 
-    -  
 
 
 TODO
