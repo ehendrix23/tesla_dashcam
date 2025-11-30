@@ -121,7 +121,7 @@ Three Docker images are available:
 - **NVIDIA**: GPU-accelerated processing using NVIDIA CUDA
 - **VAAPI**: Hardware acceleration using Intel/AMD VAAPI
 - **gpu-latest**: Hardware acceleration using NVIDIA CUDA and Intel/AMD VAAPI with latest ffmpeg
-- **pre_release**: Latest pre-release of tesla_dashcam with hardware acceleration using NVIDIA CUDA and Intel/AMD VAAPI.
+- **pre-release**: Latest pre-release of tesla_dashcam with hardware acceleration using NVIDIA CUDA and Intel/AMD VAAPI.
 
 Building Docker Images
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -136,6 +136,12 @@ Building Docker Images
     
     # VAAPI hardware acceleration
     docker build -f Dockerfile.vaapi -t tesla_dashcam:vaapi .
+
+    # Latest FFMPEG
+    docker build -f Dockerfile.gpu-latest -t tesla_dashcam:gpu-latest .
+
+    # Latest tesla_dashcam pre-release
+    docker build -f Dockerfile.pre-release -t tesla_dashcam:pre-release .
 
 Running with Docker
 ~~~~~~~~~~~~~~~~~~~
