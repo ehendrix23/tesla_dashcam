@@ -33,5 +33,3 @@
 
 # Merge files together
 --merge "{layout}_PERSPECTIVE"
-
---ffmpeg_debug
