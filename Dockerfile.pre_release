@@ -1,36 +1,47 @@
-FROM jrottenberg/ffmpeg:7-scratch AS ffmpeg
 FROM python:3-slim
 
-COPY --from=ffmpeg /bin/ffmpeg /bin/ffprobe /usr/local/bin/
-COPY --from=ffmpeg /lib /lib
-COPY --from=ffmpeg /share /share
+WORKDIR /usr/src/app/tesla_dashcam
 
+# Install FFmpeg with GPU support (both VAAPI and NVIDIA) and other dependencies
+# Note: Debian's FFmpeg is compiled with both VAAPI and NVENC support
 RUN apt-get update -y \
-    && apt-get install -y \
+    && apt-get install -y --no-install-recommends \
+    # FFmpeg with GPU support
+    ffmpeg \
+    # Application dependencies
     fonts-freefont-ttf \
     libnotify-bin \
-    libva2 \
-    libva-drm2 \
+    # Build essentials for psutil.
+    build-essential \
+    python3-dev \
+    # git etc. to get latest pre-release
     git \
     curl \
     jq \
+    # VAAPI runtime libraries (for Intel and AMD GPUs)
+    libva2 \
+    libva-drm2 \
+    mesa-va-drivers \
+    vainfo \
+    && if [ "$(dpkg --print-architecture)" = "amd64" ]; then \
+    apt-get install -y --no-install-recommends \
+    i965-va-driver intel-media-va-driver; \
+    else \
+    echo "Skipping Intel VA drivers on $(dpkg --print-architecture)"; \
+    fi \    
     && apt-get remove --purge --auto-remove -y && rm -rf /var/lib/apt/lists/*
 
-ENV LIBRARY_PATH=/lib:/usr/lib
-
-WORKDIR /usr/src/app
+WORKDIR /usr/src/app/tesla_dashcam
 RUN TAG=$(curl -s https://api.github.com/repos/ehendrix23/tesla_dashcam/releases \
     | jq -r '[.[] | select(.prerelease)] | max_by(.created_at).tag_name') \
     && git clone --depth 1 --branch "$TAG" https://github.com/ehendrix23/tesla_dashcam.git .
 
-WORKDIR /usr/src/app/tesla_dashcam
-# COPY . /usr/src/app/tesla_dashcam
 
-RUN pip install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Enable Logs to show on run
 ENV PYTHONUNBUFFERED=true
 # Provide a default timezone
 ENV TZ=America/New_York
 
-ENTRYPOINT [ "python3", "tesla_dashcam/tesla_dashcam.py" ]
+ENTRYPOINT [ "python3", "-m", "tesla_dashcam" ]
