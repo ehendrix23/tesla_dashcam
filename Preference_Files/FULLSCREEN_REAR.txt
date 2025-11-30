@@ -25,9 +25,6 @@
 # Encode with x265
 --encoding x265
 
-# Disable GPU as on Mac with x265 it seems faster
---no-gpu
-
 # Merge files together
 --merge "{layout}_REAR {event_timestamp} - {event_reason} - {event_city}"
 

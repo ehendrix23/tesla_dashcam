@@ -23,10 +23,10 @@
 --motion_only
 
 # Encode with x264
---encoding x264
+--encoding x265
 
 # Disable GPU
---no-gpu
+#--no-gpu
 
 # Set end offset to 120 seconds
 --end_offset -120

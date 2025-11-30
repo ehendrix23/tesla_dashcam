@@ -25,9 +25,6 @@
 # Encode with x265
 --encoding x265
 
-# Disable GPU as on Mac with x265 it seems faster
---no-gpu
-
 # Set start offset to 30 seconds before the event
 --start_offset -30
 

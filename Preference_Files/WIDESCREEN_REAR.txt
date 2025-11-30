@@ -24,6 +24,3 @@
 
 # Encode with x265
 --encoding x265
-
-# Disable GPU as on Mac with x265 it seems faster
---no-gpu

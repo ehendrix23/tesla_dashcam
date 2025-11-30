@@ -23,7 +23,7 @@
 --encoding x265
 
 # Disable GPU as on Mac with x265 it seems faster
---no-gpu
+# --no-gpu
 
 # Set start offset to 120 seconds
 --start_offset 120
