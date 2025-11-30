@@ -120,6 +120,8 @@ Three Docker images are available:
 - **Standard**: Basic CPU-only processing
 - **NVIDIA**: GPU-accelerated processing using NVIDIA CUDA
 - **VAAPI**: Hardware acceleration using Intel/AMD VAAPI
+- **gpu-latest**: Hardware acceleration using NVIDIA CUDA and Intel/AMD VAAPI with latest ffmpeg
+- **pre_release**: Latest pre-release of tesla_dashcam with hardware acceleration using NVIDIA CUDA and Intel/AMD VAAPI.
 
 Building Docker Images
 ~~~~~~~~~~~~~~~~~~~~~~

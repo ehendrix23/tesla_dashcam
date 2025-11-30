@@ -13,15 +13,12 @@ RUN apt-get update -y \
     libnotify-bin \
     && apt-get remove --purge --auto-remove -y && rm -rf /var/lib/apt/lists/*
 
-# Copy application code
-COPY . /usr/src/app/tesla_dashcam
-
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Install tesla_dashcam
+RUN pip install --no-cache-dir tesla_dashcam
 
 # Enable Logs to show on run
 ENV PYTHONUNBUFFERED=true
 # Provide a default timezone
 ENV TZ=America/New_York
 
-ENTRYPOINT [ "python3", "tesla_dashcam/tesla_dashcam.py" ]
+ENTRYPOINT [ "python3", "-m", "tesla_dashcam" ]
