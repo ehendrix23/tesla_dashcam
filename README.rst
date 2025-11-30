@@ -88,8 +88,9 @@ Requirements
 
 This package relies on `ffmpeg <https://ffmpeg.org>`__ to be installed, this is a free, open source cross-platform
 solution to convert video. The created executables for Windows and MacOS include an ffmpeg version.
+For Mac, download the latest: `ffmpeg <https://ffmpeg.martin-riedl.de>`__ 
 
-If not using the executables (Windows and MacOS) then `Python <https://www.python.org>`__ 3.8.6 or higher is required.
+If not using the executables (Windows and MacOS) then `Python <https://www.python.org>`__ 3.13.1 or higher is required.
 
 
 Installation
@@ -443,8 +444,8 @@ Usage
     Advanced encoding settings:
       Advanced options for encoding
 
-      --no-gpu              Disable use of GPU acceleration. Default on Non-MACs and Mac's with Apple CPU                           
-      --gpu                 Use GPU acceleration. Default on Macs with Intel CPU.                            
+      --no-gpu              Disable use of GPU acceleration. Default on Non-MACs.
+      --gpu                 Use GPU acceleration. Default on Macs.                            
                             --gpu_type has to be provided as well on Non-Macs when enabling this parameter (default: False)
       --gpu_type {nvidia,intel,qsv,rpi,vaapi}
                             Type of graphics card (GPU) in the system. This determines the encoder that will be used.This parameter is mandatory if --gpu is provided on Non-Macs. (default: None)
@@ -1140,26 +1141,18 @@ The following parameters are more advanced settings to determine how ffmpeg shou
 *--no-gpu*
 
   Disables GPU acceleration. 
-  Intel Macs: GPU acceleration is enabled by default, use this parameter to disable it.
-  Apple Silicon Macs: GPU acceleration is disabled by default due to current issues with ffmpeg.
+  Macs: GPU acceleration is enabled by default, use this parameter to disable it.
   Non-Macs: GPU acceleration is disabled by default.
 
   If this parameter is used in combination with --gpu then the first one will have preference.
 
-  Note: we can only detect Apple Silicon if Python deployed is the Universal2 binary OR the tesla_dashcam executable is for Apple Silicon.
-  If running on Apple Silicon but using the x64 executable or x64 Python then tesla_dashcam will not be able to detect it is running on Apple Silicon.
-
 *--gpu*
 
   Enables GPU acceleration.
-  Intel Macs: this is already enabled by default
-  Apple Silicon Macs: to enable GPU acceleration. Note that current ffmpeg produces a corrupt video when doing this but newer versions of ffmpeg might work.
+  Macs: this is already enabled by default
   Non-Macs: to enable GPU acceleration, parameter parameter --gpu_type has to be provided as well then to identify the hardware.
 
   If this parameter is used in combination with --no-gpu then the first one will have preference.
-
-  Note: we can only detect Apple Silicon if Python deployed is the Universal2 binary OR the tesla_dashcam executable is for Apple Silicon.
-  If running on Apple Silicon but using the x64 executable or x64 Python then tesla_dashcam will not be able to detect it is running on Apple Silicon.
 
 *--gpu_type*
 
