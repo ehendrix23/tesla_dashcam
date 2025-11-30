@@ -50,7 +50,7 @@ _LOGGER = logging.getLogger(__name__)
 #  log file, ...).
 
 # cSpell: disable
-VERSION = {"major": 0, "minor": 1, "patch": 21, "beta": 4}
+VERSION = {"major": 0, "minor": 1, "patch": 21, "beta": 5}
 VERSION_STR = f"v{VERSION['major']}.{VERSION['minor']}.{VERSION['patch']}"
 
 if VERSION["beta"] > -1:
@@ -3725,6 +3725,7 @@ def create_movie_ffmpeg(
                 ]
             )
             video_string += f"[v{file_number}]"
+
         else:
             # We're doing simple concatenation.
             ffmpeg_complex += f"[{file_number}:v]setpts=PTS-STARTPTS[v{file_number}];"
@@ -3740,6 +3741,7 @@ def create_movie_ffmpeg(
     if complex_concat:
         # Final items to be added for a complex concatenation.
         _LOGGER.debug("Using ffmpeg complex for %s", movie_filename)
+        # TODO: We need to add additional parameters here now just as quality, hardware-encoding,...
         ffmpeg_params_files.extend(
             [
                 "-f",
@@ -3760,7 +3762,7 @@ def create_movie_ffmpeg(
                 "[outv]",
             ]
         )
-        ffmpeg_params_files += video_settings["video_encoding"]
+        ffmpeg_params_files += video_settings["other_params"]
     else:
         # Final items to be added for a simple concatenation.
         _LOGGER.debug(
@@ -3803,6 +3805,8 @@ def create_movie_ffmpeg(
     ffmpeg_command = (
         [video_settings["ffmpeg_exec"]]
         + ["-loglevel", "info"]
+        + video_settings["ffmpeg_hwdev"]
+        + video_settings["ffmpeg_hwout"]
         + ffmpeg_params_files
         + ffmpeg_params
         + ffmpeg_metadata
@@ -5623,17 +5627,23 @@ def main() -> int:
     if args.motion_only:
         ffmpeg_motiononly = filter_string.format(
             input_clip=input_clip,
-            filter="mpdecimate=hi=64*48, setpts=N/FRAME_RATE/TB",
+            filter="mpdecimate=hi=64*48, setpts=N/FRAME_RATE/TB, format=yuv420p",
             filter_counter=filter_counter,
         )
-        input_clip = f"tmp{filter_counter}"
-        filter_counter += 1
+    else:
+        ffmpeg_motiononly = filter_string.format(
+            input_clip=input_clip,
+            filter="format=yuv420p",
+            filter_counter=filter_counter,
+        )
+    input_clip = f"tmp{filter_counter}"
+    filter_counter += 1
 
     ffmpeg_params = ["-preset", args.compression, "-crf", MOVIE_QUALITY[args.quality]]
 
     use_gpu = (
         getattr(args, "gpu", True)
-        if PLATFORM == "darwin" and PROCESSOR != "arm"
+        if PLATFORM == "darwin"
         else getattr(args, "gpu", False)
     )
 
