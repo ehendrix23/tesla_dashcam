@@ -22,7 +22,7 @@ echo "Installing Python requirements"
 pip install -r requirements_create_executable_windows.txt --upgrade
 
 echo "Creating tesla_dashcam executable"
-pyinstaller --clean ^
+python -m PyInstaller --clean ^
 	--distpath bundles\Windows\tesla_dashcam ^
 	--workpath build\Windows ^
 	--onefile ^
@@ -37,7 +37,7 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo "Creating README.html"
-rst2html.py README.rst "bundles\Windows\tesla_dashcam\Tesla_Dashcam - README.html"
+python -m docutils README.rst "bundles\Windows\tesla_dashcam\Tesla_Dashcam - README.html"
 if %ERRORLEVEL% NEQ 0 (
   echo "Failed to create README HTML file"
   goto :eof
