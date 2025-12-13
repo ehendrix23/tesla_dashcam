@@ -1778,6 +1778,7 @@ Release Notes
     - New: Added option --ffmpeg_debug so that when running with loglevel debug, FFMPEG output is not provided unless this is enabled as well.
     - Changed: Many internal changes, including how layouts are calculated, typing, etc.
     - Changed: Docker: Reduces Docker image sizes by 24-66% by switching from jrottenberg/ffmpeg to Debian's FFmpeg package on python:3-slim base. Contributed by @magicalyak
+    - Changed: Developer QoL improvements for Windows-based contributors. Contributed by @ozskywalker
     - Fixed: Issue with GPU type check of qsv for Linux. Contributed by @cjwang18
     - Fixed: ffmpeg error when swapping front/rear and excluding front or rear
     - Fixed: ffmpeg error when swapping left/right and excluding left or right
