@@ -11,7 +11,7 @@
 --layout HORIZONTAL
 
 # Put clip info center, bottom.
---halign CENTER --valign BOTTOM
+# --halign CENTER --valign BOTTOM
 
 # Output city and timestamp
 --text_overlay_fmt "Street: {event_street}\nCity: {event_city} - Date/Time: {local_timestamp_rolling}"

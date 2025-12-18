@@ -1070,7 +1070,7 @@ class Font(object):
         if (overriden := self._get_overridden("font_halign")) is not None:
             return str(overriden)
 
-        return HALIGN.get(self._halign, DEFAULT_FONT_HALIGN)
+        return HALIGN.get(self._halign, HALIGN[DEFAULT_FONT_HALIGN])
 
     @halign.setter
     def halign(self, value: str) -> None:
@@ -1080,7 +1080,7 @@ class Font(object):
     def valign(self) -> str:
         if (overriden := self._get_overridden("font_valign")) is not None:
             return str(overriden)
-        return VALIGN.get(self._valign, DEFAULT_FONT_VALIGN)
+        return VALIGN.get(self._valign, VALIGN[DEFAULT_FONT_VALIGN])
 
     @valign.setter
     def valign(self, value: str) -> None:
@@ -5525,12 +5525,11 @@ def main() -> int:
 
     layout_settings.clip_order = args.clip_order.split(",")
 
-    layout_settings.font.halign = (
-        args.halign if args.halign is not None else layout_settings.font.halign
-    )
-    layout_settings.font.valign = (
-        args.valign if args.valign is not None else layout_settings.font.valign
-    )
+    if args.halign is not None:
+        layout_settings.font.halign = args.halign
+
+    if args.valign is not None:
+        layout_settings.font.valign = args.valign
 
     layout_settings.title_screen_map = args.title_screen_map
 
