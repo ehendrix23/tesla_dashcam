@@ -8,7 +8,7 @@
 # --delete_source
 
 # WIDESCREEN Layout
---layout WIDESCREEN
+--layout MOSAIC
 
 # Show left & right cameras as looking backwards instead of through a mirror
 --rear
