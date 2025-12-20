@@ -3722,7 +3722,6 @@ def create_movie_ffmpeg(
     if complex_concat:
         # Final items to be added for a complex concatenation.
         _LOGGER.debug("Using ffmpeg complex for %s", movie_filename)
-        # TODO: We need to add additional parameters here now just as quality, hardware-encoding,...
         ffmpeg_params_files.extend(
             [
                 "-f",
@@ -3743,6 +3742,8 @@ def create_movie_ffmpeg(
                 "[outv]",
             ]
         )
+        # Complex concat re-encodes; apply encoder/quality and hardware
+        # acceleration flags here via other_params.
         ffmpeg_params_files += video_settings["other_params"]
     else:
         # Final items to be added for a simple concatenation.
