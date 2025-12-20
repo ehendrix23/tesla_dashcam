@@ -4643,7 +4643,7 @@ def main() -> int:
         help="R|Layout of the created video.\n"
         "    FULLSCREEN: Front camera center top with side and rear cameras smaller underneath it.\n"
         "    MOSAIC: Front and rear cameras on top with pillars and side cameras smaller underneath it.\n"
-        "    PERSPECTIVE: Similar to FULLSCREEN but then with side cameras in perspective.\n"
+        "    PERSPECTIVE: Similar to FULLSCREEN but then with pillar and repeater cameras in perspective.\n"
         "    CROSS: Front camera center top, pillar cameras underneath, then side cameras underneath, and rear camera center bottom.\n"
         "    DIAMOND: Front camera center top, pillar cameras on left/right of front smaller, side cameras below on left/right of rear smaller, and rear camera center bottom.\n"
         "    HORIZONTAL: All cameras in horizontal line: left, left pillar, front, rear, right pillar, right.\n"
