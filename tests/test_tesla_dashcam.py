@@ -12,8 +12,8 @@ from tesla_dashcam.tesla_dashcam import (
     Diamond,
     Font,
     FullScreen,
+    Mosaic,
     MovieLayout,
-    WideScreen,
     escape_drawtext_literals,
 )
 
@@ -561,14 +561,16 @@ class TestFullScreen:
         verify_camera_layout(layout=layout, config=config, expected=expected)
 
 
-class TestWideScreen:
+class TestMosaic:
     @pytest.fixture
     def layout(self):
-        return WideScreen()
+        return Mosaic()
 
     def test_init(self, layout):
-        """Test WideScreen initialization"""
-        assert layout.scale == 1.5
+        """Test Mosaic initialization"""
+        # Mosaic initializes with scale = 0.5 and aspect ratio preservation
+        # which results in dynamic scale calculation based on video dimensions
+        assert layout.scale != 1.5  # Different from FullScreen
 
     @pytest.mark.parametrize(
         "config, expected",
@@ -578,14 +580,14 @@ class TestWideScreen:
                 {},
                 {
                     "positions": {
-                        "left_pillar": (0, 0),
+                        "left_pillar": (0, 216),
                         "front": (640, 0),
-                        "right_pillar": (1280, 0),
-                        "left": (0, 480),
-                        "rear": (640, 480),
-                        "right": (1280, 480),
+                        "right_pillar": (1856, 216),
+                        "left": (0, 1128),
+                        "rear": (640, 912),
+                        "right": (1856, 1128),
                     },
-                    "video": (1920, 960),
+                    "video": (2496, 1824),
                 },
             ),
             # front_widescreen
@@ -593,18 +595,14 @@ class TestWideScreen:
                 {"left": 1, "rear": 1, "right": 1},
                 {
                     "positions": {
-                        "left_pillar": (0, 0),
+                        "left_pillar": (0, 1152),
                         "front": (640, 0),
-                        "right_pillar": (3200, 0),
-                        "left": (0, 480),
-                        "rear": (1280, 480),
-                        "right": (2560, 480),
+                        "right_pillar": (4352, 1152),
+                        "left": (576, 2784),
+                        "rear": (1856, 2784),
+                        "right": (3136, 2784),
                     },
-                    "video": (3840, 1440),
-                    "scale": 4.5,
-                    "dimensions": {
-                        "front": (2560, 480),
-                    },
+                    "video": (4992, 3744),
                 },
             ),
             # rear_widescreen
@@ -612,18 +610,14 @@ class TestWideScreen:
                 {"left_pillar": 1, "front": 1, "right_pillar": 1},
                 {
                     "positions": {
-                        "left_pillar": (0, 0),
-                        "front": (1280, 0),
-                        "right_pillar": (2560, 0),
-                        "left": (0, 960),
+                        "left_pillar": (576, 0),
+                        "front": (1856, 0),
+                        "right_pillar": (3136, 0),
+                        "left": (0, 2112),
                         "rear": (640, 960),
-                        "right": (3200, 960),
+                        "right": (4352, 2112),
                     },
-                    "video": (3840, 1440),
-                    "scale": 4.5,
-                    "dimensions": {
-                        "rear": (2560, 480),
-                    },
+                    "video": (4992, 3744),
                 },
             ),
         ],

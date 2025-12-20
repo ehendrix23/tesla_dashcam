@@ -1660,8 +1660,8 @@ class FullScreen(MovieLayout):
         )
 
 
-class WideScreen(FullScreen):
-    """WideScreen Movie Layout
+class Mosaic(FullScreen):
+    """Mosaic Movie Layout
 
     [LEFT-PILLAR_CAMERA][           FRONT_CAMERA             ][RIGHT-PILLAR_CAMERA]
     [       LEFT_CAMERA        ][    REAR_CAMERA     ][       RIGHT_CAMERA        ]
@@ -1673,12 +1673,26 @@ class WideScreen(FullScreen):
     """
 
     def __init__(self) -> None:
-        """Initialize WideScreen Layout."""
+        """Initialize Mosaic Layout."""
         super().__init__()
         self.scale = 1 / 2
         # Set front scale to None so we know if it was overriden or not.
         self.cameras("front").scale = None
         self.cameras("rear").scale = None
+        # Boost factor to emphasize front/rear when pillars and sides present
+        self._front_rear_boost: float = 1.3
+
+    @property
+    def front_rear_boost(self) -> float:
+        return self._front_rear_boost
+
+    @front_rear_boost.setter
+    def front_rear_boost(self, value: float) -> None:
+        self._front_rear_boost = max(1.0, float(value))
+
+    def _boost_active(self) -> bool:
+        # Always apply boost to keep front/rear emphasized consistently
+        return True
 
     @property
     def _front_normal_scale(self) -> int:
@@ -1711,39 +1725,57 @@ class WideScreen(FullScreen):
         if self.cameras("front").scale is None:
             # Front width should be:
             #  max(bottom_row_width, min_top_width) - pillar_widths
-            target_width = max(self._min_bottom_row_width, self._min_top_row_width)
-            return (
+            base_target = max(self._min_bottom_row_width, self._min_top_row_width)
+            target_width = (
+                int(base_target * self._front_rear_boost)
+                if self._boost_active()
+                else base_target
+            )
+            return max(
+                self._front_normal_scale,
                 target_width
                 - self.cameras("left_pillar").width
-                - self.cameras("right_pillar").width
+                - self.cameras("right_pillar").width,
             )
         else:
             # Use normal scale calculation if front camera scale was explicitly set
             return self._front_normal_scale
 
     def front_height(self) -> int:
-        # We need to set this as by default scale is none in which case we need to
-        # return 0.5
-        scale = self.cameras("front").scale or 0.5
+        # Preserve aspect ratio: if width is dynamically set (scale None),
+        # derive height from width and clip ratio.
+        if self.cameras("front").scale is None:
+            return int(self.cameras("front").width / self.cameras("front").ratio)
+        # Otherwise use explicit scale on original height.
+        scale = self.cameras("front").scale or 1
         return int(self.cameras("front").height_fixed * scale)
 
     # Adjust rear width if bottom row is wider then top row
     def rear_width(self) -> int:
         if self.cameras("rear").scale is None:
             # Rear width should be:
-            #  max(bottom_row_width, min_top_width) - pillar_widths
-            target_width = max(self._min_bottom_row_width, self._min_top_row_width)
-            return (
-                target_width - self.cameras("left").width - self.cameras("right").width
+            #  max(bottom_row_width, min_top_width) - left/right widths
+            base_target = max(self._min_bottom_row_width, self._min_top_row_width)
+            target_width = (
+                int(base_target * self._front_rear_boost)
+                if self._boost_active()
+                else base_target
+            )
+            return max(
+                self._rear_normal_scale,
+                target_width - self.cameras("left").width - self.cameras("right").width,
             )
         else:
             # Use normal scale calculation if front camera scale was explicitly set
             return self._rear_normal_scale
 
     def rear_height(self) -> int:
-        # We need to set this as by default scale is none in which case we need to
-        # return 0.5
-        scale = self.cameras("rear").scale or 0.5
+        # Preserve aspect ratio: if width is dynamically set (scale None),
+        # derive height from width and clip ratio.
+        if self.cameras("rear").scale is None:
+            return int(self.cameras("rear").width / self.cameras("rear").ratio)
+        # Otherwise use explicit scale on original height.
+        scale = self.cameras("rear").scale or 1
         return int(self.cameras("rear").height_fixed * scale)
 
 
@@ -4598,6 +4630,7 @@ def main() -> int:
         "--layout",
         required=False,
         choices=[
+            "MOSAIC",
             "WIDESCREEN",
             "FULLSCREEN",
             "PERSPECTIVE",
@@ -4608,19 +4641,13 @@ def main() -> int:
         default="FULLSCREEN",
         type=str.upper,
         help="R|Layout of the created video.\n"
-        "    FULLSCREEN: Front camera center top, "
-        "side cameras underneath it with rear camera between side camera.\n"
-        "    WIDESCREEN: Front camera on top with side and rear cameras smaller "
-        "underneath it.\n"
-        "    PERSPECTIVE: Similar to FULLSCREEN but then with side cameras in "
-        "perspective.\n"
-        "    CROSS: Front camera center top, side cameras underneath, and rear camera "
-        "center bottom.\n"
-        "    DIAMOND: Front camera center top, side cameras below front camera left and"
-        " right of front, "
-        "and rear camera center bottom.\n"
-        "    HORIZONTAL: All cameras in horizontal line: left, left pillar, front, "
-        "rear, right pillar, right.\n",
+        "    FULLSCREEN: Front camera center top with side and rear cameras smaller underneath it.\n"
+        "    MOSAIC: Front and rear cameras on top with pillars and side cameras smaller underneath it.\n"
+        "    PERSPECTIVE: Similar to FULLSCREEN but then with side cameras in perspective.\n"
+        "    CROSS: Front camera center top, pillar cameras underneath, then side cameras underneath, and rear camera center bottom.\n"
+        "    DIAMOND: Front camera center top, pillar cameras on left/right of front smaller, side cameras below on left/right of rear smaller, and rear camera center bottom.\n"
+        "    HORIZONTAL: All cameras in horizontal line: left, left pillar, front, rear, right pillar, right.\n"
+        "    WIDESCREEN: (Legacy) alias for MOSAIC.\n",
     )
     layout_group.add_argument(
         "--camera_position",
@@ -5390,15 +5417,17 @@ def main() -> int:
         layout_settings = FullScreen()
         layout_settings.perspective = True
     else:
-        if args.layout == "WIDESCREEN":
-            layout_settings = WideScreen()
-        elif args.layout == "FULLSCREEN":
+        # Map legacy WIDESCREEN to MOSAIC
+        layout_name = "MOSAIC" if args.layout == "WIDESCREEN" else args.layout
+        if layout_name == "MOSAIC":
+            layout_settings = Mosaic()
+        elif layout_name == "FULLSCREEN":
             layout_settings = FullScreen()
-        elif args.layout == "CROSS":
+        elif layout_name == "CROSS":
             layout_settings = Cross()
-        elif args.layout == "DIAMOND":
+        elif layout_name == "DIAMOND":
             layout_settings = Diamond()
-        elif args.layout == "HORIZONTAL":
+        elif layout_name == "HORIZONTAL":
             layout_settings = Horizontal()
         else:
             layout_settings = FullScreen()

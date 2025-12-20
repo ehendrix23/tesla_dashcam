@@ -228,7 +228,7 @@ Usage
 
     usage: tesla_dashcam.py [-h] [--version] [--loglevel {DEBUG,INFO,WARNING,ERROR,CRITICAL}] [--ffmpeg_debug] [--temp_dir TEMP_DIR] [--no-notification] [--display_ts] [--skip_existing]
                             [--delete_source] [--exclude_subdirs] [--monitor] [--monitor_once] [--monitor_trigger MONITOR_TRIGGER]
-                            [--layout {WIDESCREEN,FULLSCREEN,PERSPECTIVE,CROSS,DIAMOND,HORIZONTAL}] [--perspective] [--scale CLIP_SCALE [CLIP_SCALE ...]] [--mirror] [--rear] [--swap] [--no-swap]
+                            [--layout {MOSAIC,WIDESCREEN,FULLSCREEN,PERSPECTIVE,CROSS,DIAMOND,HORIZONTAL}] [--perspective] [--scale CLIP_SCALE [CLIP_SCALE ...]] [--mirror] [--rear] [--swap] [--no-swap]
                             [--swap_frontrear] [--background BACKGROUND] [--title_screen_map] [--no-front] [--no-left] [--no-right] [--no-rear] [--no-left-pillar] [--no-right-pillar] [--no-timestamp]
                             [--halign {LEFT,CENTER,RIGHT}] [--valign {TOP,MIDDLE,BOTTOM}] [--font FONT] [--fontsize FONTSIZE] [--fontcolor FONTCOLOR]
                             [--text_overlay_fmt TEXT_OVERLAY_FMT] [--timestamp_format TIMESTAMP_FORMAT] [--start_timestamp START_TIMESTAMP] [--end_timestamp END_TIMESTAMP]
@@ -273,14 +273,15 @@ Usage
     Video Layout:
       Set what the layout of the resulting video should be
 
-      --layout {WIDESCREEN,FULLSCREEN,PERSPECTIVE,CROSS,DIAMOND,HORIZONTAL}
+      --layout {MOSAIC,WIDESCREEN,FULLSCREEN,PERSPECTIVE,CROSS,DIAMOND,HORIZONTAL}
                             Layout of the created video.
-                                FULLSCREEN: Front camera center top, side cameras underneath it with rear camera between side camera.
-                                WIDESCREEN: Front camera on top with side and rear cameras smaller underneath it.
-                                PERSPECTIVE: Similar to FULLSCREEN but then with side cameras in perspective.
-                                CROSS: Front camera center top, side cameras underneath, and rear camera center bottom.
-                                DIAMOND: Front camera center top, side cameras below front camera left and right of front, and rear camera center bottom.
+                                FULLSCREEN: Front camera center top with side and rear cameras smaller underneath it.
+                                MOSAIC: Front and rear cameras on top with pillars and side cameras smaller underneath it.
+                                PERSPECTIVE: Similar to FULLSCREEN but then with pillar and repeater cameras in perspective.
+                                CROSS: Front camera center top, pillar cameras underneath, then repeater cameras underneath, and rear camera center bottom.
+                                DIAMOND: Front camera center top, pillar cameras on left/right of front smaller, side cameras below on left/right of rear smaller, and rear camera center bottom.
                                 HORIZONTAL: All cameras in horizontal line: left, left pillar, front, rear, right pillar, right.
+                                WIDESCREEN: (Legacy) alias for MOSAIC.
                             (default: FULLSCREEN)
       --camera_position CLIP_POS [CLIP_POS ...]
                             Set camera clip position within video. Selecting this will override the layout selected!
@@ -318,10 +319,10 @@ Usage
                               --scale 0.5 --scale camera=front 1                      all are 640x480 except front at 1280x960
                               --scale camera=left .25 --scale camera=right 320x240    left and right are set to 320x240
                             Defaults:
-                                WIDESCREEN: 1/2 (front 1280x960, others 640x480, video is 1920x1920)
+                              MOSAIC: 1/2 (all cameras 640x480 base, front/rear boosted to 1216x912, video is 2496x1824)
                                 FULLSCREEN: 1/2 (640x480, video is 1920x960)
-                                CROSS: 1/2 (640x480, video is 1280x1440)
-                                DIAMOND: 1/2 (640x480, video is 1920x976)
+                                CROSS: 1/2 (640x480, video is 1280x1920)
+                                DIAMOND: 1/2 (640x480, video is 2560x1920)
                                 HORIZONTAL: 1/2 (640x480, video is 3840x480)
                             (default: None)
       --mirror              Video from side and rear cameras as if being viewed through the mirror. Default when not providing parameter --no-front. Cannot be used in combination with
@@ -609,28 +610,32 @@ specifies where each camera clip should be placed within the resulting video. (s
     | Left Camera   |  Rear Camera   |  Right Camera  |
     +---------------+----------------+----------------+
 
-Video example: https://youtu.be/P5k9PXPGKWQ
+ 
 
 
-* WIDESCREEN: Resolution: 1920x1920
+* MOSAIC: Resolution: 2496x1824
 
 ::
 
-    +---------------+----------------+----------------+
-    |                 Front Camera                    |
-    +---------------+----------------+----------------+
-    | Left Camera   |  Rear Camera   |  Right Camera  |
-    +---------------+----------------+----------------+
+  +-------------+-------------------------+--------------+
+  +-------------+                         +--------------+
+  | Left Pillar |       Front Camera      | Right Pillar |
+  +-------------+                         +--------------+
+  +-------------+-------------------------+--------------+
+  +-------------+                         +--------------+
+  | Left Camera |       Rear Camera.      | Right Camera |
+  +-------------+                         +--------------+
+  +-------------+-------------------------+--------------+
 
-Video example: https://youtu.be/nPleIhVxyhQ
 
-
-* CROSS: Resolution: 1280x1440
+* CROSS: Resolution: 1280x1920
 
 ::
 
     +---------------+----------------+----------------+
     |               | Front Camera   |                |
+    +---------------+----------------+----------------+
+    |     Left Pillar      |       Right Pillar       |
     +---------------+----------------+----------------+
     |     Left Camera      |       Right Camera       |
     +---------------+----------------+----------------+
@@ -638,15 +643,16 @@ Video example: https://youtu.be/nPleIhVxyhQ
     +---------------+----------------+----------------+
 
 
-* DIAMOND: Resolution: 1920x976
+* DIAMOND: Resolution: 2560x1920
 
 ::
 
     +---------------+----------------+----------------+
-    |               |  Front Camera  |                |
-    +---------------+                +----------------+
-    |   Left Camera |----------------| Right Camera   |
-    +               +  Rear Camera   +                +
+    |               |                |                |
+    +---------------+  Front Camera  +----------------+
+    |   Left Pillar |                |  Right Pillar  |
+    +---------------+----------------|----------------+
+    +   Left Camera +  Rear Camera   |  Right Camera  |
     |---------------|                |----------------|
     +---------------+----------------+----------------+
 
