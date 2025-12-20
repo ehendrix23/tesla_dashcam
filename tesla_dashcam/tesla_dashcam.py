@@ -1173,7 +1173,7 @@ class Camera(object):
         if (overriden := self._get_overridden("width")) is not None:
             return int(overriden) * self.include
 
-        return int(self._width * (self.scale or 0)) * self.include
+        return int(self._width * (self.scale or 1)) * self.include
 
     @width.setter
     def width(self, value: int) -> None:
@@ -1205,7 +1205,7 @@ class Camera(object):
         if (overriden := self._get_overridden("height")) is not None:
             return int(overriden) * self.include
 
-        return int(self._height * (self.scale or 0)) * self.include
+        return int(self._height * (self.scale or 1)) * self.include
 
     @property
     def ratio(self) -> float:
@@ -1465,20 +1465,14 @@ class MovieLayout(object):
 
     @property
     def video_height(self) -> int:
-        perspective_adjustement = 3 / 2 if self.perspective else 1
-        perspective_adjustement = 1
         return int(
             max(
                 self.cameras("front").ypos + self.cameras("front").height,
                 self.cameras("rear").ypos + self.cameras("rear").height,
-                perspective_adjustement * self.cameras("left_pillar").ypos
-                + self.cameras("left_pillar").height,
-                perspective_adjustement * self.cameras("right_pillar").ypos
-                + self.cameras("right_pillar").height,
-                perspective_adjustement * self.cameras("left").ypos
-                + self.cameras("left").height,
-                perspective_adjustement * self.cameras("right").ypos
-                + self.cameras("right").height,
+                self.cameras("left_pillar").ypos + self.cameras("left_pillar").height,
+                self.cameras("right_pillar").ypos + self.cameras("right_pillar").height,
+                self.cameras("left").ypos + self.cameras("left").height,
+                self.cameras("right").ypos + self.cameras("right").height,
             )
         )
 
@@ -1870,64 +1864,6 @@ class Diamond(MovieLayout):
         self.scale = 1 / 2
         self.cameras("front").scale = 1
         self.cameras("rear").scale = 1
-
-    # def _font_halign(self):
-    #     if self._font._halign == "CENTER":
-    #         # Change alignment to left or right if one of the left/right cameras is
-    #           excluded.
-    #         if (self.cameras("left").include and not self.cameras("right").include) or (
-    #             self.cameras("right").include and not self.cameras("left").include
-    #         ):
-    #             x_pos = int(
-    #                 max(
-    #                     self.cameras("front").xpos + self.cameras("front").width / 2,
-    #                     self.cameras("rear").xpos + self.cameras("rear").width / 2,
-    #                 )
-    #             )
-    #             return f"({x_pos} - text_w / 2)"
-
-    #     return HALIGN.get(self._font._halign, self._font._halign)
-
-    # def _font_valign(self):
-    #     if self._font._valign == "MIDDLE":
-    #         if self.cameras("front").include:
-    #             return (
-    #                 f"({self.cameras('front').ypos + self.cameras('front').height} + 5)"
-    #             )
-    #         elif self.cameras("rear").include:
-    #             return f"({self.cameras('rear').ypos} - 5 - text_h)"
-
-    #     return VALIGN.get(self._font._valign, self._font._valign)
-
-    # def _font_size(self):
-    #     # For this layout the video height has to include font size. But default for calculating
-    #     # font size is based on video height.
-    #     # Thus overriding font size to get video height without font size to figure our scaling.
-    #     if self.font._size is None:
-    #         scale = (
-    #             self._video_height(include_fontsize=False)
-    #             * self.video_width
-    #             / (1280 * 960)
-    #         )
-    #         return int(max(16, 16 * scale))
-    #     else:
-    #         return self.font.size
-
-    # def _video_height(self, include_fontsize=True):
-    #     perspective = 3 / 2 if self.perspective else 1
-    #     fontsize = self.font.size if include_fontsize else 0
-
-    #     return int(
-    #         max(
-    #             perspective
-    #             * max(self.cameras("left").height, self.cameras("right").height),
-    #             self.cameras("front").height + self.cameras("rear").height + fontsize,
-    #         )
-    #     )
-
-    # @property
-    # def video_height(self):
-    #     return self._video_height(include_fontsize=True)
 
     @property
     def _left_column_width(self) -> int:
@@ -2350,6 +2286,7 @@ def get_movie_files(
 
                 # We get the clip starting time from the filename and provided
                 # that as initial timestamp.
+                # Tesla stores these timestamps in local timezone.
                 if len(clip_timestamp) == 16:
                     # This is for before version 2019.16
                     try:
@@ -2363,9 +2300,10 @@ def get_movie_files(
                             clip_filename_only,
                         )
                         continue
-                    clip_starting_timestamp = clip_starting_timestamp.astimezone(
-                        get_localzone()
-                    )
+                    # Treat filename timestamps as local time, then normalize to UTC
+                    clip_starting_timestamp = clip_starting_timestamp.replace(
+                        tzinfo=get_localzone()
+                    ).astimezone(timezone.utc)
                 else:
                     # This is for version 2019.16 and later
                     try:
@@ -2379,9 +2317,10 @@ def get_movie_files(
                             clip_filename_only,
                         )
                         continue
-                    clip_starting_timestamp = clip_starting_timestamp.astimezone(
-                        timezone.utc
-                    )
+                    # Treat filename timestamps as local time, then normalize to UTC
+                    clip_starting_timestamp = clip_starting_timestamp.replace(
+                        tzinfo=get_localzone()
+                    ).astimezone(timezone.utc)
 
                 # Check if we already processed this timestamp.
                 if (
@@ -2553,9 +2492,10 @@ def get_movie_files(
                             )
                             event_timestamp = None
                         else:
-                            event_timestamp_dt = event_timestamp_dt.astimezone(
-                                timezone.utc
-                            )
+                            # Assign local tz to JSON timestamp, then convert to UTC
+                            event_timestamp_dt = event_timestamp_dt.replace(
+                                tzinfo=get_localzone()
+                            ).astimezone(timezone.utc)
                     event_info.event_metadata.timestamp = event_timestamp_dt
                     event_info.event_metadata.city = event_file_data.get("city", "n/a")
                     event_info.event_metadata.street = event_file_data.get(
@@ -2597,8 +2537,14 @@ def get_movie_files(
             clip_timestamp_dt = (
                 metadata[0].timestamp
                 if metadata[0].timestamp is not None
-                else datetime.fromtimestamp(os.path.getmtime(event_folder))
+                # Use local timezone to avoid mixing naive/aware timestamps when
+                # user-provided start/end timestamps are tz-aware.
+                else datetime.fromtimestamp(
+                    os.path.getmtime(event_folder), tz=get_localzone()
+                )
             )
+            # Normalize to UTC for internal comparisons
+            clip_timestamp_dt = clip_timestamp_dt.astimezone(timezone.utc)
 
             clip_camera_info = Camera_Clip(
                 filename=event_folder,
@@ -2619,6 +2565,9 @@ def get_movie_files(
                 filename=event_folder,
                 video_metadata=metadata[0],
             )
+            # Ensure direct-file events have a clip entry for processing/trimming
+            event_info.set_clip(clip_camera_info.timestamp, clip_info)
+            event_info.add_camera_clip("FULL")
 
         # Now add the event folder to our events list.
         events_list.update({event_folder: event_info})
@@ -2627,7 +2576,7 @@ def get_movie_files(
     return events_list
 
 
-def get_metadata(ffmpeg: str, filenames: list[str]) -> list[Video_Metadata]:
+def get_metadata(ffmpeg: str, filenames: list[str]) -> list[Video_Metadata]:  #
     """Retrieve the meta data for the clip (i.e. timestamp, duration)"""
     # Get meta data for each video to determine creation time and duration.
     ffmpeg_command = [ffmpeg]
@@ -2715,7 +2664,7 @@ def get_metadata(ffmpeg: str, filenames: list[str]) -> list[Video_Metadata]:
         ) is not None:
             metadata_item.timestamp = datetime.strptime(
                 match_videotime.group(1).strip(), "%Y-%m-%dT%H:%M:%S.%f%z"
-            )
+            ).astimezone(timezone.utc)
             continue
 
         # Title of the video
@@ -4106,6 +4055,27 @@ def process_folders(
                 "was before clip start timestamp or after clip end timestamp",
                 last_clip_tmstp,
             )
+
+        # Clamp event timestamps to user-requested start/end timestamp window
+        if video_settings["start_timestamp"] is not None:
+            if event_start_timestamp < video_settings["start_timestamp"]:
+                _LOGGER.debug(
+                    "Clip start timestamp changed from %s to %s to match "
+                    "user-requested start timestamp",
+                    event_start_timestamp,
+                    video_settings["start_timestamp"],
+                )
+                event_start_timestamp = video_settings["start_timestamp"]
+
+        if video_settings["end_timestamp"] is not None:
+            if event_end_timestamp > video_settings["end_timestamp"]:
+                _LOGGER.debug(
+                    "Clip end timestamp changed from %s to %s to match "
+                    "user-requested end timestamp",
+                    event_end_timestamp,
+                    video_settings["end_timestamp"],
+                )
+                event_end_timestamp = video_settings["end_timestamp"]
 
         # Put them together to create the filename for the folder.
         event_movie_filename = (
@@ -5785,6 +5755,8 @@ def main() -> int:
             start_timestamp = isoparse(args.start_timestamp)
             if start_timestamp.tzinfo is None:
                 start_timestamp = start_timestamp.astimezone(get_localzone())
+            # Normalize to UTC for internal comparisons
+            start_timestamp = start_timestamp.astimezone(timezone.utc)
         except ValueError as e:
             print(
                 f"{get_current_timestamp()}Start timestamp ({args.start_timestamp}) "
@@ -5799,6 +5771,8 @@ def main() -> int:
             end_timestamp = isoparse(args.end_timestamp)
             if end_timestamp.tzinfo is None:
                 end_timestamp = end_timestamp.astimezone(get_localzone())
+            # Normalize to UTC for internal comparisons
+            end_timestamp = end_timestamp.astimezone(timezone.utc)
         except ValueError as e:
             print(
                 f"{get_current_timestamp()}End timestamp ({args.end_timestamp}) "
