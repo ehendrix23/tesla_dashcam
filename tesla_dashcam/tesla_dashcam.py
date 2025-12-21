@@ -3647,12 +3647,12 @@ def create_movie(
     except (OSError, IOError) as exc:
         _LOGGER.debug("Failed to remove %s: %s", ffmpeg_meta_filename, exc)
 
-    # Remove image video
-    # if title_video_filename:
-    #    try:
-    #        os.remove(title_video_filename)
-    #    except (OSError, IOError) as exc:
-    #        _LOGGER.debug("Failed to remove %s: %s", title_video_filename, exc)
+    # Remove title video temp file
+    if title_video_filename:
+        try:
+            os.remove(title_video_filename)
+        except (OSError, IOError) as exc:
+            _LOGGER.debug("Failed to remove %s: %s", title_video_filename, exc)
 
     if movie.filename is None:
         return False
