@@ -1326,3 +1326,6 @@ class TestEdgeCases:
         md = get_metadata("ffmpeg", [str(f)])
         assert md and md[0].duration is not None
         assert abs(md[0].duration - 62.041) < 1e-6
+        # Verify fractional FPS is preserved
+        assert md[0].fps is not None
+        assert abs(md[0].fps - 29.97) < 1e-6

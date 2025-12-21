@@ -2757,7 +2757,7 @@ def get_metadata(ffmpeg: str, filenames: list[str]) -> list[Video_Metadata]:  #
 
             # 4. FPS
             if m := search(r"([\d.]+)\s*fps", line):
-                metadata_item.fps = int(float(m.group(1)))
+                metadata_item.fps = float(m.group(1))
 
     return metadata
 
