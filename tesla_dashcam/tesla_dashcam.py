@@ -3776,6 +3776,9 @@ def create_movie_ffmpeg(
             ]
         )
 
+        # Stream copy to avoid re-encoding when using concat demuxer
+        ffmpeg_params_files.extend(["-c", "copy"])
+
     ffmpeg_params_files.extend(
         [
             "-map_metadata",
