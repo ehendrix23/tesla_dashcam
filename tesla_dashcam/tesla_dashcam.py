@@ -471,7 +471,7 @@ class Clip(object):
         if self._start_timestamp is not None:
             return self._start_timestamp
         if len(self.items) == 0:
-            return datetime.now()
+            return datetime.now(timezone.utc)
 
         for camera in self.sorted:
             if (camera_clip := self.camera(camera)) is not None:
@@ -755,7 +755,7 @@ class Event(object):
 
         if len(self.items) != 0 and (clip := self.clip(self.sorted[0])) is not None:
             return clip.start_timestamp
-        return datetime.now()
+        return datetime.now(timezone.utc)
 
     @start_timestamp.setter
     def start_timestamp(self, value: datetime) -> None:
@@ -916,7 +916,7 @@ class Movie(object):
 
         if len(self.items) != 0 and (event := self.event(self.sorted[0])) is not None:
             return event.start_timestamp
-        return datetime.now()
+        return datetime.now(timezone.utc)
 
     @start_timestamp.setter
     def start_timestamp(self, value: datetime) -> None:
@@ -2597,7 +2597,7 @@ def get_movie_files(
                 duration=metadata[0].duration,
                 timestmp=clip_timestamp_dt
                 if clip_timestamp_dt is not None
-                else datetime.now(),
+                else datetime.now(timezone.utc),
                 include=True,
                 video_metadata=metadata[0],
             )
