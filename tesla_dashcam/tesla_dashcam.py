@@ -2710,12 +2710,10 @@ def get_metadata(ffmpeg: str, filenames: list[str]) -> list[Video_Metadata]:  #
             line_split = line_split[0].split(":", 1)
             duration_list = line_split[1].split(":")
             try:
-                metadata_item.duration = (
-                    int(duration_list[0]) * 60 * 60
-                    + int(duration_list[1]) * 60
-                    + int(duration_list[2].split(".")[0])
-                    + (float(duration_list[2].split(".")[1]) / 100)
-                )
+                hours = int(duration_list[0])
+                minutes = int(duration_list[1])
+                seconds = float(duration_list[2])
+                metadata_item.duration = hours * 3600 + minutes * 60 + seconds
             except ValueError:
                 _LOGGER.warning(
                     "Duration in file %s contains invalid data and "
@@ -3673,6 +3671,7 @@ def create_movie_ffmpeg(
     ffmpeg_metadata: list[str],
 ) -> CompletedProcess[str]:
     chapter_file: int = 1
+    metadata_file_index: int = 1
     ffmpeg_join_filename: str | None = None
     video_string: str = ""
     ffmpeg_complex: str = ""
@@ -3732,6 +3731,7 @@ def create_movie_ffmpeg(
             ]
         )
         chapter_file = len(file_content)
+        metadata_file_index = chapter_file
         ffmpeg_params_files.extend(
             [
                 "-filter_complex",
@@ -3782,7 +3782,7 @@ def create_movie_ffmpeg(
     ffmpeg_params_files.extend(
         [
             "-map_metadata",
-            "1",
+            f"{metadata_file_index}",
             "-map_chapters",
             f"{chapter_file}",
         ]

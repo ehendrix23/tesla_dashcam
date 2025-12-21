@@ -1162,8 +1162,9 @@ class TestEdgeCases:
         assert "'\\''" in content, f"Join file not escaping apostrophes: {content}"
 
     def test_simple_concat_uses_stream_copy(self, monkeypatch, tmp_path):
-        from tesla_dashcam.tesla_dashcam import create_movie_ffmpeg
         from subprocess import CompletedProcess
+
+        from tesla_dashcam.tesla_dashcam import create_movie_ffmpeg
 
         captured_cmd = {"cmd": None}
 
@@ -1177,7 +1178,12 @@ class TestEdgeCases:
         (tmp_path / "a.mp4").write_text("")
         meta = tmp_path / "m.ffmetadata"
         meta.write_text(";FFMETADATA1\n")
-        vs = {"ffmpeg_exec": "ffmpeg", "ffmpeg_hwdev": [], "ffmpeg_hwout": [], "other_params": []}
+        vs = {
+            "ffmpeg_exec": "ffmpeg",
+            "ffmpeg_hwdev": [],
+            "ffmpeg_hwout": [],
+            "other_params": [],
+        }
         create_movie_ffmpeg(
             movie_filename=str(tmp_path / "out.mp4"),
             video_settings=vs,
@@ -1191,11 +1197,14 @@ class TestEdgeCases:
 
         assert captured_cmd["cmd"] is not None
         # Expect stream copy for simple concat to avoid re-encoding
-        assert "-c" in captured_cmd["cmd"] and "copy" in captured_cmd["cmd"], captured_cmd["cmd"]
+        assert "-c" in captured_cmd["cmd"] and "copy" in captured_cmd["cmd"], (
+            captured_cmd["cmd"]
+        )
 
     def test_complex_concat_includes_encoder_flags(self, monkeypatch, tmp_path):
-        from tesla_dashcam.tesla_dashcam import create_movie_ffmpeg
         from subprocess import CompletedProcess
+
+        from tesla_dashcam.tesla_dashcam import create_movie_ffmpeg
 
         captured_cmd = {"cmd": None}
 
@@ -1214,7 +1223,12 @@ class TestEdgeCases:
         (tmp_path / "b.mp4").write_text("")
         meta = tmp_path / "m.ffmetadata"
         meta.write_text(";FFMETADATA1\n")
-        vs = {"ffmpeg_exec": "ffmpeg", "ffmpeg_hwdev": [], "ffmpeg_hwout": [], "other_params": ["-preset", "medium", "-crf", "23", "-c:v", "libx264"]}
+        vs = {
+            "ffmpeg_exec": "ffmpeg",
+            "ffmpeg_hwdev": [],
+            "ffmpeg_hwout": [],
+            "other_params": ["-preset", "medium", "-crf", "23", "-c:v", "libx264"],
+        }
         create_movie_ffmpeg(
             movie_filename=str(tmp_path / "out.mp4"),
             video_settings=vs,
@@ -1228,4 +1242,87 @@ class TestEdgeCases:
 
         assert captured_cmd["cmd"] is not None
         # Expect encoder flags to be present for complex concat
-        assert "-crf" in captured_cmd["cmd"] and "-c:v" in captured_cmd["cmd"], captured_cmd["cmd"]
+        assert "-crf" in captured_cmd["cmd"] and "-c:v" in captured_cmd["cmd"], (
+            captured_cmd["cmd"]
+        )
+
+    def test_complex_concat_maps_metadata_from_ffmetadata_input(
+        self, monkeypatch, tmp_path
+    ):
+        from subprocess import CompletedProcess
+
+        from tesla_dashcam.tesla_dashcam import create_movie_ffmpeg
+
+        captured_cmd = {"cmd": None}
+
+        def fake_run(cmd, capture_output=True, check=True, text=True):
+            captured_cmd["cmd"] = cmd
+            return CompletedProcess(args=cmd, returncode=0, stdout="", stderr="")
+
+        monkeypatch.setattr("tesla_dashcam.tesla_dashcam.run", fake_run)
+
+        # Two inputs -> ffmetadata index should equal len(file_content)
+        fc = [
+            SimpleNamespace(filename=str(tmp_path / "a.mp4"), width=1280, height=960),
+            SimpleNamespace(filename=str(tmp_path / "b.mp4"), width=640, height=480),
+        ]
+        (tmp_path / "a.mp4").write_text("")
+        (tmp_path / "b.mp4").write_text("")
+        meta = tmp_path / "m.ffmetadata"
+        meta.write_text(";FFMETADATA1\n")
+        vs = {
+            "ffmpeg_exec": "ffmpeg",
+            "ffmpeg_hwdev": [],
+            "ffmpeg_hwout": [],
+            "other_params": [],
+        }
+        create_movie_ffmpeg(
+            movie_filename=str(tmp_path / "out.mp4"),
+            video_settings=vs,
+            movie_scale=SimpleNamespace(width=1280, height=960),
+            ffmpeg_params=[],
+            complex_concat=True,
+            file_content=fc,
+            ffmpeg_meta_filename=str(meta),
+            ffmpeg_metadata=[],
+        )
+
+        assert captured_cmd["cmd"] is not None
+        # Find the index of -map_metadata and read the following value
+        cmd = captured_cmd["cmd"]
+        idx = cmd.index("-map_metadata")
+        meta_idx = int(cmd[idx + 1])
+        assert meta_idx == len(fc), (
+            f"Expected map_metadata to reference ffmetadata input ({len(fc)}), got {meta_idx}. Cmd: {cmd}"
+        )
+
+    def test_get_metadata_parses_fractional_seconds(self, monkeypatch, tmp_path):
+        from subprocess import CompletedProcess
+
+        from tesla_dashcam.tesla_dashcam import get_metadata
+
+        # Create a temp file so get_metadata includes it
+        f = tmp_path / "clip.mp4"
+        f.write_text("")
+
+        # Simulate ffmpeg stderr output with fractional seconds
+        stderr = "\n".join(
+            [
+                "Input #0, mov,mp4,m4a,3gp,3g2,mj2, from 'clip.mp4':",
+                "  Duration: 00:01:02.041, start: 0.000000, bitrate: 1234 kb/s",
+                "    Stream #0:0: Video: h264 (High), yuv420p, 1280x960 [SAR 1:1 DAR 4:3], 29.97 fps, 29.97 tbr, 30k tbn, 59.94 tbc (default)",
+            ]
+        )
+
+        def fake_run(cmd, capture_output=True, text=True, check=False):
+            return CompletedProcess(args=cmd, returncode=0, stdout="", stderr=stderr)
+
+        monkeypatch.setattr("tesla_dashcam.tesla_dashcam.run", fake_run)
+        # Ensure os.path.isfile returns True for our temp file path
+        monkeypatch.setattr(
+            "tesla_dashcam.tesla_dashcam.os.path.isfile", lambda p: True
+        )
+
+        md = get_metadata("ffmpeg", [str(f)])
+        assert md and md[0].duration is not None
+        assert abs(md[0].duration - 62.041) < 1e-6
