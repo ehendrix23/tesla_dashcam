@@ -90,7 +90,7 @@ This package relies on `ffmpeg <https://ffmpeg.org>`__ to be installed, this is 
 solution to convert video. The created executables for Windows and MacOS include an ffmpeg version.
 For Mac, download the latest: `ffmpeg <https://ffmpeg.martin-riedl.de>`__ 
 
-If not using the executables (Windows and MacOS) then `Python <https://www.python.org>`__ 3.13.1 or higher is required.
+If not using the executables (Windows and MacOS) then `Python <https://www.python.org>`__ 3.13.0 or higher is required.
 
 
 Installation
@@ -613,6 +613,9 @@ specifies where each camera clip should be placed within the resulting video. (s
 
 
 * MOSAIC: Resolution: 2496x1824
+  
+  Shows all 6 cameras with front and rear cameras having larger dimensions (1.3x boost) to provide better detail.
+  Replaces the legacy WIDESCREEN layout.
 
 ::
 
@@ -622,7 +625,7 @@ specifies where each camera clip should be placed within the resulting video. (s
   +-------------+                         +--------------+
   +-------------+-------------------------+--------------+
   +-------------+                         +--------------+
-  | Left Camera |       Rear Camera.      | Right Camera |
+  | Left Camera |       Rear Camera       | Right Camera |
   +-------------+                         +--------------+
   +-------------+-------------------------+--------------+
 
@@ -1700,7 +1703,7 @@ Release Notes
     - New: Option  --no-faststart for not setting the faststart flag in the video files as doing this can result in encoding failures on network shares `Issue #62 <https://github.com/ehendrix23/tesla_dashcam/issues/62>`_
     - New: Option --temp_dir to provide a different path to store the temporary video files that are created `Issue #67 <https://github.com/ehendrix23/tesla_dashcam/issues/67>`_
     - New: Description metadata to include video was created by tesla_dashcam with version number.
-    - Changed: WIDESCREEN layout will now by default show the front camera on top with higher resolution compared to others due to incorporation of rear camera
+    - Changed: WIDESCREEN layout (now MOSAIC in 0.1.21) will now by default show the front camera on top with higher resolution compared to others due to incorporation of rear camera
     - Changed: Include folder SentryClips in default source list if no source provided (SavedClips was already default).
     - Changed: Check to ensure that Python version is at required level or higher (currently 3.7).
     - Changed: Existence of font file (provided or default) will be checked and error returned if not existing.
@@ -1792,6 +1795,8 @@ Release Notes
     - Fixed: Traceback if duration in video clip from Tesla is N/A, now clip will be excluded. `Issue #212 <https://github.com/ehendrix23/tesla_dashcam/issues/212>`_
     - Fixed: When using front-layout, will now use ratio of clip instead of fixed 4/3 `Issue #214 <https://github.com/ehendrix23/tesla_dashcam/issues/214>`_
     - Fixed: Will now force SAR to be 1:1 same as Tesla clips.
+    - Fixed: Camera width/height scale calculation to prevent zero multiplication when scale is not set
+    - Fixed: Alignment (halign/valign) defaults not being applied when not explicitly specified
     - Fixed: Typo in qsv arg check. Contributed by @cjwang18
     - Fixed: Docker: Add tesla_dashcam to non-accelerated container image. Contributed by @croadfeldt
 
@@ -1799,6 +1804,7 @@ Release Notes
 TODO
 ----
 
+* Implement FSD information in video
 * Implement Jinja2 for templates
 * Implement templates for other options
 * Implement option to crop individual camera output
