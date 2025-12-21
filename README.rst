@@ -228,7 +228,7 @@ Usage
 
     usage: tesla_dashcam.py [-h] [--version] [--loglevel {DEBUG,INFO,WARNING,ERROR,CRITICAL}] [--ffmpeg_debug] [--temp_dir TEMP_DIR] [--no-notification] [--display_ts] [--skip_existing]
                             [--delete_source] [--exclude_subdirs] [--monitor] [--monitor_once] [--monitor_trigger MONITOR_TRIGGER]
-                            [--layout {MOSAIC,WIDESCREEN,FULLSCREEN,PERSPECTIVE,CROSS,DIAMOND,HORIZONTAL}] [--perspective] [--scale CLIP_SCALE [CLIP_SCALE ...]] [--mirror] [--rear] [--swap] [--no-swap]
+                            [--layout {MOSAIC,FULLSCREEN,PERSPECTIVE,CROSS,DIAMOND,HORIZONTAL}] [--perspective] [--scale CLIP_SCALE [CLIP_SCALE ...]] [--mirror] [--rear] [--swap] [--no-swap]
                             [--swap_frontrear] [--background BACKGROUND] [--title_screen_map] [--no-front] [--no-left] [--no-right] [--no-rear] [--no-left-pillar] [--no-right-pillar] [--no-timestamp]
                             [--halign {LEFT,CENTER,RIGHT}] [--valign {TOP,MIDDLE,BOTTOM}] [--font FONT] [--fontsize FONTSIZE] [--fontcolor FONTCOLOR]
                             [--text_overlay_fmt TEXT_OVERLAY_FMT] [--timestamp_format TIMESTAMP_FORMAT] [--start_timestamp START_TIMESTAMP] [--end_timestamp END_TIMESTAMP]
@@ -273,7 +273,7 @@ Usage
     Video Layout:
       Set what the layout of the resulting video should be
 
-      --layout {MOSAIC,WIDESCREEN,FULLSCREEN,PERSPECTIVE,CROSS,DIAMOND,HORIZONTAL}
+      --layout {MOSAIC,FULLSCREEN,PERSPECTIVE,CROSS,DIAMOND,HORIZONTAL}
                             Layout of the created video.
                                 FULLSCREEN: Front camera center top with side and rear cameras smaller underneath it.
                                 MOSAIC: Front and rear cameras on top with pillars and side cameras smaller underneath it.
@@ -281,7 +281,6 @@ Usage
                                 CROSS: Front camera center top, pillar cameras underneath, then repeater cameras underneath, and rear camera center bottom.
                                 DIAMOND: Front camera center top, pillar cameras on left/right of front smaller, side cameras below on left/right of rear smaller, and rear camera center bottom.
                                 HORIZONTAL: All cameras in horizontal line: left, left pillar, front, rear, right pillar, right.
-                                WIDESCREEN: (Legacy) alias for MOSAIC.
                             (default: FULLSCREEN)
       --camera_position CLIP_POS [CLIP_POS ...]
                             Set camera clip position within video. Selecting this will override the layout selected!

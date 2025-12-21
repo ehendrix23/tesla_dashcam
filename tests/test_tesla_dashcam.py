@@ -1,3 +1,5 @@
+from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, Mock, PropertyMock
 
 import pytest
@@ -1077,3 +1079,84 @@ class TestDiamond:
     )
     def test_camera_layout(self, layout, config, expected):
         verify_camera_layout(layout=layout, config=config, expected=expected)
+
+
+class TestEdgeCases:
+    def test_create_movie_no_clips_returns_false(self):
+        from tesla_dashcam.tesla_dashcam import Movie, create_movie
+
+        # Prepare minimal args; early return should only depend on movie.count
+        movie = Movie()
+        event_info = []
+        video_settings = {
+            "video_layout": SimpleNamespace(video_width=1280, video_height=960)
+        }
+        # Expectation: production behavior should signal failure on empty input
+        result = create_movie(
+            movie=movie,
+            event_info=event_info,
+            movie_filename="/tmp/output.mp4",
+            video_settings=video_settings,
+            chapter_offset=0,
+            title_screen_map=False,
+        )
+        assert result is False
+
+    def test_concat_joinfile_escapes_apostrophes(self, monkeypatch, tmp_path):
+        from subprocess import CompletedProcess
+
+        from tesla_dashcam.tesla_dashcam import create_movie_ffmpeg
+
+        # Capture join file path written and prevent deletion
+        removed_paths = []
+
+        def fake_remove(path):
+            removed_paths.append(path)
+            # Do not actually delete; allow inspection
+
+        monkeypatch.setattr("tesla_dashcam.tesla_dashcam.os.remove", fake_remove)
+
+        # Stub subprocess.run to succeed without invoking ffmpeg
+        def fake_run(cmd, capture_output=True, check=True, text=True):
+            return CompletedProcess(args=cmd, returncode=0, stdout="", stderr="")
+
+        monkeypatch.setattr("tesla_dashcam.tesla_dashcam.run", fake_run)
+
+        # Prepare inputs
+        path_with_quote = tmp_path / "clip o'clock.mp4"
+        path_with_quote.write_text("")
+
+        file_content = [
+            SimpleNamespace(filename=str(path_with_quote), width=1280, height=960)
+        ]
+        movie_scale = SimpleNamespace(width=1280, height=960)
+        ffmpeg_params = []
+        ffmpeg_meta = tmp_path / "meta.ffmetadata"
+        ffmpeg_meta.write_text(";FFMETADATA1\n")
+        ffmpeg_metadata = []
+        video_settings = {
+            "ffmpeg_exec": "ffmpeg",
+            "ffmpeg_hwdev": [],
+            "ffmpeg_hwout": [],
+            "other_params": [],
+        }
+
+        # Execute
+        create_movie_ffmpeg(
+            movie_filename=str(tmp_path / "out.mp4"),
+            video_settings=video_settings,
+            movie_scale=movie_scale,
+            ffmpeg_params=ffmpeg_params,
+            complex_concat=False,
+            file_content=file_content,
+            ffmpeg_meta_filename=str(ffmpeg_meta),
+            ffmpeg_metadata=ffmpeg_metadata,
+        )
+
+        # The join file should be the one attempted to be removed last
+        assert removed_paths, "Expected a join file to be scheduled for deletion"
+        joinfile = removed_paths[-1]
+        content = Path(joinfile).read_text()
+        # Expect proper escaping of inner apostrophes inside single-quoted path
+        # ffmpeg concat syntax requires closing+escaped apostrophe+reopen i.e. '\'\''
+        assert "'\\''" in content, f"Join file not escaping apostrophes: {content}"

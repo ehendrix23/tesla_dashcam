@@ -3253,7 +3253,7 @@ def create_movie(
     # Just return if there are no clips.
     if movie.count <= 0:
         _LOGGER.debug("Movie list is empty")
-        return True
+        return False
 
     # Determine the scale of the video, for now this is based on the largest video
     # in the list.
@@ -3456,7 +3456,7 @@ def create_movie(
 
     if total_clips == 0:
         print(f"{get_current_timestamp()}\t\tError: No valid clips to merge found.")
-        return True
+        return False
 
     # Write out the meta data file.
     meta_content = ";FFMETADATA1" + os.linesep + meta_content
@@ -3715,9 +3715,10 @@ def create_movie_ffmpeg(
             # like file 'file:<actual path>'
             # https://trac.ffmpeg.org/ticket/2702
             # Write out the video files file
-            file_content_string += (
-                f"file '{video_file.filename.strip().replace(os.sep, '/')}'{os.linesep}"
-            )
+            # Escape single quotes in file paths per ffmpeg concat syntax
+            join_path = video_file.filename.strip().replace(os.sep, "/")
+            join_path = join_path.replace("'", "'\\''")
+            file_content_string += f"file '{join_path}'" + os.linesep
 
     if complex_concat:
         # Final items to be added for a complex concatenation.
@@ -4641,14 +4642,14 @@ def main() -> int:
         ],
         default="FULLSCREEN",
         type=str.upper,
+        metavar="MOSAIC|FULLSCREEN|PERSPECTIVE|CROSS|DIAMOND|HORIZONTAL",
         help="R|Layout of the created video.\n"
         "    FULLSCREEN: Front camera center top with side and rear cameras smaller underneath it.\n"
         "    MOSAIC: Front and rear cameras on top with pillars and side cameras smaller underneath it.\n"
         "    PERSPECTIVE: Similar to FULLSCREEN but then with pillar and repeater cameras in perspective.\n"
         "    CROSS: Front camera center top, pillar cameras underneath, then side cameras underneath, and rear camera center bottom.\n"
         "    DIAMOND: Front camera center top, pillar cameras on left/right of front smaller, side cameras below on left/right of rear smaller, and rear camera center bottom.\n"
-        "    HORIZONTAL: All cameras in horizontal line: left, left pillar, front, rear, right pillar, right.\n"
-        "    WIDESCREEN: (Legacy) alias for MOSAIC.\n",
+        "    HORIZONTAL: All cameras in horizontal line: left, left pillar, front, rear, right pillar, right.\n",
     )
     layout_group.add_argument(
         "--camera_position",
@@ -4740,10 +4741,10 @@ def main() -> int:
         "  --scale camera=left_pillar 0.25                         left pillar camera "
         "is set to 320x240\n"
         "Defaults:\n"
-        "    WIDESCREEN: 1/2 (front 1280x960, others 640x480, video is 1920x1920)\n"
+        "    MOSAIC: 1/2 (all cameras 640x480 base, front/rear boosted to 1216x912, video is 2496x1824)\n"
         "    FULLSCREEN: 1/2 (640x480, video is 1920x960)\n"
-        "    CROSS: 1/2 (640x480, video is 1280x1440)\n"
-        "    DIAMOND: 1/2 (640x480, video is 1920x976)\n",
+        "    CROSS: 1/2 (640x480, video is 1280x1920)\n"
+        "    DIAMOND: 1/2 (640x480, video is 2560x1920)\n",
     )
     layout_group.add_argument(
         "--mirror",
