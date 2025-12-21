@@ -734,7 +734,7 @@ class Event(object):
 
     @property
     def first_item(self) -> Clip | None:
-        return self.clip(self.sorted[0])
+        return self.clip(self.sorted[0]) if self.sorted else None
 
     @property
     def items(self) -> ItemsView[datetime, Clip]:
@@ -895,7 +895,7 @@ class Movie(object):
 
     @property
     def first_item(self) -> Event | None:
-        return self.event(self.sorted[0])
+        return self.event(self.sorted[0]) if self.sorted else None
 
     @property
     def items(self) -> ItemsView[str, Event]:
@@ -1267,8 +1267,13 @@ class Camera(object):
             self._scale = float(str(value).split("x")[0])
         else:
             # Scale is a resolution.
-            self.width = int(str(value).split("x")[0])
-            self.height = int(str(value).split("x")[1])
+            parts = str(value).split("x")
+            if len(parts) != 2 or not parts[0] or not parts[1]:
+                raise ValueError(
+                    f"Invalid resolution format: '{value}'. Expected format: WIDTHxHEIGHT (e.g., 1920x1080)"
+                )
+            self.width = int(parts[0])
+            self.height = int(parts[1])
             self._scale = 1
 
     @property
@@ -2250,6 +2255,9 @@ def check_latest_release(include_beta: bool = False) -> Optional[dict[str, str]]
     # If we include betas then we would have received a list, thus get 1st
     # element as that is the latest release.
     if include_beta:
+        if not release_data or len(release_data) == 0:
+            print(f"{get_current_timestamp()}No releases found")
+            return None
         release_data = release_data[0]
 
     return release_data
@@ -2565,6 +2573,12 @@ def get_movie_files(
             _LOGGER.debug("Adding video file %s.", event_folder)
             # Get the metadata for this video files.
             metadata = get_metadata(video_settings["ffmpeg_exec"], [event_folder])
+            if not metadata:
+                _LOGGER.warning(
+                    "Failed to get metadata for file %s, skipping.", event_folder
+                )
+                continue
+            
             # Store video as a camera clip.
             clip_timestamp_dt = (
                 metadata[0].timestamp

@@ -17,6 +17,7 @@ from tesla_dashcam.tesla_dashcam import (
     Mosaic,
     MovieLayout,
     escape_drawtext_literals,
+    get_metadata,
 )
 
 
@@ -1329,3 +1330,45 @@ class TestEdgeCases:
         # Verify fractional FPS is preserved
         assert md[0].fps is not None
         assert abs(md[0].fps - 29.97) < 1e-6
+
+    def test_scale_setter_handles_malformed_resolution(self):
+        """Test that scale setter handles malformed resolutions like '1920x' or 'x1080'."""
+        layout = FullScreen()
+        
+        # Test missing height
+        with pytest.raises(ValueError, match="Invalid resolution format"):
+            layout.scale = "1920x"
+        
+        # Test missing width  
+        with pytest.raises(ValueError, match="Invalid resolution format"):
+            layout.scale = "x1080"
+        
+        # Test empty string
+        with pytest.raises(ValueError, match="Invalid resolution format"):
+            layout.scale = "x"
+        
+        # Test completely malformed
+        with pytest.raises(ValueError):
+            layout.scale = "not_a_number"
+        
+        # Test valid formats work
+        layout.scale = "1920x1080"
+        assert layout.cameras("front").width == 1920
+        assert layout.cameras("front").height == 1080
+        
+        layout.scale = "0.5"
+        assert layout.cameras("front")._scale == 0.5
+
+    def test_get_metadata_empty_list_safe(self, monkeypatch):
+        """Test that get_metadata returns empty list for nonexistent files."""
+        # Mock run to simulate ffmpeg not finding any valid files
+        def fake_run(cmd, **kwargs):
+            return SimpleNamespace(returncode=0, stderr="")
+        
+        monkeypatch.setattr("tesla_dashcam.tesla_dashcam.run", fake_run)
+        monkeypatch.setattr(
+            "tesla_dashcam.tesla_dashcam.os.path.isfile", lambda p: False
+        )
+        
+        metadata = get_metadata("ffmpeg", ["/nonexistent/file.mp4"])
+        assert metadata == []
