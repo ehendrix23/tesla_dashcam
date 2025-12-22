@@ -36,7 +36,7 @@ from tzlocal import get_localzone
 # Import on Windows only
 # pylint: disable=import-error
 if sys.platform == "win32":
-    from win10toast import ToastNotifier  # type: ignore[import]
+    from win11toast import toast  # type: ignore[import]
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -141,7 +141,6 @@ FFMPEG_RIGHT_PERSPECTIVE = (
     "x2=1/8*W:y3=6*H/5:x3=W:y2=5*H/6:sense=destination"
 )
 
-TOASTER_INSTANCE = None
 
 FFMPEG_DEBUG = False
 DISPLAY_TS = False
@@ -4492,27 +4491,14 @@ def notify_macos(title, subtitle, message):
 def notify_windows(title, subtitle, message):
     """Notification on Windows"""
 
-    # Section commented out, waiting to see if it really does not work on Windows 7
-    # This works only on Windows 10 9r Windows Server 2016/2019. Skipping for
-    # everything else
-    #    from platform import win32_ver
-    #    if win32_ver()[0] != 10:
-    #        return
-
     try:
-        global TOASTER_INSTANCE  # pylint: disable=global-statement
-        if TOASTER_INSTANCE is None:
-            TOASTER_INSTANCE = ToastNotifier()
-
-        TOASTER_INSTANCE.show_toast(
+        toast(
             threaded=True,
             title=f"{title} {subtitle}",
-            msg=message,
+            body=message,
             duration=5,
-            icon_path=resource_path("tesla_dashcam.ico"),
+            icon=resource_path("tesla_dashcam.ico"),
         )
-
-        run(["notify-send", f'"{title} {subtitle}"', f'"{message}"'], check=True)
     except CalledProcessError as exc:
         _LOGGER.error("Failed in notifification: %s", exc)
 
