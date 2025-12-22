@@ -46,7 +46,7 @@ if [ $? -ne 0 ]; then
 fi
 
 echo "Creating README.html"
-rst2html.py README.rst bundles/MacOS/tesla_dashcam/Tesla_Dashcam\ -\ README.html
+python3 -m markdown -x extra -x toc -x fenced_code -x tables README.md > README.html
 if [ $? -ne 0 ]; then
   echo "Failed to create README.html."
   exit 1
