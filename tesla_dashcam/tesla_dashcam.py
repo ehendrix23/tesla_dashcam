@@ -2709,9 +2709,13 @@ def get_metadata(ffmpeg: str, filenames: list[str]) -> list[Video_Metadata]:  #
         if (
             match_videotime := search(r"^\s*creation_time\s*:\s*(.+)", line)
         ) is not None:
-            metadata_item.timestamp = datetime.strptime(
+            parsed_time = datetime.strptime(
                 match_videotime.group(1).strip(), "%Y-%m-%dT%H:%M:%S.%f%z"
             ).astimezone(timezone.utc)
+            _LOGGER.debug(
+                f"Parsed clip timestamp: {parsed_time}, tzinfo: {parsed_time.tzinfo}"
+            )
+            metadata_item.timestamp = parsed_time
             continue
 
         # Title of the video
@@ -3923,6 +3927,14 @@ def process_folders(
         first_clip_tmstp: datetime = event_info.start_timestamp
         last_clip_tmstp: datetime = event_info.end_timestamp
 
+        _LOGGER.debug(
+            f"Processing folder {event_folder}: first_clip={first_clip_tmstp}, last_clip={last_clip_tmstp}"
+        )
+        if video_settings["start_timestamp"] is not None:
+            _LOGGER.debug(
+                f"  Comparing last_clip {last_clip_tmstp} < start_timestamp {video_settings['start_timestamp']}"
+            )
+
         # Skip this folder if we it does not fall within provided timestamps.
         if (
             video_settings["start_timestamp"] is not None
@@ -4110,6 +4122,9 @@ def process_folders(
 
         # Clamp event timestamps to user-requested start/end timestamp window
         if video_settings["start_timestamp"] is not None:
+            _LOGGER.debug(
+                f"Comparing event_start_timestamp {event_start_timestamp} < user start {video_settings['start_timestamp']}"
+            )
             if event_start_timestamp < video_settings["start_timestamp"]:
                 _LOGGER.debug(
                     "Clip start timestamp changed from %s to %s to match "
@@ -4120,6 +4135,9 @@ def process_folders(
                 event_start_timestamp = video_settings["start_timestamp"]
 
         if video_settings["end_timestamp"] is not None:
+            _LOGGER.debug(
+                f"Comparing event_end_timestamp {event_end_timestamp} > user end {video_settings['end_timestamp']}"
+            )
             if event_end_timestamp > video_settings["end_timestamp"]:
                 _LOGGER.debug(
                     "Clip end timestamp changed from %s to %s to match "
@@ -5810,10 +5828,15 @@ def main() -> int:
     if args.start_timestamp is not None:
         try:
             start_timestamp = isoparse(args.start_timestamp)
+            _LOGGER.debug(
+                f"Parsed start_timestamp: {start_timestamp}, tzinfo: {start_timestamp.tzinfo}"
+            )
             if start_timestamp.tzinfo is None:
                 start_timestamp = start_timestamp.astimezone(get_localzone())
+                _LOGGER.debug(f"After local timezone conversion: {start_timestamp}")
             # Normalize to UTC for internal comparisons
             start_timestamp = start_timestamp.astimezone(timezone.utc)
+            _LOGGER.debug(f"After UTC conversion: {start_timestamp}")
         except ValueError as e:
             print(
                 f"{get_current_timestamp()}Start timestamp ({args.start_timestamp}) "
@@ -5826,10 +5849,15 @@ def main() -> int:
     if args.end_timestamp is not None:
         try:
             end_timestamp = isoparse(args.end_timestamp)
+            _LOGGER.debug(
+                f"Parsed end_timestamp: {end_timestamp}, tzinfo: {end_timestamp.tzinfo}"
+            )
             if end_timestamp.tzinfo is None:
                 end_timestamp = end_timestamp.astimezone(get_localzone())
+                _LOGGER.debug(f"After local timezone conversion: {end_timestamp}")
             # Normalize to UTC for internal comparisons
             end_timestamp = end_timestamp.astimezone(timezone.utc)
+            _LOGGER.debug(f"After UTC conversion: {end_timestamp}")
         except ValueError as e:
             print(
                 f"{get_current_timestamp()}End timestamp ({args.end_timestamp}) "
