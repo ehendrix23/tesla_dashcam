@@ -222,7 +222,7 @@ class Video_Metadata(object):
         height: int | None = None,
         width: int | None = None,
         video_codec: str | None = None,
-        fps: int | None = None,
+        fps: float | None = None,
         dar: str | None = None,
         chapters: list[Chapter] | None = None,
     ):
@@ -234,7 +234,7 @@ class Video_Metadata(object):
         self._height: int | None = height
         self._width: int | None = width
         self._video_codec: str | None = video_codec
-        self._fps: int | None = fps
+        self._fps: float | None = fps
         self._dar: str | None = dar
         self._chapters: list[Chapter] = chapters if chapters is not None else []
 
@@ -311,11 +311,11 @@ class Video_Metadata(object):
         self._video_codec = value
 
     @property
-    def fps(self) -> int | None:
+    def fps(self) -> float | None:
         return self._fps
 
     @fps.setter
-    def fps(self, value: int):
+    def fps(self, value: float):
         self._fps = value
 
     @property
@@ -1270,7 +1270,8 @@ class Camera(object):
             parts = str(value).split("x")
             if len(parts) != 2 or not parts[0] or not parts[1]:
                 raise ValueError(
-                    f"Invalid resolution format: '{value}'. Expected format: WIDTHxHEIGHT (e.g., 1920x1080)"
+                    f"Invalid resolution format: '{value}'. Expected format: "
+                    "WIDTHxHEIGHT (e.g., 1920x1080)"
                 )
             self.width = int(parts[0])
             self.height = int(parts[1])
@@ -2578,7 +2579,7 @@ def get_movie_files(
                     "Failed to get metadata for file %s, skipping.", event_folder
                 )
                 continue
-            
+
             # Store video as a camera clip.
             clip_timestamp_dt = (
                 metadata[0].timestamp
@@ -2771,7 +2772,7 @@ def get_metadata(ffmpeg: str, filenames: list[str]) -> list[Video_Metadata]:  #
 
             # 4. FPS
             if m := search(r"([\d.]+)\s*fps", line):
-                metadata_item.fps = float(m.group(1))
+                metadata_item.fps = float(m.group(1) or 24.0)
 
     return metadata
 
@@ -4661,12 +4662,19 @@ def main() -> int:
         type=str.upper,
         metavar="MOSAIC|FULLSCREEN|PERSPECTIVE|CROSS|DIAMOND|HORIZONTAL",
         help="R|Layout of the created video.\n"
-        "    FULLSCREEN: Front camera center top with side and rear cameras smaller underneath it.\n"
-        "    MOSAIC: Front and rear cameras on top with pillars and side cameras smaller underneath it.\n"
-        "    PERSPECTIVE: Similar to FULLSCREEN but then with pillar and repeater cameras in perspective.\n"
-        "    CROSS: Front camera center top, pillar cameras underneath, then side cameras underneath, and rear camera center bottom.\n"
-        "    DIAMOND: Front camera center top, pillar cameras on left/right of front smaller, side cameras below on left/right of rear smaller, and rear camera center bottom.\n"
-        "    HORIZONTAL: All cameras in horizontal line: left, left pillar, front, rear, right pillar, right.\n",
+        "    FULLSCREEN: Front camera center top with side and rear cameras smaller "
+        "underneath it.\n"
+        "    MOSAIC: Front and rear cameras on top with pillars and side cameras "
+        "smaller underneath it.\n"
+        "    PERSPECTIVE: Similar to FULLSCREEN but then with pillar and repeater "
+        "cameras in perspective.\n"
+        "    CROSS: Front camera center top, pillar cameras underneath, then side "
+        "cameras underneath, and rear camera center bottom.\n"
+        "    DIAMOND: Front camera center top, pillar cameras on left/right of front "
+        "smaller, side cameras below on left/right of rear smaller, and rear camera "
+        "center bottom.\n"
+        "    HORIZONTAL: All cameras in horizontal line: left, left pillar, front, "
+        "rear, right pillar, right.\n",
     )
     layout_group.add_argument(
         "--camera_position",
@@ -4758,7 +4766,8 @@ def main() -> int:
         "  --scale camera=left_pillar 0.25                         left pillar camera "
         "is set to 320x240\n"
         "Defaults:\n"
-        "    MOSAIC: 1/2 (all cameras 640x480 base, front/rear boosted to 1216x912, video is 2496x1824)\n"
+        "    MOSAIC: 1/2 (all cameras 640x480 base, front/rear boosted to 1216x912, "
+        "video is 2496x1824)\n"
         "    FULLSCREEN: 1/2 (640x480, video is 1920x960)\n"
         "    CROSS: 1/2 (640x480, video is 1280x1920)\n"
         "    DIAMOND: 1/2 (640x480, video is 2560x1920)\n",
