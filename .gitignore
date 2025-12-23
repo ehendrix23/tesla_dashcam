@@ -18,6 +18,8 @@ eggs/
 .eggs/
 lib/
 lib64/
+Lib/
+Scripts/
 parts/
 sdist/
 var/
@@ -93,6 +95,7 @@ venv*/
 ENV/
 env.bak/
 venv.bak/
+pyvenv.cfg
 
 # Spyder project settings
 .spyderproject
@@ -125,3 +128,7 @@ bundles/Windows/tesla_dashcam/Tesla_Dashcam - README.html
 *.scratch
 .vscode/
 examples/
+*-workspace
+.vscode/settings.json
+=*
+README.html

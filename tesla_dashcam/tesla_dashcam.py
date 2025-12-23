@@ -2,29 +2,41 @@
 Merges the 3 Tesla Dashcam and Sentry camera video files into 1 video. If
 then further concatenates the files together to make 1 movie.
 """
+
+from __future__ import annotations
+
 import argparse
+import json
 import logging
 import os
 import sys
-from platform import processor as platform_processor
-import json
 from datetime import datetime, timedelta, timezone
 from glob import glob, iglob
+from inspect import isclass, isroutine
 from pathlib import Path
-from re import match, search, IGNORECASE as re_IGNORECASE
+from platform import processor as platform_processor
+from re import IGNORECASE as re_IGNORECASE
+from re import match, search
 from shlex import split as shlex_split
 from shutil import which
-from subprocess import CalledProcessError, TimeoutExpired, run
+from subprocess import CalledProcessError, CompletedProcess, TimeoutExpired, run
 from tempfile import mkstemp
-from time import sleep, time as timestamp, mktime
-from typing import Any, List, Optional
+from time import mktime, sleep
+from time import time as timestamp
+from types import SimpleNamespace
+from typing import Any, ItemsView, Iterator, List, Optional
 
 import requests
+import staticmap
 from dateutil.parser import isoparse
+from PIL.Image import Image
 from psutil import disk_partitions
 from tzlocal import get_localzone
 
-import staticmap
+# Import on Windows only
+# pylint: disable=import-error
+if sys.platform == "win32":
+    from win11toast import toast  # type: ignore[import]
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,7 +49,9 @@ _LOGGER = logging.getLogger(__name__)
 #  different ones to be created based on where it should go to (stdout,
 #  log file, ...).
 
-VERSION = {"major": 0, "minor": 1, "patch": 20, "beta": -1}
+# cSpell: disable
+# VERSION = {"major": 0, "minor": 1, "patch": 21, "beta": 5}
+VERSION = {"major": 0, "minor": 1, "patch": 21, "beta": -1}
 VERSION_STR = f"v{VERSION['major']}.{VERSION['minor']}.{VERSION['patch']}"
 
 if VERSION["beta"] > -1:
@@ -59,10 +73,9 @@ FFMPEG = {
     "freebsd11": "ffmpeg",
 }
 
-# noinspection PyPep8
 MOVIE_HOMEDIR = {
     "darwin": "Movies/Tesla_Dashcam",
-    "win32": "Videos\Tesla_Dashcam",
+    "win32": r"Videos\Tesla_Dashcam",
     "cygwin": "Videos/Tesla_Dashcam",
     "linux": "Videos/Tesla_Dashcam",
     "freebsd11": "Videos/Tesla_Dashcam",
@@ -70,6 +83,8 @@ MOVIE_HOMEDIR = {
 
 DEFAULT_CLIP_HEIGHT = 960
 DEFAULT_CLIP_WIDTH = 1280
+DEFAULT_FONT_HALIGN = "CENTER"
+DEFAULT_FONT_VALIGN = "BOTTOM"
 
 MOVIE_QUALITY = {
     "HIGH": "18",
@@ -115,15 +130,29 @@ EVENT_REASON = {
     "user_interaction*": "USER",
 }
 
-TOASTER_INSTANCE = None
+FFMPEG_LEFT_PERSPECTIVE = (
+    ", pad=iw+4:3/2*ih:-1:ih/8:0x00000000, "
+    "perspective=x0=0:y0=1*H/5:x1=W:y1=-3/44*H:"
+    "x2=0:y2=6*H/5:x3=7/8*W:y3=5*H/6:sense=destination"
+)
 
-display_ts = False
+FFMPEG_RIGHT_PERSPECTIVE = (
+    ", pad=iw+4:3/2*ih:-1:ih/8:0x00000000,"
+    "perspective=x0=0:y1=1*H/5:x1=W:y0=-3/44*H:"
+    "x2=1/8*W:y3=6*H/5:x3=W:y2=5*H/6:sense=destination"
+)
+
+
+FFMPEG_DEBUG = False
+DISPLAY_TS = False
 
 PLATFORM = sys.platform
 # Allow setting for testing.
 # PLATFORM = "darwin"
 # PLATFORM = "win32"
 # PLATFORM = "linux"
+
+# cSpell: enable
 
 PROCESSOR = platform_processor()
 if PLATFORM == "darwin" and PROCESSOR == "i386":
@@ -133,130 +162,329 @@ if PLATFORM == "darwin" and PROCESSOR == "i386":
             capture_output=True,
             timeout=120,
             text=True,
+            check=True,
         )
     except TimeoutExpired:
         print("Timeout running sysctl")
+    except CalledProcessError as exc:
+        _LOGGER.error("Error running sysctl: %d - %s", exc.returncode, exc.stderr)
     else:
-        if sysctl.returncode == 0:
-            if search("Apple", sysctl.stdout, re_IGNORECASE) is not None:
-                PROCESSOR = "arm"
-        else:
-            print("Error running sysctl: {sysctl.returncode} - {sysctl.stderr}")
+        if search("Apple", sysctl.stdout, re_IGNORECASE) is not None:
+            PROCESSOR = "arm"
 
 # Allow setting for testing.
 # PROCESSOR = "arm"
 
 
-class Camera_Clip(object):
-    """ Camera Clip Class
-    """
+class Chapter(object):
+    """Chapters Class"""
 
-    def __init__(self, filename, timestamp, duration=0, include=False):
-        self._filename = filename
-        self._duration = duration
-        self._timestamp = timestamp
-        self._include = include
+    def __init__(self, start=None, end=None, title=None):
+        self._start: float | None = start
+        self._end: float | None = end
+        self._title: str | None = title
 
     @property
-    def filename(self):
+    def start(self) -> float | None:
+        return self._start
+
+    @start.setter
+    def start(self, value: float):
+        self._start = value
+
+    @property
+    def end(self) -> float | None:
+        return self._end
+
+    @end.setter
+    def end(self, value: float):
+        self._end = value
+
+    @property
+    def title(self) -> str | None:
+        return self._title
+
+    @title.setter
+    def title(self, value: str):
+        self._title = value
+
+
+class Video_Metadata(object):
+    """Metadata Class"""
+
+    def __init__(
+        self,
+        filename: str,
+        timestp: datetime | None = None,
+        duration: float = 0,
+        include: bool = False,
+        title: str | None = None,
+        height: int | None = None,
+        width: int | None = None,
+        video_codec: str | None = None,
+        fps: float | None = None,
+        dar: str | None = None,
+        chapters: list[Chapter] | None = None,
+    ):
+        self._filename: str = filename
+        self._timestamp: datetime | None = timestp
+        self._duration: float = duration
+        self._include: bool = include
+        self._title: str | None = title
+        self._height: int | None = height
+        self._width: int | None = width
+        self._video_codec: str | None = video_codec
+        self._fps: float | None = fps
+        self._dar: str | None = dar
+        self._chapters: list[Chapter] = chapters if chapters is not None else []
+
+    @property
+    def filename(self) -> str:
         return self._filename
 
     @filename.setter
-    def filename(self, value):
+    def filename(self, value: str):
         self._filename = value
 
     @property
-    def duration(self):
-        return self._duration if self._duration is not None else 0
-
-    @duration.setter
-    def duration(self, value):
-        self._duration = value
-
-    @property
-    def timestamp(self):
+    def timestamp(self) -> datetime | None:
         return self._timestamp
 
     @timestamp.setter
-    def timestamp(self, value):
+    def timestamp(self, value: datetime):
         self._timestamp = value
 
     @property
-    def include(self):
-        return self._include
+    def duration(self) -> float:
+        return self._duration
+
+    @duration.setter
+    def duration(self, value: float):
+        self._duration = value
+
+    @property
+    def include(self) -> bool:
+        return self._include or True
 
     @include.setter
-    def include(self, value):
+    def include(self, value: bool):
         self._include = value
 
     @property
-    def start_timestamp(self):
-        return self.timestamp
+    def title(self) -> str | None:
+        return self._title
+
+    @title.setter
+    def title(self, value: str):
+        self._title = value
 
     @property
-    def end_timestamp(self):
-        return self.start_timestamp + timedelta(seconds=self.duration)
+    def height(self) -> int | None:
+        return self._height
 
-
-class Clip(object):
-    """ Clip Class
-    """
-
-    def __init__(self, timestamp=None, filename=None):
-        self._timestamp = timestamp
-        self._filename = filename
-        self._start_timestamp = None
-        self._end_timestamp = None
-        self._duration = None
-        self._cameras = {}
+    @height.setter
+    def height(self, value: int):
+        self._height = value
 
     @property
-    def timestamp(self):
-        return self._timestamp
+    def width(self) -> int | None:
+        return self._width
+
+    @width.setter
+    def width(self, value: int):
+        self._width = value
 
     @property
-    def filename(self):
+    def ratio(self) -> float:
+        width = self.width or 0
+        height = self.height or 0
+        if width != 0 and height != 0:
+            return width / height
+        return 4 / 3
+
+    @property
+    def video_codec(self) -> str | None:
+        return self._video_codec
+
+    @video_codec.setter
+    def video_codec(self, value: str):
+        self._video_codec = value
+
+    @property
+    def fps(self) -> float | None:
+        return self._fps
+
+    @fps.setter
+    def fps(self, value: float):
+        self._fps = value
+
+    @property
+    def dar(self) -> str | None:
+        return self._dar
+
+    @dar.setter
+    def dar(self, value: str):
+        self._dar = value
+
+    @property
+    def chapters(self) -> list[Chapter] | None:
+        return self._chapters
+
+    @chapters.setter
+    def chapters(self, value: list[Chapter]):
+        self._chapters = value
+
+    def add_chapter(self, chapter: Chapter):
+        """Add a chapter to the metadata."""
+        if chapter not in self._chapters:
+            self._chapters.append(chapter)
+
+
+class Camera_Clip(object):
+    """Camera Clip Class"""
+
+    def __init__(
+        self,
+        filename: str,
+        timestmp: datetime,
+        duration: float = 0,
+        include: bool = False,
+        video_metadata: Optional[Video_Metadata] = None,
+    ) -> None:
+        """Initialize the Camera Clip"""
+        self._filename: str = filename
+        self._timestamp: datetime = timestmp
+        self._duration: float = duration
+        self._include: bool = include
+        self._video_metadata: Optional[Video_Metadata] = video_metadata
+
+    @property
+    def filename(self) -> str:
         return self._filename
 
     @filename.setter
-    def filename(self, value):
+    def filename(self, value: str) -> None:
         self._filename = value
 
-    def camera(self, name):
+    @property
+    def duration(self) -> float:
+        return self._duration
+
+    @duration.setter
+    def duration(self, value: float) -> None:
+        self._duration = value
+
+    @property
+    def timestamp(self) -> datetime:
+        return self._timestamp
+
+    @timestamp.setter
+    def timestamp(self, value: datetime) -> None:
+        self._timestamp = value
+
+    @property
+    def include(self) -> bool:
+        return self._include
+
+    @include.setter
+    def include(self, value: bool) -> None:
+        self._include = value
+
+    @property
+    def start_timestamp(self) -> datetime:
+        return self.timestamp
+
+    @property
+    def end_timestamp(self) -> datetime:
+        return self.start_timestamp + timedelta(seconds=self.duration)
+
+    @property
+    def video_metadata(self) -> Video_Metadata | None:
+        return self._video_metadata
+
+    @video_metadata.setter
+    def video_metadata(self, value: Video_Metadata):
+        self._video_metadata = value
+
+    @property
+    def width(self) -> int:
+        if self._video_metadata is not None:
+            return self._video_metadata.width or 0
+        return 0
+
+    @property
+    def height(self) -> int:
+        if self._video_metadata is not None:
+            return self._video_metadata.height or 0
+        return 0
+
+    @property
+    def ratio(self) -> float:
+        if self.width != 0 and self.height != 0:
+            return self.width / self.height
+        return 4 / 3
+
+
+class Clip(object):
+    """Clip Class"""
+
+    def __init__(self, timestmp: datetime, filename: Optional[str] = None) -> None:
+        self._timestamp: datetime = timestmp
+        self._filename: str | None = filename
+        self._start_timestamp: datetime | None = None
+        self._end_timestamp: datetime | None = None
+        self._duration: float | None = None
+        self._cameras: dict[str, Camera_Clip] = {}
+        self._video_metadata: Video_Metadata | None = None
+
+    @property
+    def timestamp(self) -> datetime:
+        return self._timestamp
+
+    @property
+    def filename(self) -> str | None:
+        return self._filename
+
+    @filename.setter
+    def filename(self, value: str) -> None:
+        self._filename = value
+
+    def camera(self, name: str) -> Camera_Clip | None:
         return self._cameras.get(name)
 
-    def set_camera(self, name, camera_info: Camera_Clip):
+    def set_camera(self, name: str, camera_info: Camera_Clip) -> None:
         self._cameras.update({name: camera_info})
 
     @property
-    def cameras(self):
+    def cameras(self) -> ItemsView[str, Camera_Clip]:
         return self._cameras.items()
 
-    def item(self, value):
+    def item(self, value: str) -> Camera_Clip | None:
         return self.camera(value)
 
     @property
-    def items(self):
+    def items(self) -> ItemsView[str, Camera_Clip]:
         return self.cameras
 
     @property
-    def start_timestamp(self):
+    def start_timestamp(self) -> datetime:
         if self._start_timestamp is not None:
             return self._start_timestamp
         if len(self.items) == 0:
-            return datetime.now()
+            return datetime.now(timezone.utc)
 
         for camera in self.sorted:
-            if self.camera(camera).include:
-                return self.camera(camera).start_timestamp
+            if (camera_clip := self.camera(camera)) is not None:
+                if camera_clip.include:
+                    return camera_clip.start_timestamp
         return self.timestamp
 
     @start_timestamp.setter
-    def start_timestamp(self, value):
+    def start_timestamp(self, value: datetime) -> None:
         self._start_timestamp = value
 
     @property
-    def end_timestamp(self):
+    def end_timestamp(self) -> datetime:
         if self._end_timestamp is not None:
             return self._end_timestamp
 
@@ -277,11 +505,11 @@ class Clip(object):
         return end_timestamp
 
     @end_timestamp.setter
-    def end_timestamp(self, value):
+    def end_timestamp(self, value: datetime) -> None:
         self._end_timestamp = value
 
     @property
-    def duration(self):
+    def duration(self) -> float:
         return (
             (self.end_timestamp - self.start_timestamp).total_seconds()
             if self._duration is None
@@ -289,121 +517,272 @@ class Clip(object):
         )
 
     @duration.setter
-    def duration(self, value):
+    def duration(self, value: float) -> None:
         self._duration = value
 
     @property
-    def sorted(self):
+    def sorted(self) -> list[str]:
         return sorted(
             self._cameras, key=lambda camera: self._cameras[camera].start_timestamp
         )
 
+    @property
+    def video_metadata(self) -> Video_Metadata | None:
+        return self._video_metadata
 
-class Event(object):
-    """ Event Class """
-
-    def __init__(self, folder, isfile=False, filename=None):
-        self._folder = folder
-        self._isFile = isfile
-        self._filename = filename
-        self._metadata: dict[str, Any] = {}
-        self._start_timestamp = None
-        self._end_timestamp = None
-        self._duration = None
-        self._clips = {}
+    @video_metadata.setter
+    def video_metadata(self, value: Video_Metadata):
+        self._video_metadata = value
 
     @property
-    def folder(self):
+    def width(self) -> int:
+        if self._video_metadata is not None:
+            return self._video_metadata.width or 0
+        return 0
+
+    @property
+    def height(self) -> int:
+        if self._video_metadata is not None:
+            return self._video_metadata.height or 0
+        return 0
+
+    @property
+    def ratio(self) -> float:
+        if self.width != 0 and self.height != 0:
+            return self.width / self.height
+        return 4 / 3
+
+
+class Event_Metadata(object):
+    def __init__(
+        self,
+        reason: Optional[str] = None,
+        timestmp: Optional[datetime] = None,
+        city: Optional[str] = None,
+        street: Optional[str] = None,
+        longitude: Optional[float] = None,
+        latitude: Optional[float] = None,
+    ) -> None:
+        self._reason: Optional[str] = reason
+        self._timestamp: Optional[datetime] = timestmp
+        self._city: Optional[str] = city
+        self._street: Optional[str] = street
+        self._longitude: Optional[float] = longitude
+        self._latitude: Optional[float] = latitude
+
+    @property
+    def reason(self) -> Optional[str]:
+        return self._reason
+
+    @reason.setter
+    def reason(self, value: str) -> None:
+        self._reason = value
+
+    @property
+    def timestamp(self) -> Optional[datetime]:
+        return self._timestamp
+
+    @timestamp.setter
+    def timestamp(self, value: datetime) -> None:
+        self._timestamp = value
+
+    @property
+    def city(self) -> Optional[str]:
+        return self._city
+
+    @city.setter
+    def city(self, value: str) -> None:
+        self._city = value
+
+    @property
+    def street(self) -> Optional[str]:
+        return self._street
+
+    @street.setter
+    def street(self, value: str) -> None:
+        self._street = value
+
+    @property
+    def longitude(self) -> Optional[float]:
+        return self._longitude
+
+    @longitude.setter
+    def longitude(self, value: float) -> None:
+        self._longitude = value
+
+    @property
+    def latitude(self) -> Optional[float]:
+        return self._latitude
+
+    @latitude.setter
+    def latitude(self, value: float) -> None:
+        self._latitude = value
+
+
+class Event(object):
+    """Event Class"""
+
+    def __init__(
+        self,
+        folder: str,
+        isfile: bool = False,
+        filename: Optional[str] = None,
+        event_metadata: Optional[Event_Metadata] = None,
+        video_metadata: Optional[Video_Metadata] = None,
+    ):
+        self._folder: str = folder
+        self._isfile: bool = isfile
+        self._filename: Optional[str] = filename
+        self._event_metadata: Event_Metadata = (
+            event_metadata if event_metadata else Event_Metadata()
+        )
+        self._video_metadata: Optional[Video_Metadata] = video_metadata
+        self._start_timestamp: Optional[datetime] = None
+        self._end_timestamp: Optional[datetime] = None
+        self._duration: Optional[float] = None
+        self._clips: dict[datetime, Clip] = {}
+        self._camera_clips: list[str] = []
+
+    @property
+    def folder(self) -> str:
         return self._folder
 
     @property
-    def timestamp(self):
+    def timestamp(self) -> datetime:
         return self.start_timestamp
 
     @property
-    def filename(self):
+    def filename(self) -> Optional[str]:
         return self._filename
 
     @filename.setter
-    def filename(self, value):
+    def filename(self, value: str) -> None:
         self._filename = value
 
     @property
-    def metadata(self):
-        return self._metadata or {}
-
-    @metadata.setter
-    def metadata(self, value: dict):
-        self._metadata = value
+    def event_metadata(self) -> Event_Metadata:
+        return self._event_metadata
 
     @property
-    def isfile(self):
-        return self._isFile
+    def video_metadata(self) -> Video_Metadata | None:
+        return self._video_metadata
+
+    @video_metadata.setter
+    def video_metadata(self, value: Video_Metadata):
+        self._video_metadata = value
+
+    @property
+    def isfile(self) -> bool:
+        return self._isfile
 
     @isfile.setter
-    def isfile(self, value):
-        self._isFile = value
+    def isfile(self, value: bool) -> None:
+        self._isfile = value
 
-    def clip(self, timestamp):
-        return self._clips.get(timestamp)
+    @property
+    def width(self) -> int | None:
+        if self._video_metadata is not None:
+            return self._video_metadata.width
 
-    def set_clip(self, timestamp, clip_info: Clip):
-        self._clips.update({timestamp: clip_info})
+        width = 0
+        for clip_item in self.items:
+            video_metadata = clip_item[1].video_metadata
+            if video_metadata is not None:
+                if (video_metadata.width or 0) > width:
+                    width = video_metadata.width or 0
 
-    def item(self, value):
+        return width
+
+    @property
+    def height(self) -> int | None:
+        if self._video_metadata is not None:
+            return self._video_metadata.height
+
+        height = 0
+        for clip_item in self.items:
+            video_metadata = clip_item[1].video_metadata
+            if video_metadata is not None:
+                if (video_metadata.height or 0) > height:
+                    height = video_metadata.height or 0
+        return height
+
+    @property
+    def ratio(self) -> float:
+        width = self.width or 0
+        height = self.height or 0
+        if width != 0 and height != 0:
+            return width / height
+        return 4 / 3
+
+    def clip(self, timestmp: datetime) -> Clip | None:
+        return self._clips.get(timestmp)
+
+    def set_clip(self, timestmp: datetime, clip_info: Clip) -> None:
+        self._clips.update({timestmp: clip_info})
+
+    def has_camera_clip(self, camera: str) -> bool:
+        """Returns the camera clips for the given camera."""
+        return camera in self._camera_clips
+
+    def add_camera_clip(self, camera: str):
+        """Sets the camera clip for the given camera."""
+        if camera not in self._camera_clips:
+            self._camera_clips.append(camera)
+
+    def item(self, value: datetime) -> Clip | None:
         return self.clip(value)
 
     @property
-    def first_item(self):
-        return self.clip(self.sorted[0])
+    def first_item(self) -> Clip | None:
+        return self.clip(self.sorted[0]) if self.sorted else None
 
     @property
-    def items(self):
+    def items(self) -> ItemsView[datetime, Clip]:
         return self._clips.items()
 
     @property
-    def items_sorted(self):
-        sorted_items = []
-        for clip in self.sorted:
-            sorted_items.append(self.clip(clip))
-        return sorted_items
+    def items_sorted(self) -> list[Clip]:
+        return (
+            [c for c in (self.clip(clip) for clip in self.sorted) if c is not None]
+            if len(self._clips) > 0
+            else []
+        )
 
     @property
-    def start_timestamp(self):
+    def start_timestamp(self) -> datetime:
         if self._start_timestamp is not None:
             return self._start_timestamp
-        if len(self.items) == 0:
-            return datetime.now()
 
-        return self.clip(self.sorted[0]).start_timestamp
+        if len(self.items) != 0 and (clip := self.clip(self.sorted[0])) is not None:
+            return clip.start_timestamp
+        return datetime.now(timezone.utc)
 
     @start_timestamp.setter
-    def start_timestamp(self, value):
+    def start_timestamp(self, value: datetime) -> None:
         self._start_timestamp = value
 
     @property
-    def end_timestamp(self):
+    def end_timestamp(self) -> datetime:
         if self._end_timestamp is not None:
             return self._end_timestamp
 
         if len(self.items) == 0:
             return self.start_timestamp
 
-        end_timestamp = self.clip(self.sorted[-1]).end_timestamp
+        if (clip := self.clip(self.sorted[-1])) is not None:
+            end_timestamp = clip.end_timestamp
+
         for _, clip_info in self.items:
-            end_timestamp = (
-                clip_info.end_timestamp
-                if clip_info.end_timestamp > end_timestamp
-                else end_timestamp
-            )
+            if clip_info.end_timestamp > end_timestamp or end_timestamp is None:
+                end_timestamp = clip_info.end_timestamp
         return end_timestamp
 
     @end_timestamp.setter
-    def end_timestamp(self, value):
+    def end_timestamp(self, value: datetime) -> None:
         self._end_timestamp = value
 
     @property
-    def duration(self):
+    def duration(self) -> float:
         return (
             (self.end_timestamp - self.start_timestamp).total_seconds()
             if self._duration is None
@@ -411,24 +790,30 @@ class Event(object):
         )
 
     @duration.setter
-    def duration(self, value):
+    def duration(self, value: float) -> None:
         self._duration = value
 
     @property
-    def count(self):
+    def count(self) -> int:
         return len(self._clips)
 
     @property
-    def sorted(self):
-        return sorted(self._clips, key=lambda clip: self._clips[clip].start_timestamp)
+    def sorted(self) -> list[datetime]:
+        return (
+            sorted(self._clips, key=lambda clip: self._clips[clip].start_timestamp)
+            if len(self._clips) > 0
+            else []
+        )
 
-    def template(self, template, timestamp_format, video_settings):
+    def template(
+        self, template: str | None, timestamp_format: str, video_settings: dict
+    ) -> str:
         # This will also be called if no merging is going to occur (template = None) or
         # with an empty template (no grouping). In that case return "" as template.
         if template is None or template == "":
             return ""
 
-        replacement_strings = {
+        replacement_strings: dict[str, str] = {
             "layout": video_settings["movie_layout"],
             "start_timestamp": self.start_timestamp.astimezone(
                 get_localzone()
@@ -439,17 +824,18 @@ class Event(object):
             "event_timestamp": self.start_timestamp.astimezone(
                 get_localzone()
             ).strftime(timestamp_format),
-            "event_city": self.metadata.get("city", "") or "",
-            "event_reason": self.metadata.get("reason", "") or "",
-            "event_latitude": self.metadata.get("latitude", "") or "",
-            "event_longitude": self.metadata.get("longitude", "") or "",
+            "event_city": self.event_metadata.city or "",
+            "event_street": self.event_metadata.street or "",
+            "event_reason": self.event_metadata.reason or "",
+            "event_latitude": str(self.event_metadata.latitude) or "",
+            "event_longitude": str(self.event_metadata.longitude) or "",
         }
 
-        if self.metadata.get("event_timestamp") is not None:
+        if self.event_metadata.timestamp:
             replacement_strings["event_timestamp"] = (
-                self.metadata.get("event_timestamp")
-                .astimezone(get_localzone())
-                .strftime(timestamp_format)
+                self.event_metadata.timestamp.astimezone(get_localzone()).strftime(
+                    timestamp_format
+                )
             )
 
         try:
@@ -457,96 +843,107 @@ class Event(object):
             template = template.format(**replacement_strings)
         except KeyError as e:
             print(
-                f"{get_current_timestamp()}Bad string format for merge template: Invalid variable {str(e)}"
+                f"{get_current_timestamp()}Bad string format for merge template: "
+                f"Invalid variable {str(e)}"
             )
-            template = None
+            template = ""
 
         if template == "":
             template = (
-                f"{self.start_timestamp.astimezone(get_localzone()).strftime(timestamp_format)} - "
-                f"{self.end_timestamp.astimezone(get_localzone()).strftime(timestamp_format)}"
+                f"{
+                    self.start_timestamp.astimezone(get_localzone()).strftime(
+                        timestamp_format
+                    )
+                } - "
+                f"{
+                    self.end_timestamp.astimezone(get_localzone()).strftime(
+                        timestamp_format
+                    )
+                }"
             )
         return template
 
 
 class Movie(object):
-    """ Movie Class """
+    """Movie Class"""
 
-    def __init__(self, filename=None):
-        self._filename = filename
-        self._start_timestamp = None
-        self._end_timestamp = None
-        self._duration = None
-        self._events = {}
+    def __init__(self, filename: str | None = None):
+        self._filename: str | None = filename
+        self._start_timestamp: datetime | None = None
+        self._end_timestamp: datetime | None = None
+        self._duration: float | None = None
+        self._events: dict[str, Event] = {}
+        self._video_metadata: Video_Metadata | None = None
 
     @property
-    def filename(self):
+    def filename(self) -> str | None:
         return self._filename
 
     @filename.setter
-    def filename(self, value):
+    def filename(self, value: str):
         self._filename = value
 
-    def event(self, folder):
+    def event(self, folder: str) -> Event | None:
         return self._events.get(folder)
 
     def set_event(self, event_info: Event):
-        self._events.update({event_info.filename: event_info})
+        key = event_info.folder if event_info.filename is None else event_info.filename
+        self._events.update({key: event_info})
 
-    def item(self, value):
+    def item(self, value: str) -> Event | None:
         return self.event(value)
 
     @property
-    def first_item(self):
-        return self.event(self.sorted[0])
+    def first_item(self) -> Event | None:
+        return self.event(self.sorted[0]) if self.sorted else None
 
     @property
-    def items(self):
+    def items(self) -> ItemsView[str, Event]:
         return self._events.items()
 
     @property
-    def items_sorted(self):
-        sorted_items = []
-        for event in self.sorted:
-            sorted_items.append(self.event(event))
-        return sorted_items
+    def items_sorted(self) -> list[Event]:
+        return (
+            [c for c in (self.event(event) for event in self.sorted) if c is not None]
+            if len(self._events) > 0
+            else []
+        )
 
     @property
-    def start_timestamp(self):
+    def start_timestamp(self) -> datetime:
         if self._start_timestamp is not None:
             return self._start_timestamp
-        if len(self.items) == 0:
-            return datetime.now()
 
-        return self.event(self.sorted[0]).start_timestamp
+        if len(self.items) != 0 and (event := self.event(self.sorted[0])) is not None:
+            return event.start_timestamp
+        return datetime.now(timezone.utc)
 
     @start_timestamp.setter
-    def start_timestamp(self, value):
+    def start_timestamp(self, value: datetime) -> None:
         self._start_timestamp = value
 
     @property
-    def end_timestamp(self):
+    def end_timestamp(self) -> datetime:
         if self._end_timestamp is not None:
             return self._end_timestamp
 
         if len(self.items) == 0:
             return self.start_timestamp
 
-        end_timestamp = self.event(self.sorted[-1]).end_timestamp
+        if (event := self.event(self.sorted[-1])) is not None:
+            end_timestamp = event.end_timestamp
+
         for _, event_info in self.items:
-            end_timestamp = (
-                event_info.end_timestamp
-                if event_info.end_timestamp > end_timestamp
-                else end_timestamp
-            )
+            if event_info.end_timestamp > end_timestamp or end_timestamp is None:
+                end_timestamp = event_info.end_timestamp
         return end_timestamp
 
     @end_timestamp.setter
-    def end_timestamp(self, value):
+    def end_timestamp(self, value: datetime) -> None:
         self._end_timestamp = value
 
     @property
-    def duration(self):
+    def duration(self) -> float | None:
         return (
             (self.end_timestamp - self.start_timestamp).total_seconds()
             if self._duration is None
@@ -554,190 +951,315 @@ class Movie(object):
         )
 
     @duration.setter
-    def duration(self, value):
+    def duration(self, value: float):
         self._duration = value
 
     @property
-    def count(self):
+    def width(self) -> int | None:
+        if self._video_metadata is not None:
+            return self._video_metadata.width
+
+        width = 0
+        for item in self.items:
+            video_metadata = item[1].video_metadata
+            if video_metadata is not None:
+                if (video_metadata.width or 0) > width:
+                    width = video_metadata.width or 0
+
+        return width
+
+    @property
+    def height(self) -> int | None:
+        if self._video_metadata is not None:
+            return self._video_metadata.height
+
+        height = 0
+        for item in self.items:
+            video_metadata = item[1].video_metadata
+            if video_metadata is not None:
+                if (video_metadata.height or 0) > height:
+                    height = video_metadata.height or 0
+        return height
+
+    @property
+    def ratio(self) -> float:
+        width = self.width or 0
+        height = self.height or 0
+        if width != 0 and height != 0:
+            return width / height
+        return 4 / 3
+
+    @property
+    def count(self) -> int:
         return len(self._events)
 
     @property
-    def count_clips(self):
+    def count_clips(self) -> int:
         count = 0
         for _, event_info in self.items:
             count = count + event_info.count
         return count
 
     @property
-    def sorted(self):
-        return sorted(self._events, key=lambda clip: self._events[clip].start_timestamp)
+    def sorted(self) -> list[str]:
+        return (
+            sorted(self._events, key=lambda clip: self._events[clip].start_timestamp)
+            if len(self._events) > 0
+            else []
+        )
+
+    @property
+    def video_metadata(self) -> Video_Metadata | None:
+        return self._video_metadata
+
+    @video_metadata.setter
+    def video_metadata(self, value: Video_Metadata):
+        self._video_metadata = value
 
 
 class Font(object):
-    """ Font Class
-    """
+    """Font Class"""
 
-    def __init__(self, layout, font=None, size=None, color=None):
-        self._layout = layout
-        self._font = font
-        self._size = size
-        self._color = color
-        self._halign = None
-        self._valign = None
-        self._xpos = None
-        self._ypos = None
+    def __init__(
+        self,
+        layout: MovieLayout,
+        font: str | None = None,
+        size: int | None = None,
+        color: str | None = None,
+    ):
+        self._layout: MovieLayout = layout
+        self._font: str | None = font or DEFAULT_FONT.get(PLATFORM, None)
+        self._size: int | None = size
+        self._color: str | None = color
+        self._halign: str = DEFAULT_FONT_HALIGN
+        self._valign: str = DEFAULT_FONT_VALIGN
+        self._xpos: int | None = None
+        self._ypos: int | None = None
 
     @property
-    def font(self):
+    def font(self) -> str | None:
         return self._font
 
     @font.setter
-    def font(self, value):
+    def font(self, value: str) -> None:
         self._font = value
 
     @property
-    def size(self):
-        if hasattr(self._layout, "_font_size"):
-            return getattr(self._layout, "_font_size")()
+    def size(self) -> int:
+        if (overriden := self._get_overridden("font_size")) is not None:
+            return int(overriden)
 
         return (
             int(max(16, 16 * self._layout.scale)) if self._size is None else self._size
         )
 
     @size.setter
-    def size(self, value):
+    def size(self, value: int) -> None:
         self._size = value
 
     @property
-    def color(self):
+    def color(self) -> str | None:
         return self._color
 
     @color.setter
-    def color(self, value):
+    def color(self, value: str) -> None:
         self._color = value
 
     @property
-    def halign(self):
-        if hasattr(self._layout, "_font_halign"):
-            return getattr(self._layout, "_font_halign")()
+    def halign(self) -> str:
+        if (overriden := self._get_overridden("font_halign")) is not None:
+            return str(overriden)
 
-        return HALIGN.get(self._halign, self._halign)
+        return HALIGN.get(self._halign, HALIGN[DEFAULT_FONT_HALIGN])
 
     @halign.setter
-    def halign(self, value):
+    def halign(self, value: str) -> None:
         self._halign = value
 
     @property
-    def valign(self):
-        if hasattr(self._layout, "_font_valign"):
-            return getattr(self._layout, "_font_valign")()
-
-        return VALIGN.get(self._valign, self._valign)
+    def valign(self) -> str:
+        if (overriden := self._get_overridden("font_valign")) is not None:
+            return str(overriden)
+        return VALIGN.get(self._valign, VALIGN[DEFAULT_FONT_VALIGN])
 
     @valign.setter
-    def valign(self, value):
+    def valign(self, value: str) -> None:
         self._valign = value
 
     @property
-    def xpos(self):
+    def xpos(self) -> int | None:
         return self._xpos
 
     @xpos.setter
-    def xpos(self, value):
+    def xpos(self, value: int | None) -> None:
         self._xpos = value
 
     @property
-    def ypos(self):
+    def ypos(self) -> int | None:
         return self._ypos
 
     @ypos.setter
-    def ypos(self, value):
+    def ypos(self, value: int | None) -> None:
         self._ypos = value
+
+    def _get_overridden(self, attr) -> str | int | None:
+        try:
+            return getattr(self._layout, f"{attr}", None)()  # type: ignore[misc]
+        except (AttributeError, TypeError):
+            return None
 
 
 class Camera(object):
-    """ Camera Class
-    """
+    """Camera Class"""
 
-    def __init__(self, layout, camera):
-        self._layout = layout
-        self._camera = camera
-        self._include = True
-        self._width = 1280
-        self._height = 960
-        self._xpos = 0
-        self._ypos = 0
-        self._scale = 0
-        self._options = ""
+    def __init__(self, layout: MovieLayout, camera: str):
+        self._layout: MovieLayout = layout
+        self._camera: str = camera
+        self._include: bool = True
+        self._width: int = 1280
+        self._height: int = 960
+        self._clip_ratio: float = 4 / 3
+        self._xpos: int = 0
+        self._xpos_override: bool = False
+        self._ypos: int = 0
+        self._ypos_override: bool = False
+        self._scale: float | None = 1
+        self._mirror: bool = False
+        self._options: str = ""
 
     @property
-    def camera(self):
+    def layout(self) -> MovieLayout:
+        return self._layout
+
+    @layout.setter
+    def layout(self, value: MovieLayout) -> None:
+        self._layout = value
+
+    @property
+    def camera(self) -> str:
         return self._camera
 
     @camera.setter
-    def camera(self, value):
+    def camera(self, value: str) -> None:
         self._camera = value
 
     @property
-    def include(self):
+    def include(self) -> bool:
+        # If we're supposed to include then check the event to see if it should be
+        # included
+        if not self._include:
+            return False
+
+        # Make sure layout has an event.
+        if self._layout.event is not None:
+            return self._layout.event.has_camera_clip(self.camera)
+
         return self._include
 
     @include.setter
-    def include(self, value):
+    def include(self, value: bool) -> None:
         self._include = value
 
     @property
-    def width(self):
-        return (
-            getattr(self._layout, "_" + self._camera + "_width")()
-            if hasattr(self._layout, "_" + self._camera + "_width")
-            else int(self._width * self.scale * self.include)
-        )
+    def width_fixed(self) -> int:
+        return self._width
+
+    @property
+    def height_fixed(self) -> int:
+        return self._height
+
+    @property
+    def width(self) -> int:
+        if (overriden := self._get_overridden("width")) is not None:
+            return int(overriden) * self.include
+
+        return int(self._width * (self.scale or 1)) * self.include
 
     @width.setter
-    def width(self, value):
+    def width(self, value: int) -> None:
         self._width = value
 
     @property
-    def height(self):
-        return (
-            getattr(self._layout, "_" + self._camera + "_height")()
-            if hasattr(self._layout, "_" + self._camera + "_height")
-            else int(self._height * self.scale * self.include)
-        )
+    def scale_width(self) -> int:
+        return self.width
+
+    @property
+    def height(self) -> int:
+        perspective_adjustement: float = 1
+        if self.layout.perspective and self.camera in [
+            "left",
+            "right",
+            "left_pillar",
+            "right_pillar",
+        ]:
+            # Adjust height for perspective cameras
+            perspective_adjustement = 3 / 2
+        return int(self.scale_height * perspective_adjustement)
 
     @height.setter
-    def height(self, value):
+    def height(self, value: int) -> None:
         self._height = value
 
     @property
-    def xpos(self):
-        if hasattr(self._layout, "_" + self._camera + "_xpos"):
-            return getattr(self._layout, "_" + self._camera + "_xpos")() * self.include
+    def scale_height(self) -> int:
+        if (overriden := self._get_overridden("height")) is not None:
+            return int(overriden) * self.include
 
+        return int(self._height * (self.scale or 1)) * self.include
+
+    @property
+    def ratio(self) -> float:
+        width = self.width_fixed or 0
+        height = self.height_fixed or 0
+        if width != 0 and height != 0:
+            return width / height
+        return 4 / 3
+
+    @property
+    def clip_ratio(self) -> float:
+        return self._clip_ratio or 4 / 3
+
+    @clip_ratio.setter
+    def clip_ratio(self, value: float) -> None:
+        self._clip_ratio = value
+
+    @property
+    def xpos(self) -> int:
+        if not self._xpos_override:
+            if (overriden := self._get_overridden("xpos")) is not None:
+                return int(overriden) * self.include
         return self._xpos * self.include
 
     @xpos.setter
-    def xpos(self, value):
-        self._xpos = value
+    def xpos(self, value: int) -> None:
+        if value is not None:
+            self._xpos = int(value)
+            self._xpos_override = True
+        else:
+            self._xpos_override = False
 
     @property
-    def ypos(self):
-        if hasattr(self._layout, "_" + self._camera + "_ypos"):
-            return getattr(self._layout, "_" + self._camera + "_ypos")() * self.include
-
+    def ypos(self) -> int:
+        if not self._ypos_override:
+            override = self._get_overridden("ypos")
+            if override is not None:
+                return int(override) * self.include
         return self._ypos * self.include
 
     @ypos.setter
-    def ypos(self, value):
-        self._ypos = value
+    def ypos(self, value: int) -> None:
+        if value is not None:
+            self._ypos = int(value)
+            self._ypos_override = True
+        else:
+            self._ypos_override = False
 
     @property
-    def scale(self):
+    def scale(self) -> float | None:
         return self._scale
 
     @scale.setter
-    def scale(self, value):
+    def scale(self, value: float | None) -> None:
         if value is None:
             self._scale = None
         elif len(str(value).split("x")) == 1:
@@ -745,531 +1267,826 @@ class Camera(object):
             self._scale = float(str(value).split("x")[0])
         else:
             # Scale is a resolution.
-            self.width = int(str(value).split("x")[0])
-            self.height = int(str(value).split("x")[1])
+            parts = str(value).split("x")
+            if len(parts) != 2 or not parts[0] or not parts[1]:
+                raise ValueError(
+                    f"Invalid resolution format: '{value}'. Expected format: "
+                    "WIDTHxHEIGHT (e.g., 1920x1080)"
+                )
+            self.width = int(parts[0])
+            self.height = int(parts[1])
             self._scale = 1
 
     @property
-    def options(self):
+    def options(self) -> str:
         return self._options
 
     @options.setter
-    def options(self, value):
+    def options(self, value: str):
         self._options = value
+
+    @property
+    def mirror(self) -> bool:
+        return self._mirror
+
+    @mirror.setter
+    def mirror(self, value: bool) -> None:
+        self._mirror = value
+
+    @property
+    def mirror_text(self) -> str | None:
+        return ", hflip" if self.mirror else ""
+
+    def _get_overridden(self, attr) -> str | int | None:
+        try:
+            attr_func = getattr(self._layout, f"{self.camera}_{attr}", None)
+            return attr_func() if attr_func is not None else None  # type: ignore[misc]
+        except (AttributeError, TypeError):
+            return None
 
 
 class MovieLayout(object):
-    """ Main Layout class
-    """
+    """Main Layout class"""
 
-    def __init__(self):
-        self._cameras = {
-            "Front": Camera(layout=self, camera="front"),
-            "Left": Camera(layout=self, camera="left"),
-            "Right": Camera(layout=self, camera="right"),
-            "Rear": Camera(layout=self, camera="rear"),
+    def __init__(self) -> None:
+        self._cameras: dict[str, Camera] = {
+            "front": Camera(layout=self, camera="front"),
+            "left": Camera(layout=self, camera="left"),
+            "right": Camera(layout=self, camera="right"),
+            "rear": Camera(layout=self, camera="rear"),
+            "left_pillar": Camera(layout=self, camera="left_pillar"),
+            "right_pillar": Camera(layout=self, camera="right_pillar"),
         }
-        self._font = Font(layout=self)
+        self._clip_order: list[str] = [
+            "left",
+            "right",
+            "front",
+            "rear",
+            "left_pillar",
+            "right_pillar",
+        ]
+        self._font: Font = Font(layout=self)
 
-        self._swap_left_right = False
-        self._swap_front_rear = False
+        self._swap_left_right: bool = False
+        self._swap_front_rear: bool = False
+        self._swap_pillar: bool = False
 
-        self._perspective = False
+        self._perspective: bool = False
+        self._title_screen_map: bool = False
+        self._event: Event | None = None
 
+        self.background_color = "black"
         self._font.halign = "CENTER"
         self._font.valign = "BOTTOM"
 
-    def cameras(self, camera):
-        return self._cameras.get(camera, self._cameras)
+    def cameras(self, camera: str) -> Camera:
+        return self._cameras[camera]
 
     @property
-    def font(self):
+    def clip_order(self) -> list[str]:
+        return self._clip_order
+
+    @clip_order.setter
+    def clip_order(self, value: list[str]) -> None:
+        self._clip_order = []
+        for camera in value:
+            camera = camera.lower().strip()
+            if camera in [
+                "front",
+                "left",
+                "right",
+                "rear",
+                "left_pillar",
+                "right_pillar",
+            ]:
+                self._clip_order.append(camera)
+
+        # Make sure we have all of them, if not then add based on default order.
+        if "left" not in self._clip_order:
+            self._clip_order.append("left")
+        if "right" not in self._clip_order:
+            self._clip_order.append("right")
+        if "front" not in self._clip_order:
+            self._clip_order.append("front")
+        if "rear" not in self._clip_order:
+            self._clip_order.append("rear")
+        if "left_pillar" not in self._clip_order:
+            self._clip_order.append("left_pillar")
+        if "right_pillar" not in self._clip_order:
+            self._clip_order.append("right_pillar")
+
+    @property
+    def font(self) -> Font:
         return self._font
 
     @font.setter
-    def font(self, value):
+    def font(self, value: Font) -> None:
         self._font = value
 
     @property
-    def swap_left_right(self):
+    def swap_left_right(self) -> bool:
         return self._swap_left_right
 
     @swap_left_right.setter
-    def swap_left_right(self, value):
+    def swap_left_right(self, value: bool) -> None:
         self._swap_left_right = value
 
     @property
-    def swap_front_rear(self):
+    def swap_front_rear(self) -> bool:
         return self._swap_front_rear
 
     @swap_front_rear.setter
-    def swap_front_rear(self, value):
+    def swap_front_rear(self, value: bool) -> None:
         self._swap_front_rear = value
 
     @property
-    def perspective(self):
+    def swap_pillar(self) -> bool:
+        return self._swap_pillar
+
+    @swap_pillar.setter
+    def swap_pillar(self, value: bool) -> None:
+        self._swap_pillar = value
+
+    @property
+    def perspective(self) -> bool:
         return self._perspective
 
     @perspective.setter
-    def perspective(self, new_perspective):
+    def perspective(self, new_perspective: bool) -> None:
         self._perspective = new_perspective
 
         if self._perspective:
-            self.cameras("Left").options = (
-                ", pad=iw+4:3/2*ih:-1:ih/8:0x00000000, "
-                "perspective=x0=0:y0=1*H/5:x1=W:y1=-3/44*H:"
-                "x2=0:y2=6*H/5:x3=7/8*W:y3=5*H/6:sense=destination"
-            )
-            self.cameras("Right").options = (
-                ", pad=iw+4:3/2*ih:-1:ih/8:0x00000000,"
-                "perspective=x0=0:y1=1*H/5:x1=W:y0=-3/44*H:"
-                "x2=1/8*W:y3=6*H/5:x3=W:y2=5*H/6:sense=destination"
-            )
+            self.cameras("left").options = FFMPEG_LEFT_PERSPECTIVE
+            self.cameras("right").options = FFMPEG_RIGHT_PERSPECTIVE
+            self.cameras("left_pillar").options = FFMPEG_LEFT_PERSPECTIVE
+            self.cameras("right_pillar").options = FFMPEG_RIGHT_PERSPECTIVE
         else:
-            self.cameras("Left").options = ""
-            self.cameras("Right").options = ""
+            self.cameras("left").options = ""
+            self.cameras("right").options = ""
+            self.cameras("left_pillar").options = ""
+            self.cameras("right_pillar").options = ""
 
     @property
-    def scale(self):
+    def scale(self) -> float:
         # Return scale of new video based on 1280x960 video = scale:1
         return (self.video_height * self.video_width) / (1280 * 960)
 
     @scale.setter
-    def scale(self, scale):
-        self.cameras("Front").scale = scale
-        self.cameras("Left").scale = scale
-        self.cameras("Right").scale = scale
-        self.cameras("Rear").scale = scale
+    def scale(self, scale: float) -> None:
+        self.cameras("front").scale = scale
+        self.cameras("left").scale = scale
+        self.cameras("right").scale = scale
+        self.cameras("rear").scale = scale
+        self.cameras("left_pillar").scale = scale
+        self.cameras("right_pillar").scale = scale
 
     @property
-    def video_width(self):
+    def event(self) -> Event | None:
+        return self._event
+
+    @event.setter
+    def event(self, value: Event) -> None:
+        self._event = value
+
+    @property
+    def title_screen_map(self) -> bool:
+        return self._title_screen_map
+
+    @title_screen_map.setter
+    def title_screen_map(self, value: bool):
+        self._title_screen_map = value
+
+    @property
+    def video_width(self) -> int:
         return int(
             max(
-                self.cameras("Front").xpos + self.cameras("Front").width,
-                self.cameras("Left").xpos + self.cameras("Left").width,
-                self.cameras("Right").xpos + self.cameras("Right").width,
-                self.cameras("Rear").xpos + self.cameras("Rear").width,
+                self.cameras("front").xpos + self.cameras("front").width,
+                self.cameras("right").xpos + self.cameras("right").width,
+                self.cameras("left_pillar").xpos + self.cameras("left_pillar").width,
+                self.cameras("right_pillar").xpos + self.cameras("right_pillar").width,
+                self.cameras("left").xpos + self.cameras("left").width,
+                self.cameras("rear").xpos + self.cameras("rear").width,
             )
         )
 
     @property
-    def video_height(self):
-        perspective_adjustement = 3 / 2 if self.perspective else 1
+    def video_height(self) -> int:
         return int(
             max(
-                self.cameras("Front").ypos + self.cameras("Front").height,
-                perspective_adjustement * self.cameras("Left").ypos
-                + self.cameras("Left").height,
-                perspective_adjustement * self.cameras("Right").ypos
-                + self.cameras("Right").height,
-                self.cameras("Rear").ypos + self.cameras("Rear").height,
+                self.cameras("front").ypos + self.cameras("front").height,
+                self.cameras("rear").ypos + self.cameras("rear").height,
+                self.cameras("left_pillar").ypos + self.cameras("left_pillar").height,
+                self.cameras("right_pillar").ypos + self.cameras("right_pillar").height,
+                self.cameras("left").ypos + self.cameras("left").height,
+                self.cameras("right").ypos + self.cameras("right").height,
             )
         )
 
     @property
-    def center_xpos(self):
+    def center_xpos(self) -> int:
         return int(self.video_width / 2)
 
     @property
-    def center_ypos(self):
+    def center_ypos(self) -> int:
         return int(self.video_height / 2)
+
+    def rear_xpos(self) -> int:
+        return self.cameras("front").xpos + self.cameras("front").width
+
+    def left_pillar_ypos(self) -> int:
+        return max(
+            self.cameras("front").ypos + self.cameras("front").height,
+            self.cameras("rear").ypos + self.cameras("rear").height,
+        )
+
+    def right_pillar_xpos(self) -> int:
+        return self.cameras("left_pillar").xpos + self.cameras("left_pillar").width
+
+    def right_pillar_ypos(self) -> int:
+        return self.cameras("left_pillar").ypos
+
+    def left_ypos(self) -> int:
+        return max(
+            self.cameras("front").ypos + self.cameras("front").height,
+            self.cameras("rear").ypos + self.cameras("rear").height,
+            self.cameras("left_pillar").ypos + self.cameras("left_pillar").height,
+            self.cameras("right_pillar").ypos + self.cameras("right_pillar").height,
+        )
+
+    def right_xpos(self) -> int:
+        return self.cameras("left").xpos + self.cameras("left").width
+
+    def right_ypos(self) -> int:
+        return self.cameras("left").ypos
 
 
 class FullScreen(MovieLayout):
-    """ FullScreen Movie Layout
+    """FullScreen Movie Layout
 
-                     [FRONT_CAMERA]
-        [LEFT_CAMERA][REAR_CAMERA][RIGHT_CAMERA]
+    [LEFT-PILLAR_CAMERA][FRONT_CAMERA][RIGHT-PILLAR_CAMERA]
+    [   LEFT_CAMERA    ][REAR_CAMERA ][   RIGHT_CAMERA    ]
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.scale = 1 / 2
 
     @property
-    def video_width(self):
-        return int(
-            max(
-                self.cameras("Front").width,
-                self.cameras("Left").width
-                + self.cameras("Rear").width
-                + self.cameras("Right").width,
-            )
+    def _top_row_width(self) -> int:
+        return (
+            self.cameras("left_pillar").width
+            + self.cameras("front").width
+            + self.cameras("right_pillar").width
         )
 
     @property
-    def video_height(self):
-        perspective_adjustement = 3 / 2 if self.perspective else 1
-        return int(
-            self.cameras("Front").height
-            + max(
-                perspective_adjustement * self.cameras("Left").height,
-                self.cameras("Rear").height,
-                perspective_adjustement * self.cameras("Right").height,
-            )
+    def _bottom_row_width(self) -> int:
+        return (
+            self.cameras("left").width
+            + self.cameras("rear").width
+            + self.cameras("right").width
         )
 
-    def _front_height(self):
-        # For height keep same ratio of 4/3
-        return int(self.cameras("Front").width / 4 * 3)
+    @property
+    def _row_width(self) -> int:
+        # Use the maximum of the top and bottom row width.
+        return max(self._top_row_width, self._bottom_row_width)
 
-    def _front_xpos(self):
-        # Make sure that front is placed in the middle
-        return (
-            max(
-                0,
-                self.center_xpos
-                - int(
-                    (
-                        self.cameras("Left").width
-                        + self.cameras("Front").width
-                        + self.cameras("Right").width
-                    )
-                    / 2
-                )
-                + self.cameras("Left").width,
-            )
-            * self.cameras("Front").include
+    @property
+    def _top_row_xpos(self) -> int:
+        # Make sure that top row is centered.
+        return int(self._row_width / 2) - int(self._top_row_width / 2)
+
+    @property
+    def _bottom_row_xpos(self) -> int:
+        # Make sure that bottom row is centered.
+        return int(self._row_width / 2) - int(self._bottom_row_width / 2)
+
+    @property
+    def _top_row_height(self) -> int:
+        return max(
+            self.cameras("left_pillar").height,
+            self.cameras("front").height,
+            self.cameras("right_pillar").height,
         )
 
-    def _left_xpos(self):
-        return (
-            max(
-                0,
-                self.center_xpos
-                - int(
-                    (
-                        self.cameras("Left").width
-                        + self.cameras("Rear").width
-                        + self.cameras("Right").width
-                    )
-                    / 2
-                ),
-            )
-            * self.cameras("Left").include
+    @property
+    def _bottom_row_height(self) -> int:
+        return max(
+            self.cameras("left").height,
+            self.cameras("rear").height,
+            self.cameras("right").height,
         )
 
-    def _left_ypos(self):
-        return (
-            self.cameras("Front").ypos + self.cameras("Front").height
-        ) * self.cameras("Left").include
+    @property
+    def _row_height(self) -> int:
+        # Use the maximum of the top and bottom row height.
+        return self._top_row_height + self._bottom_row_height
 
-    def _rear_xpos(self):
+    @property
+    def _top_row_ypos(self) -> int:
+        # Make sure that top row is centered.
+        return 0
+
+    @property
+    def _bottom_row_ypos(self) -> int:
+        # Make sure that bottom row is centered.
+        return self._top_row_height
+
+    # We can't use video width or center_xpos as they use the positions to calculate.
+    def left_pillar_xpos(self) -> int:
+        # left_pillar is put on the left but ensuring that the row is centered
+        return self._top_row_xpos
+
+    def front_xpos(self) -> int:
+        # front is placed next to left_pillar, we need to use width as left pillar
+        # might not be included
+        return self._top_row_xpos + self.cameras("left_pillar").width
+
+    def right_pillar_xpos(self) -> int:
+        # right_pillar is placed next to front, we need to use width as left pillar or
+        # front might not be included
         return (
-            max(
-                0,
-                self.center_xpos
-                - int(
-                    (
-                        self.cameras("Left").width
-                        + self.cameras("Rear").width
-                        + self.cameras("Right").width
-                    )
-                    / 2
-                )
-                + self.cameras("Left").width,
-            )
-            * self.cameras("Rear").include
+            self._top_row_xpos
+            + self.cameras("left_pillar").width
+            + self.cameras("front").width
         )
 
-    def _rear_ypos(self):
-        return (
-            self.cameras("Front").ypos + self.cameras("Front").height
-        ) * self.cameras("Rear").include
+    # We can't use video width or center_xpos as they use the positions to calculate.
+    def left_xpos(self) -> int:
+        # left is put on the left but ensuring that the row is centered
+        return self._bottom_row_xpos
 
-    def _right_xpos(self):
+    def rear_xpos(self) -> int:
+        # rear is placed next to left, we need to use width as left might not be
+        # included
+        return self._bottom_row_xpos + self.cameras("left").width
+
+    def right_xpos(self) -> int:
+        # right is placed next to rear, we need to use width as left and rear might not
+        # be included
         return (
-            max(
-                0,
-                self.center_xpos
-                - int(
-                    (
-                        self.cameras("Left").width
-                        + self.cameras("Rear").width
-                        + self.cameras("Right").width
-                    )
-                    / 2
-                )
-                + self.cameras("Left").width
-                + self.cameras("Rear").width,
-            )
-            * self.cameras("Right").include
+            self._bottom_row_xpos
+            + self.cameras("left").width
+            + self.cameras("rear").width
         )
 
-    def _right_ypos(self):
-        return (
-            self.cameras("Front").ypos + self.cameras("Front").height
-        ) * self.cameras("Right").include
+    def front_height(self) -> int:
+        # For height keep same ratio as original clip
+        return int(self.cameras("front").width / self.cameras("front").ratio)
+
+    def left_pillar_ypos(self) -> int:
+        return self._top_row_ypos + int(
+            (self._top_row_height - self.cameras("left_pillar").height) / 2
+        )
+
+    def front_ypos(self) -> int:
+        return self._top_row_ypos + int(
+            (self._top_row_height - self.cameras("front").height) / 2
+        )
+
+    def right_pillar_ypos(self) -> int:
+        return self._top_row_ypos + int(
+            (self._top_row_height - self.cameras("right_pillar").height) / 2
+        )
+
+    def left_ypos(self) -> int:
+        return self._bottom_row_ypos + int(
+            (self._bottom_row_height - self.cameras("left").height) / 2
+        )
+
+    def rear_ypos(self) -> int:
+        return self._bottom_row_ypos + int(
+            (self._bottom_row_height - self.cameras("rear").height) / 2
+        )
+
+    def right_ypos(self) -> int:
+        return self._bottom_row_ypos + int(
+            (self._bottom_row_height - self.cameras("right").height) / 2
+        )
 
 
-# noinspection PyProtectedMember
-class WideScreen(FullScreen):
-    """ WideScreen Movie Layout
+class Mosaic(FullScreen):
+    """Mosaic Movie Layout
 
-    [             FRONT_CAMERA             ]
-    [LEFT_CAMERA][REAR_CAMERA][RIGHT_CAMERA]
+    [LEFT-PILLAR_CAMERA][           FRONT_CAMERA             ][RIGHT-PILLAR_CAMERA]
+    [       LEFT_CAMERA        ][    REAR_CAMERA     ][       RIGHT_CAMERA        ]
+
+    or
+
+    [LEFT-PILLAR_CAMERA][FRONT_CAMERA][RIGHT-PILLAR_CAMERA]
+    [LEFT_CAMERA][       REAR_CAMERA        ][RIGHT_CAMERA]
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Initialize Mosaic Layout."""
         super().__init__()
         self.scale = 1 / 2
         # Set front scale to None so we know if it was overriden or not.
-        self.cameras("Front").scale = None
+        self.cameras("front").scale = None
+        self.cameras("rear").scale = None
+        # Boost factor to emphasize front/rear when pillars and sides present
+        self._front_rear_boost: float = 1.3
 
-    # Only front_width has to be adjusted as by default width would be left+rear+right instead of normal scale.
-    def _front_width(self):
+    @property
+    def front_rear_boost(self) -> float:
+        return self._front_rear_boost
+
+    @front_rear_boost.setter
+    def front_rear_boost(self, value: float) -> None:
+        self._front_rear_boost = max(1.0, float(value))
+
+    def _boost_active(self) -> bool:
+        # Always apply boost to keep front/rear emphasized consistently
+        return True
+
+    @property
+    def _front_normal_scale(self) -> int:
+        scale = self.cameras("front").scale or 0.5
+        return int(self.cameras("front").width_fixed * scale)
+
+    @property
+    def _min_top_row_width(self) -> int:
         return (
-            (
-                self.cameras("Left").width
-                + self.cameras("Rear").width
-                + self.cameras("Right").width
-            )
-            * self.cameras("Front").include
-            if self.cameras("Front").scale is None
-            else int(
-                (
-                    self.cameras("Front")._width
-                    * self.cameras("Front").scale
-                    * self.cameras("Front").include
-                )
-            )
+            self.cameras("left_pillar").width
+            + self._front_normal_scale
+            + self.cameras("right_pillar").width
         )
 
+    @property
+    def _rear_normal_scale(self) -> int:
+        scale = self.cameras("rear").scale or 0.5
+        return int(self.cameras("rear").width_fixed * scale)
 
-class Cross(FullScreen):
-    """ Cross Movie Layout
+    @property
+    def _min_bottom_row_width(self) -> int:
+        return int(
+            self.cameras("left").width
+            + self._rear_normal_scale
+            + self.cameras("right").width
+        )
 
-             [FRONT_CAMERA]
-        [LEFT_CAMERA][RIGHT_CAMERA]
-             [REAR_CAMERA]
+    # Adjust front width if bottom row is wider then top row
+    def front_width(self) -> int:
+        if self.cameras("front").scale is None:
+            # Front width should be:
+            #  max(bottom_row_width, min_top_width) - pillar_widths
+            base_target = max(self._min_bottom_row_width, self._min_top_row_width)
+            target_width = (
+                int(base_target * self._front_rear_boost)
+                if self._boost_active()
+                else base_target
+            )
+            return max(
+                self._front_normal_scale,
+                target_width
+                - self.cameras("left_pillar").width
+                - self.cameras("right_pillar").width,
+            )
+        else:
+            # Use normal scale calculation if front camera scale was explicitly set
+            return self._front_normal_scale
+
+    def front_height(self) -> int:
+        # Preserve aspect ratio: if width is dynamically set (scale None),
+        # derive height from width and clip ratio.
+        if self.cameras("front").scale is None:
+            return int(self.cameras("front").width / self.cameras("front").ratio)
+        # Otherwise use explicit scale on original height.
+        scale = self.cameras("front").scale or 1
+        return int(self.cameras("front").height_fixed * scale)
+
+    # Adjust rear width if bottom row is wider then top row
+    def rear_width(self) -> int:
+        if self.cameras("rear").scale is None:
+            # Rear width should be:
+            #  max(bottom_row_width, min_top_width) - left/right widths
+            base_target = max(self._min_bottom_row_width, self._min_top_row_width)
+            target_width = (
+                int(base_target * self._front_rear_boost)
+                if self._boost_active()
+                else base_target
+            )
+            return max(
+                self._rear_normal_scale,
+                target_width - self.cameras("left").width - self.cameras("right").width,
+            )
+        else:
+            # Use normal scale calculation if front camera scale was explicitly set
+            return self._rear_normal_scale
+
+    def rear_height(self) -> int:
+        # Preserve aspect ratio: if width is dynamically set (scale None),
+        # derive height from width and clip ratio.
+        if self.cameras("rear").scale is None:
+            return int(self.cameras("rear").width / self.cameras("rear").ratio)
+        # Otherwise use explicit scale on original height.
+        scale = self.cameras("rear").scale or 1
+        return int(self.cameras("rear").height_fixed * scale)
+
+
+class Cross(MovieLayout):
+    """Cross Movie Layout
+
+               [   FRONT_CAMERA    ]
+    [LEFT-PILLAR_CAMERA][RIGHT-PILLAR_CAMERA]
+    [   LEFT_CAMERA    ][   RIGHT_CAMERA    ]
+               [   REAR_CAMERA    ]
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.scale = 1 / 2
 
     @property
-    def video_width(self):
+    def _pillar_row_width(self) -> int:
+        return self.cameras("left_pillar").width + self.cameras("right_pillar").width
+
+    @property
+    def _repeater_row_width(self) -> int:
+        return self.cameras("left").width + self.cameras("right").width
+
+    @property
+    def _row_width(self) -> int:
         return max(
-            self.cameras("Front").width,
-            self.cameras("Left").width + self.cameras("Right").width,
-            self.cameras("Rear").width,
+            self.cameras("front").width,
+            self._pillar_row_width,
+            self._repeater_row_width,
+            self.cameras("rear").width,
         )
 
     @property
-    def video_height(self):
-        if self.perspective:
-            height = int(
-                max(
-                    3 / 2 * self.cameras("Left").height,
-                    3 / 2 * self.cameras("Right").height,
-                )
-            )
-            if (
-                self.cameras("Left").include
-                and self.cameras("Left").scale >= self.cameras("Rear").scale
-                and self.cameras("Right").include
-                and self.cameras("Right").scale >= self.cameras("Rear").scale
-                and self.cameras("Rear").include
-            ):
-                height = int(height / 3 * 2)
-            height += self.cameras("Rear").height
-        else:
-            height = (
-                max(self.cameras("Left").height, self.cameras("Right").height)
-                + self.cameras("Rear").height
-            )
+    def _pillar_row_xpos(self) -> int:
+        return int(self._row_width / 2) - int(self._pillar_row_width / 2)
 
-        return int(height + self.cameras("Front").height)
+    @property
+    def _repeater_row_xpos(self) -> int:
+        return int(self._row_width / 2) - int(self._repeater_row_width / 2)
 
-    def _front_xpos(self):
-        return (
-            int(max(0, self.center_xpos - (self.cameras("Front").width / 2)))
-            * self.cameras("Front").include
+    @property
+    def _pillar_row_height(self) -> int:
+        return max(
+            self.cameras("left_pillar").height, self.cameras("right_pillar").height
         )
 
-    def _left_xpos(self):
-        return (
-            max(
-                0,
-                self.center_xpos
-                - int((self.cameras("Left").width + self.cameras("Right").width) / 2),
-            )
-            * self.cameras("Left").include
+    @property
+    def _repeater_row_height(self) -> int:
+        return max(self.cameras("left").height, self.cameras("right").height)
+
+    @property
+    def _pillar_row_ypos(self) -> int:
+        return self.cameras("front").height
+
+    @property
+    def _repeater_row_ypos(self) -> int:
+        return self.cameras("front").height + self._pillar_row_height
+
+    def front_xpos(self) -> int:
+        return int(self._row_width / 2) - int(self.cameras("front").width / 2)
+
+    def left_pillar_xpos(self) -> int:
+        return self._pillar_row_xpos
+
+    def right_pillar_xpos(self) -> int:
+        return self._pillar_row_xpos + self.cameras("left_pillar").width
+
+    def left_xpos(self) -> int:
+        return self._repeater_row_xpos
+
+    def right_xpos(self) -> int:
+        return self._repeater_row_xpos + self.cameras("left").width
+
+    def rear_xpos(self) -> int:
+        return int(self._row_width / 2) - int(self.cameras("rear").width / 2)
+
+    def left_pillar_ypos(self) -> int:
+        return self._pillar_row_ypos + int(
+            (self._pillar_row_height - self.cameras("left_pillar").height) / 2
         )
 
-    def _left_ypos(self):
-        return (
-            self.cameras("Front").height
-            + int(
-                (
-                    max(self.cameras("Left").height, self.cameras("Right").height)
-                    - self.cameras("Left").height
-                )
-                / 2
-            )
-        ) * self.cameras("Left").include
-
-    def _right_xpos(self):
-        return (
-            max(
-                0,
-                self.center_xpos
-                - int((self.cameras("Left").width + self.cameras("Right").width) / 2)
-                + self.cameras("Left").width,
-            )
-            * self.cameras("Right").include
+    def right_pillar_ypos(self) -> int:
+        return self._pillar_row_ypos + int(
+            (self._pillar_row_height - self.cameras("right_pillar").height) / 2
         )
 
-    def _right_ypos(self):
-        return (
-            self.cameras("Front").height
-            + int(
-                (
-                    max(self.cameras("Left").height, self.cameras("Right").height)
-                    - self.cameras("Right").height
-                )
-                / 2
-            )
-        ) * self.cameras("Right").include
-
-    def _rear_xpos(self):
-        return (
-            int(max(0, self.center_xpos - (self.cameras("Rear").width / 2)))
-            * self.cameras("Rear").include
+    def left_ypos(self) -> int:
+        return self._repeater_row_ypos + int(
+            (self._repeater_row_height - self.cameras("left").height) / 2
         )
 
-    def _rear_ypos(self):
-        return int(max(0, self.video_height - self.cameras("Rear").height))
+    def right_ypos(self) -> int:
+        return self._repeater_row_ypos + int(
+            (self._repeater_row_height - self.cameras("right").height) / 2
+        )
+
+    def rear_ypos(self) -> int:
+        return (
+            self.cameras("front").height
+            + self._pillar_row_height
+            + self._repeater_row_height
+        )
 
 
-# noinspection PyProtectedMember
-class Diamond(Cross):
-    """ Diamond Movie Layout
+class Diamond(MovieLayout):
+    """Diamond Movie Layout
 
-                    [FRONT_CAMERA]
-        [LEFT_CAMERA]            [RIGHT_CAMERA]
-                    [REAR_CAMERA]
+                        [            ]
+    [LEFT-PILLAR_CAMERA][FRONT_CAMERA][RIGHT-PILLAR_CAMERA]
+    [   LEFT_CAMERA    ][REAR_CAMERA ][   RIGHT_CAMERA    ]
+                        [            ]
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
-        self.scale = 1 / 2
-
         self._font.valign = "MIDDLE"
-
-    def _font_halign(self):
-        if self._font._halign == "CENTER":
-            # Change alignment to left or right if one of the left/right cameras is excluded.
-            if (self.cameras("Left").include and not self.cameras("Right").include) or (
-                self.cameras("Right").include and not self.cameras("Left").include
-            ):
-                x_pos = int(
-                    max(
-                        self.cameras("Front").xpos + self.cameras("Front").width / 2,
-                        self.cameras("Rear").xpos + self.cameras("Rear").width / 2,
-                    )
-                )
-                return f"({x_pos} - text_w / 2)"
-
-        return HALIGN.get(self._font._halign, self._font._halign)
-
-    def _font_valign(self):
-        if self._font._valign == "MIDDLE":
-            if self.cameras("Front").include:
-                return (
-                    f'({self.cameras("Front").ypos + self.cameras("Front").height} + 5)'
-                )
-            elif self.cameras("Rear").include:
-                return f'({self.cameras("Rear").ypos} - 5 - text_h)'
-
-        return VALIGN.get(self._font._valign, self._font._valign)
-
-    def _font_size(self):
-        # For this layout the video height has to include font size. But default for calculating
-        # font size is based on video height.
-        # Thus overriding font size to get video height without font size to figure our scaling.
-        if self.font._size is None:
-            scale = (
-                self._video_height(include_fontsize=False)
-                * self.video_width
-                / (1280 * 960)
-            )
-            return int(max(16, 16 * scale))
-        else:
-            return self.font.size
+        self.scale = 1 / 2
+        self.cameras("front").scale = 1
+        self.cameras("rear").scale = 1
 
     @property
-    def video_width(self):
-        return (
-            max(self.cameras("Front").width, self.cameras("Rear").width)
-            + self.cameras("Left").width
-            + self.cameras("Right").width
+    def _left_column_width(self) -> int:
+        return max(self.cameras("left_pillar").width, self.cameras("left").width)
+
+    @property
+    def _front_rear_column_width(self) -> int:
+        return max(self.cameras("front").width, self.cameras("rear").width)
+
+    @property
+    def _right_column_width(self) -> int:
+        return max(self.cameras("right_pillar").width, self.cameras("right").width)
+
+    @property
+    def _pillar_row_height(self) -> int:
+        return max(
+            self.cameras("left_pillar").height, self.cameras("right_pillar").height
         )
 
-    def _video_height(self, include_fontsize=True):
-        perspective = 3 / 2 if self.perspective else 1
-        fontsize = self.font.size if include_fontsize else 0
+    @property
+    def _repeater_row_height(self) -> int:
+        return max(self.cameras("left").height, self.cameras("right").height)
 
+    @property
+    def _pillar_repeater_row_height(self) -> int:
+        return self._pillar_row_height + self._repeater_row_height
+
+    @property
+    def _left_column_height(self) -> int:
+        return self.cameras("left_pillar").height + self.cameras("left").height
+
+    @property
+    def _front_rear_height(self) -> int:
+        return self.cameras("front").height + self.cameras("rear").height
+
+    @property
+    def _right_column_height(self) -> int:
+        return self.cameras("right_pillar").height + self.cameras("right").height
+
+    def front_xpos(self) -> int:
+        return self._left_column_width + int(
+            (self._front_rear_column_width - self.cameras("front").width) / 2
+        )
+
+    def left_pillar_xpos(self) -> int:
+        return self._left_column_width - self.cameras("left_pillar").width
+
+    def left_xpos(self) -> int:
+        return self._left_column_width - self.cameras("left").width
+
+    def right_pillar_xpos(self) -> int:
+        return self._left_column_width + self._front_rear_column_width
+
+    def right_xpos(self) -> int:
+        return self._left_column_width + self._front_rear_column_width
+
+    def rear_xpos(self) -> int:
+        return self._left_column_width + int(
+            (self._front_rear_column_width - self.cameras("rear").width) / 2
+        )
+
+    def front_ypos(self) -> int:
         return int(
             max(
-                perspective
-                * max(self.cameras("Left").height, self.cameras("Right").height),
-                self.cameras("Front").height + self.cameras("Rear").height + fontsize,
+                0,
+                (
+                    max(self._left_column_height, self._right_column_height)
+                    - self._front_rear_height
+                )
+                / 2,
             )
         )
+
+    def left_pillar_ypos(self) -> int:
+        return int(max(0, (self._front_rear_height - self._left_column_height) / 2))
+
+    def left_ypos(self) -> int:
+        return int(
+            (
+                max(0, (self._front_rear_height - self._left_column_height) / 2)
+                + self.cameras("left_pillar").height
+            )
+        )
+
+    def right_pillar_ypos(self) -> int:
+        return int(max(0, (self._front_rear_height - self._right_column_height) / 2))
+
+    def right_ypos(self) -> int:
+        return int(
+            max(0, (self._front_rear_height - self._right_column_height) / 2)
+            + self.cameras("right_pillar").height
+        )
+
+    def rear_ypos(self) -> int:
+        return int(
+            max(
+                0,
+                (
+                    max(self._left_column_height, self._right_column_height)
+                    - self._front_rear_height
+                )
+                / 2,
+            )
+            + self.cameras("front").height
+        )
+
+
+class Horizontal(MovieLayout):
+    """Horizontal Movie Layout
+
+    [LEFT_CAMERA][LEFT_PILLAR][FRONT_CAMERA][REAR_CAMERA][RIGHT_PILLAR][RIGHT_CAMERA]
+    """
+
+    def __init__(self) -> None:
+        """Initialize Horizontal Layout."""
+        super().__init__()
+        self.scale = 1 / 2
 
     @property
-    def video_height(self):
-        return self._video_height(include_fontsize=True)
-
-    def _front_xpos(self):
-        return (
-            self.cameras("Left").width
-            + int(
-                (
-                    max(self.cameras("Front").width, self.cameras("Rear").width)
-                    - self.cameras("Front").width
-                )
-                / 2
-            )
-        ) * self.cameras("Front").include
-
-    def _left_xpos(self):
-        return 0
-
-    def _left_ypos(self):
-        return max(0, self.center_ypos - int(self.cameras("Left").height / 2))
-
-    def _right_xpos(self):
+    def _row_height(self) -> int:
         return max(
-            self.cameras("Front").xpos + self.cameras("Front").width,
-            self.cameras("Rear").xpos + self.cameras("Rear").width,
+            self.cameras("left").height,
+            self.cameras("left_pillar").height,
+            self.cameras("front").height,
+            self.cameras("rear").height,
+            self.cameras("right_pillar").height,
+            self.cameras("right").height,
         )
 
-    def _right_ypos(self):
-        return max(0, self.center_ypos - int(self.cameras("Right").height / 2))
+    def left_ypos(self) -> int:
+        return int((self._row_height - self.cameras("left").height) / 2)
 
-    def _rear_xpos(self):
+    def left_pillar_xpos(self) -> int:
+        return self.cameras("left").width
+
+    def left_pillar_ypos(self) -> int:
+        return int((self._row_height - self.cameras("left_pillar").height) / 2)
+
+    def front_xpos(self) -> int:
+        return self.cameras("left").width + self.cameras("left_pillar").width
+
+    def front_ypos(self) -> int:
+        return int((self._row_height - self.cameras("front").height) / 2)
+
+    def rear_xpos(self) -> int:
         return (
-            self.cameras("Left").width
-            + int(
-                (
-                    max(self.cameras("Front").width, self.cameras("Rear").width)
-                    - self.cameras("Rear").width
-                )
-                / 2
-            )
-        ) * self.cameras("Rear").include
+            self.cameras("left").width
+            + self.cameras("left_pillar").width
+            + self.cameras("front").width
+        )
+
+    def rear_ypos(self) -> int:
+        return int((self._row_height - self.cameras("rear").height) / 2)
+
+    def right_pillar_xpos(self) -> int:
+        return (
+            self.cameras("left").width
+            + self.cameras("left_pillar").width
+            + self.cameras("front").width
+            + self.cameras("rear").width
+        )
+
+    def right_pillar_ypos(self) -> int:
+        return int((self._row_height - self.cameras("right_pillar").height) / 2)
+
+    def right_xpos(self) -> int:
+        return (
+            self.cameras("left").width
+            + self.cameras("left_pillar").width
+            + self.cameras("front").width
+            + self.cameras("rear").width
+            + self.cameras("right_pillar").width
+        )
+
+    def right_ypos(self) -> int:
+        return int((self._row_height - self.cameras("right").height) / 2)
 
 
 class MyArgumentParser(argparse.ArgumentParser):
-    def convert_arg_line_to_args(self, arg_line):
+    def convert_arg_line_to_args(self, arg_line) -> list[str]:
         # Remove comments.
         return shlex_split(arg_line, comments=True)
 
-    def args_to_dict(self, arguments, default):
-        argument_list = []
+    def args_to_dict(self, arguments, default) -> list:
+        argument_list: list = []
 
         if arguments is None:
             return argument_list
@@ -1293,24 +2110,53 @@ class MyArgumentParser(argparse.ArgumentParser):
         return argument_list
 
 
-# noinspection PyCallByClass,PyProtectedMember
-class SmartFormatter(argparse.HelpFormatter):
-    """ Formatter for argument help. """
+class SmartFormatter(argparse.ArgumentDefaultsHelpFormatter):
+    """Formatter for argument help."""
 
-    def _split_lines(self, text, width):
-        """ Provide raw output allowing for prettier help output """
+    def _split_lines(self, text: str, width: int) -> list[str]:
+        """Provide raw output allowing for prettier help output"""
         if text.startswith("R|"):
             return text[2:].splitlines()
         # this is the RawTextHelpFormatter._split_lines
-        return argparse.HelpFormatter._split_lines(self, text, width)
+        return super()._split_lines(text, width)
 
-    def _get_help_string(self, action):
-        """ Call default help string """
-        return argparse.ArgumentDefaultsHelpFormatter._get_help_string(self, action)
+
+def get_class_properties(
+    instance: object, max_depth: int = 3, _depth: int = 0, _seen: set | None = None
+):
+    if _seen is None:
+        _seen = set()
+    if id(instance) in _seen or _depth >= max_depth:
+        return "<circular or max depth reached>"
+    _seen.add(id(instance))
+
+    properties: dict[str, Any] = {}
+    for attr_name in dir(instance):
+        if attr_name.startswith("_"):
+            continue  # Skip private/internal
+        try:
+            attr_value = getattr(instance, attr_name)
+        except AttributeError as e:
+            properties[attr_name] = f"<error reading value> ({e})"
+        else:
+            if isroutine(attr_value):
+                continue  # Skip methods
+            if isinstance(
+                attr_value, (int, float, str, bool, list, dict, tuple, type(None))
+            ):
+                properties[attr_name] = attr_value
+            elif hasattr(attr_value, "__dict__") or not isclass(attr_value):
+                # Likely a custom object — dig deeper
+                properties[attr_name] = get_class_properties(
+                    attr_value, max_depth=max_depth, _depth=_depth + 1, _seen=_seen
+                )
+            else:
+                properties[attr_name] = repr(attr_value)
+    return properties
 
 
 def search_dict(
-    match_value: object = None, key: str = None, search_list: List[dict] = None
+    key: str, search_list: List[dict], match_value: object = None
 ) -> Optional[dict]:
     """
     Returns the 1st element in a list containing dictionaries
@@ -1325,7 +2171,7 @@ def search_dict(
     :return: Dictionary object that matches
     :rtype: dict
     """
-    if key is None or search_list is None:
+    if key == "" or len(search_list) == 0:
         return None
 
     if match_value is None:
@@ -1338,25 +2184,70 @@ def search_dict(
     )
 
 
-def get_current_timestamp():
+def escape_drawtext_literals(text: str) -> str:
+    """Escape literal colons for drawtext while preserving %{...} expansions."""
+
+    def is_escaped(pos: int) -> bool:
+        """Return True when the character at pos is already escaped."""
+        backslash_count = 0
+        idx = pos - 1
+        while idx >= 0 and text[idx] == "\\":
+            backslash_count += 1
+            idx -= 1
+        return backslash_count % 2 == 1
+
+    escaped: list[str] = []
+    inside_expansion = False
+    idx = 0
+    text_length = len(text)
+
+    while idx < text_length:
+        char = text[idx]
+        next_char = text[idx + 1] if idx + 1 < text_length else ""
+
+        if (
+            not inside_expansion
+            and char == "%"
+            and next_char == "{"
+            and not is_escaped(idx)
+        ):
+            inside_expansion = True
+            escaped.append("%{")
+            idx += 2
+            continue
+
+        if inside_expansion and char == "}" and not is_escaped(idx):
+            inside_expansion = False
+            escaped.append("}")
+            idx += 1
+            continue
+
+        if char == ":" and not inside_expansion and not is_escaped(idx):
+            escaped.append(r"\:")
+        else:
+            escaped.append(char)
+
+        idx += 1
+
+    return "".join(escaped)
+
+
+def get_current_timestamp() -> str:
     """Returns the current timestamp"""
-    """Uses ugly global variable, this should die a quick death..."""
-    """Preferably, a text output class should be created and the value stored there."""
-    if display_ts:
+    if DISPLAY_TS:
         return datetime.now().strftime("%Y-%m-%d %H:%M:%S - ")
-    else:
-        return ""
+    return ""
 
 
-def check_latest_release(include_beta):
-    """ Checks GitHub for latest release """
+def check_latest_release(include_beta: bool = False) -> Optional[dict[str, str]]:
+    """Checks GitHub for latest release"""
 
-    url = f"{GITHUB['URL']}/repos/{GITHUB['owner']}/{GITHUB['repo']}/releases"
+    url: str = f"{GITHUB['URL']}/repos/{GITHUB['owner']}/{GITHUB['repo']}/releases"
 
     if not include_beta:
         url = url + "/latest"
     try:
-        releases = requests.get(url)
+        releases = requests.get(url, timeout=30)
     except requests.exceptions.RequestException as exc:
         print(f"{get_current_timestamp()}Unable to check for latest release: {exc}")
         return None
@@ -1365,63 +2256,68 @@ def check_latest_release(include_beta):
     # If we include betas then we would have received a list, thus get 1st
     # element as that is the latest release.
     if include_beta:
+        if not release_data or len(release_data) == 0:
+            print(f"{get_current_timestamp()}No releases found")
+            return None
         release_data = release_data[0]
 
     return release_data
 
 
-def get_tesladashcam_folder():
-    """ Check if there is a drive mounted with the Tesla DashCam folder."""
+def get_tesladashcam_folder() -> tuple[Optional[str], Optional[str]]:
+    """Check if there is a drive mounted with the Tesla DashCam folder."""
     for partition in disk_partitions(all=False):
         if "cdrom" in partition.opts or partition.fstype == "":
             continue
 
-        teslacamfolder = os.path.join(partition.mountpoint, "TeslaCam")
+        teslacamfolder: str = os.path.join(partition.mountpoint, "TeslaCam")
         if os.path.isdir(teslacamfolder):
-            _LOGGER.debug(f"Folder TeslaCam found on partition {partition.mountpoint}.")
+            _LOGGER.debug(
+                "Folder TeslaCam found on partition %s.", partition.mountpoint
+            )
             return teslacamfolder, partition.mountpoint
-        _LOGGER.debug(f"No TeslaCam folder on partition {partition.mountpoint}.")
+        _LOGGER.debug("No TeslaCam folder on partition %s.", partition.mountpoint)
     return None, None
 
 
-def get_movie_files(source_folder, video_settings):
-    """ Find all the clip files within folder (and subfolder if requested)
-
-
-    """
+def get_movie_files(
+    source_folder: list[str], video_settings: dict[str, Any]
+) -> dict[str, Event]:
+    """Find all the clip files within folder (and subfolder if requested)"""
 
     # Making as a set to ensure uniqueness.
-    folder_list = set()
-    # Determine all the folders to scan for files. Using a SET ensuring uniqueness for the folders.
-    _LOGGER.debug(f"Determining all the folders to scan for video files")
+    folder_list: set[str] = set()
+    # Determine all the folders to scan for files. Using a SET ensuring uniqueness for
+    # the folders.
+    _LOGGER.debug("Determining all the folders to scan for video files")
     for source_pathname in source_folder:
-        _LOGGER.debug(f"Processing provided source path {source_pathname}.")
+        _LOGGER.debug("Processing provided source path %s.", source_pathname)
         for pathname in iglob(os.path.expanduser(os.path.expandvars(source_pathname))):
-            _LOGGER.debug(f"Processing {pathname}.")
+            _LOGGER.debug("Processing %s.", pathname)
             if (
                 os.path.isdir(pathname)
                 or os.path.ismount(pathname)
                 and not video_settings["exclude_subdirs"]
             ):
-                _LOGGER.debug(f"Retrieving all subfolders for {pathname}.")
+                _LOGGER.debug("Retrieving all subfolders for %s.", pathname)
                 for folder, _, _ in os.walk(pathname, followlinks=True):
                     folder_list.add(folder)
             else:
                 folder_list.add(pathname)
 
-    events_list = {}
+    events_list: dict[str, Event] = {}
     # Go through each folder, get the movie files within it and add to movie list.
     # Sorting folder list 1st.
     print(f"{get_current_timestamp()}Scanning {len(folder_list)} folder(s)")
-    folders_scanned = 0
+    folders_scanned: int = 0
     for event_folder in sorted(folder_list):
         if folders_scanned % 10 == 0 and folders_scanned != 0:
             print(f"Scanned {folders_scanned}/{len(folder_list)}.")
         folders_scanned = folders_scanned + 1
 
         if os.path.isdir(event_folder):
-            _LOGGER.debug(f"Retrieving all video files in folder {event_folder}.")
-            event_info = None
+            _LOGGER.debug("Retrieving all video files in folder %s.", event_folder)
+            event_info: Event | None = None
 
             # Collect video files within folder and process.
             for clip_filename in glob(os.path.join(event_folder, "*.mp4")):
@@ -1429,238 +2325,317 @@ def get_movie_files(source_folder, video_settings):
                 _, clip_filename_only = os.path.split(clip_filename)
                 clip_timestamp = clip_filename_only.rsplit("-", 1)[0]
 
+                # We get the clip starting time from the filename and provided
+                # that as initial timestamp.
+                # Tesla stores these timestamps in local timezone.
+                if len(clip_timestamp) == 16:
+                    # This is for before version 2019.16
+                    try:
+                        clip_starting_timestamp = datetime.strptime(
+                            clip_timestamp, "%Y-%m-%d_%H-%M"
+                        )
+                    except ValueError:
+                        _LOGGER.debug(
+                            "Invalid timestamp format in filename %s. Expected format "
+                            "is YYYY-MM-DD_HH-MM.",
+                            clip_filename_only,
+                        )
+                        continue
+                    # Treat filename timestamps as local time, then normalize to UTC
+                    clip_starting_timestamp = clip_starting_timestamp.replace(
+                        tzinfo=get_localzone()
+                    ).astimezone(timezone.utc)
+                else:
+                    # This is for version 2019.16 and later
+                    try:
+                        clip_starting_timestamp = datetime.strptime(
+                            clip_timestamp, "%Y-%m-%d_%H-%M-%S"
+                        )
+                    except ValueError:
+                        _LOGGER.debug(
+                            "Invalid timestamp format in filename %s. Expected format "
+                            "is YYYY-MM-DD_HH-MM.",
+                            clip_filename_only,
+                        )
+                        continue
+                    # Treat filename timestamps as local time, then normalize to UTC
+                    clip_starting_timestamp = clip_starting_timestamp.replace(
+                        tzinfo=get_localzone()
+                    ).astimezone(timezone.utc)
+
                 # Check if we already processed this timestamp.
                 if (
                     event_info is not None
-                    and event_info.clip(clip_timestamp) is not None
+                    and event_info.clip(clip_starting_timestamp) is not None
                 ):
                     # Already processed this clip, moving on.
                     continue
 
-                front_filename = str(clip_timestamp) + "-front.mp4"
+                front_filename = f"{str(clip_timestamp)}-front.mp4"
                 front_path = os.path.join(event_folder, front_filename)
 
-                left_filename = str(clip_timestamp) + "-left_repeater.mp4"
+                left_filename = f"{str(clip_timestamp)}-left_repeater.mp4"
                 left_path = os.path.join(event_folder, left_filename)
 
-                right_filename = str(clip_timestamp) + "-right_repeater.mp4"
+                right_filename = f"{str(clip_timestamp)}-right_repeater.mp4"
                 right_path = os.path.join(event_folder, right_filename)
 
-                rear_filename = str(clip_timestamp) + "-back.mp4"
+                rear_filename = f"{str(clip_timestamp)}-back.mp4"
                 rear_path = os.path.join(event_folder, rear_filename)
 
-                # Get meta data for each camera for this timestamp to determine creation time and duration.
+                left_pillar_filename = f"{str(clip_timestamp)}-left_pillar.mp4"
+                left_pillar_path = os.path.join(event_folder, left_pillar_filename)
+
+                right_pillar_filename = f"{str(clip_timestamp)}-right_pillar.mp4"
+                right_pillar_path = os.path.join(event_folder, right_pillar_filename)
+
+                # Get meta data for each camera for this timestamp to determine
+                # creation time and duration.
                 metadata = get_metadata(
                     video_settings["ffmpeg_exec"],
-                    [front_path, left_path, right_path, rear_path],
+                    [
+                        front_path,
+                        left_path,
+                        right_path,
+                        rear_path,
+                        left_pillar_path,
+                        right_pillar_path,
+                    ],
                 )
 
                 # Move on to next one if nothing received.
                 if not metadata:
                     _LOGGER.debug(
-                        f"No camera files in folder {event_folder} with timestamp "
-                        f"{clip_timestamp} found."
+                        "No camera files in folder %s with timestamp %s found.",
+                        event_folder,
+                        clip_timestamp,
                     )
                     continue
 
-                clip_info = None
-                clip_starting_timestamp = datetime.now()
-                # Store filename, duration, timestamp, and if has to be included for each camera
+                clip_info: Clip | None = None
+                camera: str = ""
+                # Store filename, duration, timestamp, and if has to be included for
+                # each camera
                 for item in metadata:
-                    _, filename = os.path.split(item["filename"])
+                    _, filename = os.path.split(item.filename)
                     if filename == front_filename:
-                        camera = "Front"
+                        if video_settings["video_layout"].swap_front_rear:
+                            camera = "rear"
+                        else:
+                            camera = "front"
                     elif filename == left_filename:
-                        camera = "Left"
+                        if video_settings["video_layout"].swap_left_right:
+                            camera = "right"
+                        else:
+                            camera = "left"
                     elif filename == right_filename:
-                        camera = "Right"
+                        if video_settings["video_layout"].swap_left_right:
+                            camera = "left"
+                        else:
+                            camera = "right"
                     elif filename == rear_filename:
-                        camera = "Rear"
+                        if video_settings["video_layout"].swap_front_rear:
+                            camera = "front"
+                        else:
+                            camera = "rear"
+                    elif filename == left_pillar_filename:
+                        if video_settings["video_layout"].swap_pillar:
+                            camera = "right_pillar"
+                        else:
+                            camera = "left_pillar"
+                    elif filename == right_pillar_filename:
+                        if video_settings["video_layout"].swap_pillar:
+                            camera = "left_pillar"
+                        else:
+                            camera = "right_pillar"
                     else:
                         continue
 
                     if clip_info is None:
-                        # We get the clip starting time from the filename and provided that as initial timestamp.
-                        if len(clip_timestamp) == 16:
-                            # This is for before version 2019.16
-                            clip_starting_timestamp = datetime.strptime(
-                                clip_timestamp, "%Y-%m-%d_%H-%M"
-                            )
-                            clip_starting_timestamp = clip_starting_timestamp.astimezone(
-                                get_localzone()
-                            )
-                        else:
-                            # This is for version 2019.16 and later
-                            clip_starting_timestamp = datetime.strptime(
-                                clip_timestamp, "%Y-%m-%d_%H-%M-%S"
-                            )
-                            clip_starting_timestamp = clip_starting_timestamp.astimezone(
-                                timezone.utc
-                            )
-                        clip_info = Clip(timestamp=clip_starting_timestamp)
+                        clip_info = Clip(timestmp=clip_starting_timestamp)
 
                     clip_camera_info = Camera_Clip(
                         filename=filename,
-                        duration=item["duration"],
-                        timestamp=(
-                            item["timestamp"]
-                            if item["timestamp"] is not None
+                        duration=item.duration,
+                        timestmp=(
+                            item.timestamp
+                            if item.timestamp is not None
                             else clip_starting_timestamp
                         ),
                         include=(
-                            item["include"]
+                            item.include
                             if video_settings["video_layout"].cameras(camera).include
                             else False
                         ),
+                        video_metadata=item,
                     )
 
                     # Store the camera information in the clip.
                     clip_info.set_camera(camera, clip_camera_info)
+                    if event_info is None:
+                        event_info = Event(folder=event_folder)
+                    event_info.add_camera_clip(camera)
 
                 # Not storing anything if no cameras included for this clip.
-                if clip_info is None:
+                if clip_info is None or event_info is None:
                     _LOGGER.debug(
-                        f"No valid camera files in folder {event_folder} with timestamp "
-                        f"{clip_timestamp}"
+                        "No valid camera files in folder %s with timestamp %s",
+                        event_folder,
+                        clip_timestamp,
                     )
                     continue
 
                 # Store the clip information in the event
-                if event_info is None:
-                    event_info = Event(folder=event_folder)
-                event_info.set_clip(clip_timestamp, clip_info)
+                event_info.set_clip(clip_starting_timestamp, clip_info)
 
             # Got all the clip information for this event (folder)
             # If no clips found then skip this folder and continue on.
             if event_info is None:
-                _LOGGER.debug(f"No clips found in folder {event_folder}")
+                _LOGGER.debug("No clips found in folder %s", event_folder)
                 continue
 
-            _LOGGER.debug(f"Found {event_info.count} clips in folder {event_folder}")
+            _LOGGER.debug("Found %d clips in folder %s", event_info.count, event_folder)
             # We have clips for this event, get the event meta data.
-            event_metadata = {}
             event_metadata_file = os.path.join(event_folder, "event.json")
             if os.path.isfile(event_metadata_file):
-                _LOGGER.debug(f"Folder {event_folder} has an event file.")
+                _LOGGER.debug("Folder %s has an event file.", event_folder)
                 try:
-                    with open(event_metadata_file) as f:
+                    with open(event_metadata_file, encoding="utf-8") as f:
+                        event_file_data: dict[str, Any] = json.load(f)
+                except json.JSONDecodeError as e:
+                    _LOGGER.warning(
+                        "Event JSON found in %s failed to parse with JSON error: %s",
+                        event_metadata_file,
+                        str(e),
+                    )
+                except (OSError, IOError) as exc:
+                    _LOGGER.warning(
+                        "Error opening or reading %s: %s",
+                        event_metadata_file,
+                        exc,
+                    )
+                else:
+                    event_timestamp: str | None = None
+                    if (
+                        event_timestamp := event_file_data.get("timestamp")
+                    ) is not None:
+                        # Convert string to timestamp.
                         try:
-                            event_file_data = json.load(f)
-
-                            event_timestamp = event_file_data.get("timestamp")
-                            if event_timestamp is not None:
-                                # Convert string to timestamp.
-                                try:
-                                    event_timestamp = datetime.strptime(
-                                        event_timestamp, "%Y-%m-%dT%H:%M:%S"
-                                    )
-                                    event_timestamp = event_timestamp.astimezone(
-                                        timezone.utc
-                                    )
-                                except ValueError as e:
-                                    _LOGGER.warning(
-                                        f"Event timestamp ({event_timestamp}) found in "
-                                        f"{event_metadata_file} could not be parsed as a timestamp"
-                                    )
-                                    event_timestamp = None
-
-                            event_metadata = {
-                                "event_timestamp": event_timestamp,
-                                "city": event_file_data.get("city"),
-                                "latitude": None,
-                                "longitude": None,
-                                "reason": EVENT_REASON.get(
-                                    event_file_data.get("reason")
-                                ),
-                            }
-                            if event_metadata["reason"] is None:
-                                for event_reason in EVENT_REASON:
-                                    if match(
-                                        event_reason, event_file_data.get("reason")
-                                    ):
-                                        event_metadata["reason"] = EVENT_REASON.get(
-                                            event_reason
-                                        )
-                                        break
-
-                            event_latitude = event_file_data.get("est_lat")
-                            if event_latitude is not None:
-                                try:
-                                    event_latitude = float(event_latitude)
-                                except ValueError as e:
-                                    pass
-                            event_metadata["latitude"] = event_latitude
-
-                            event_longitude = event_file_data.get("est_lon")
-                            if event_longitude is not None:
-                                try:
-                                    event_longitude = float(event_longitude)
-                                except ValueError as e:
-                                    pass
-                            event_metadata["longitude"] = event_longitude
-
-                        except json.JSONDecodeError as e:
-                            _LOGGER.warning(
-                                f"Event JSON found in {event_metadata_file} failed to parse "
-                                f"with JSON error: {str(e)}"
+                            event_timestamp_dt = datetime.strptime(
+                                event_timestamp, "%Y-%m-%dT%H:%M:%S"
                             )
-                except:
-                    pass
+                        except ValueError:
+                            _LOGGER.warning(
+                                "Event timestamp (%s) found in %s could not be parsed "
+                                "as a timestamp",
+                                event_timestamp,
+                                event_metadata_file,
+                            )
+                            event_timestamp = None
+                        else:
+                            # Assign local tz to JSON timestamp, then convert to UTC
+                            event_timestamp_dt = event_timestamp_dt.replace(
+                                tzinfo=get_localzone()
+                            ).astimezone(timezone.utc)
+                    event_info.event_metadata.timestamp = event_timestamp_dt
+                    event_info.event_metadata.city = event_file_data.get("city", "n/a")
+                    event_info.event_metadata.street = event_file_data.get(
+                        "street", "n/a"
+                    )
 
-            # Store the event data in the event.
-            event_info.metadata = event_metadata
+                    # Try to get the event reason.
+                    # If it is not in the EVENT_REASON dict then try to match it
+                    # If it is not in the EVENT_REASON dict and no match then
+                    # leave it as None
+                    if (event_file_reason := event_file_data.get("reason")) is not None:
+                        if (
+                            event_reason := EVENT_REASON.get(event_file_reason)
+                        ) is None:
+                            for event_reason in EVENT_REASON:
+                                if match(event_reason, event_file_reason):
+                                    break
+                        event_info.event_metadata.reason = event_reason or "n/a"
+
+                    if (event_latitude := event_file_data.get("est_lat")) is not None:
+                        try:
+                            event_latitude = float(event_latitude)
+                        except ValueError:
+                            pass
+                        event_info.event_metadata.latitude = event_latitude
+
+                    if (event_longitude := event_file_data.get("est_lon")) is not None:
+                        try:
+                            event_longitude = float(event_longitude)
+                        except ValueError:
+                            pass
+                        event_info.event_metadata.longitude = event_longitude
+
         else:
-            _LOGGER.debug(f"Adding video file {event_folder}.")
+            _LOGGER.debug("Adding video file %s.", event_folder)
             # Get the metadata for this video files.
             metadata = get_metadata(video_settings["ffmpeg_exec"], [event_folder])
+            if not metadata:
+                _LOGGER.warning(
+                    "Failed to get metadata for file %s, skipping.", event_folder
+                )
+                continue
+
             # Store video as a camera clip.
-            clip_timestamp = (
-                metadata[0]["timestamp"]
-                if metadata[0]["timestamp"] is not None
-                else datetime.fromtimestamp(os.path.getmtime(event_folder))
+            clip_timestamp_dt = (
+                metadata[0].timestamp
+                if metadata[0].timestamp is not None
+                # Use local timezone to avoid mixing naive/aware timestamps when
+                # user-provided start/end timestamps are tz-aware.
+                else datetime.fromtimestamp(
+                    os.path.getmtime(event_folder), tz=get_localzone()
+                )
             )
+            # Normalize to UTC for internal comparisons
+            clip_timestamp_dt = clip_timestamp_dt.astimezone(timezone.utc)
 
             clip_camera_info = Camera_Clip(
                 filename=event_folder,
-                duration=metadata[0]["duration"],
-                timestamp=clip_timestamp
-                if clip_timestamp is not None
-                else datetime.now(),
+                duration=metadata[0].duration,
+                timestmp=clip_timestamp_dt
+                if clip_timestamp_dt is not None
+                else datetime.now(timezone.utc),
                 include=True,
+                video_metadata=metadata[0],
             )
             # Add it as a clip
-            clip_info = Clip(timestamp=clip_camera_info.timestamp)
+            clip_info = Clip(timestmp=clip_camera_info.timestamp)
             clip_info.set_camera("FULL", clip_camera_info)
             # And now store as an event.
-            event_info = Event(folder=event_folder, isfile=True, filename=event_folder)
+            event_info = Event(
+                folder=event_folder,
+                isfile=True,
+                filename=event_folder,
+                video_metadata=metadata[0],
+            )
+            # Ensure direct-file events have a clip entry for processing/trimming
+            event_info.set_clip(clip_camera_info.timestamp, clip_info)
+            event_info.add_camera_clip("FULL")
 
         # Now add the event folder to our events list.
         events_list.update({event_folder: event_info})
 
-    _LOGGER.debug(f"{len(events_list)} folders contain clips.")
+    _LOGGER.debug("%d folders contain clips.", len(events_list))
     return events_list
 
 
-def get_metadata(ffmpeg, filenames):
-    """ Retrieve the meta data for the clip (i.e. timestamp, duration) """
+def get_metadata(ffmpeg: str, filenames: list[str]) -> list[Video_Metadata]:  #
+    """Retrieve the meta data for the clip (i.e. timestamp, duration)"""
     # Get meta data for each video to determine creation time and duration.
     ffmpeg_command = [ffmpeg]
 
-    metadata = []
+    metadata: list[Video_Metadata] = []
     for camera_file in filenames:
         if os.path.isfile(camera_file):
             ffmpeg_command.append("-i")
             ffmpeg_command.append(camera_file)
-            metadata.append(
-                {
-                    "filename": camera_file,
-                    "timestamp": None,
-                    "duration": 0,
-                    "include": False,
-                }
-            )
+            metadata.append(Video_Metadata(filename=camera_file))
         else:
-            _LOGGER.debug(f"File {camera_file} does not exist, skipping.")
+            _LOGGER.debug("File %s does not exist, skipping.", camera_file)
 
     # Don't run ffmpeg if nothing to check for.
     if not metadata:
@@ -1668,112 +2643,192 @@ def get_metadata(ffmpeg, filenames):
 
     ffmpeg_command.append("-hide_banner")
 
-    command_result = run(ffmpeg_command, capture_output=True, text=True)
-    metadata_iterator = iter(metadata)
-    input_counter = 0
+    try:
+        command_result = run(
+            ffmpeg_command, capture_output=True, text=True, check=False
+        )
+    except OSError as e:
+        _LOGGER.error(
+            "Error occurred while running ffmpeg: %s. Is ffmpeg installed and in PATH?",
+            e,
+        )
+        return metadata
 
-    video_timestamp = None
-    wait_for_input_line = True
-    metadata_item = {}
+    # If we got here then we have the metadata, now parse it.
+
+    # Create an iterator for the metadata list.
+    # This is to ensure that we can keep track of which metadata item we're processing.
+    metadata_iterator: Iterator[Video_Metadata] = iter(metadata)
+
+    metadata_item: Optional[Video_Metadata] = None
+    chapter_info: Optional[Chapter] = None
     for line in command_result.stderr.splitlines():
         if search("^Input #", line) is not None:
-            # If filename was not yet appended then it means it is a corrupt file, in that case just add to list for
+            # If filename was not yet appended then it means it is a corrupt file, in
+            # that case just add to list for
             # but identify not to include for processing
             metadata_item = next(metadata_iterator)
-
-            input_counter += 1
-            video_timestamp = None
-            wait_for_input_line = False
+            chapter_info = None
             continue
 
-        if wait_for_input_line:
+        if metadata_item is None:
             continue
 
-        if search("^ *creation_time ", line) is not None:
-            line_split = line.split(":", 1)
-            video_timestamp = datetime.strptime(
-                line_split[1].strip(), "%Y-%m-%dT%H:%M:%S.%f%z"
+        # Are we processing chapters?
+        if chapter_info:
+            if search(r"^\s*Chapter #\d+:", line) is not None:
+                if (
+                    chapter_match := search(r"start ([\d\.]+), end ([\d\.]+)", line)
+                ) is not None:
+                    chapter_info.start = float(chapter_match.group(1))
+                    chapter_info.end = float(chapter_match.group(2))
+                continue
+
+            if search(r"^\s*Metadata:", line) is not None:
+                # Metadata line, we can skip it.
+                continue
+
+            # Title of the chapter
+            if (title_match := search(r"^\s*title\s*:\s*(.+)", line)) is not None:
+                chapter_info.title = title_match.group(1).strip()
+
+                # And this is the last item so we can append it.
+                metadata_item.add_chapter(chapter_info)
+                chapter_info = None
+                continue
+
+        # Start of chapters in the video metadata
+        if search(r"^\s*Chapters:", line) is not None:
+            chapter_info = Chapter()
+            continue
+
+        # If we're here then we're done processing chapters.
+        chapter_info = None
+
+        # Creation time of the video
+        if (
+            match_videotime := search(r"^\s*creation_time\s*:\s*(.+)", line)
+        ) is not None:
+            parsed_time = datetime.strptime(
+                match_videotime.group(1).strip(), "%Y-%m-%dT%H:%M:%S.%f%z"
+            ).astimezone(timezone.utc)
+            _LOGGER.debug(
+                f"Parsed clip timestamp: {parsed_time}, tzinfo: {parsed_time.tzinfo}"
             )
+            metadata_item.timestamp = parsed_time
             continue
 
+        # Title of the video
+        if (match_title := search(r"^\s*title\s*:\s*(.+)", line)) is not None:
+            metadata_item.title = match_title.group(1).strip()
+            continue
+
+        # Duration of the video
         if search("^ *Duration: ", line) is not None:
             line_split = line.split(",")
             line_split = line_split[0].split(":", 1)
             duration_list = line_split[1].split(":")
-            duration = (
-                int(duration_list[0]) * 60 * 60
-                + int(duration_list[1]) * 60
-                + int(duration_list[2].split(".")[0])
-                + (float(duration_list[2].split(".")[1]) / 100)
-            )
-            # File will only be processed if duration is greater then 0
-            include = duration > 0
-
-            if video_timestamp is None:
+            try:
+                hours = int(duration_list[0])
+                minutes = int(duration_list[1])
+                seconds = float(duration_list[2])
+                metadata_item.duration = hours * 3600 + minutes * 60 + seconds
+            except ValueError:
                 _LOGGER.warning(
-                    f"Did not find a creation_time in metadata for "
-                    f"file {metadata_item['filename']}"
+                    "Duration in file %s contains invalid data and "
+                    "will be excluded: %s",
+                    metadata_item.filename,
+                    line_split,
+                )
+            else:
+                # File will only be processed if duration is greater then 0
+                metadata_item.include = metadata_item.duration > 0
+
+            if metadata_item.timestamp is None:
+                _LOGGER.warning(
+                    "Did not find a creation_time in metadata for file %s",
+                    metadata_item.filename,
+                )
+            continue
+
+        # Get the stream info which contains codec, resolution, and fps.
+        # First check if this is a stream line.
+        if (
+            search(
+                r"^\s*Stream\s+#\d+:0",
+                line,
+            )
+        ) is not None:
+            # 1. Video codec
+            if m := search(r"Video:\s*(\w+)", line):
+                metadata_item.video_codec = m.group(1)
+
+            # 2. Width and height
+            if m := search(r"Video:.*,\s*(\d+)x(\d+)\s*[,|\[]", line):
+                metadata_item.width, metadata_item.height = (
+                    int(m.group(1)),
+                    int(m.group(2)),
                 )
 
-            metadata_item.update(
-                {"timestamp": video_timestamp, "duration": duration, "include": include}
-            )
+            # 3. DAR (Display Aspect Ratio)
+            if m := search(r"DAR\s*([0-9:]+)", line):
+                metadata_item.dar = m.group(1)
 
-            wait_for_input_line = True
+            # 4. FPS
+            if m := search(r"([\d.]+)\s*fps", line):
+                metadata_item.fps = float(m.group(1) or 24.0)
 
     return metadata
 
 
 def create_intermediate_movie(
-    event_info: Event, clip_info: Clip, folder_timestamps, video_settings, clip_number
-):
-    """ Create intermediate movie files. This is the merging of the 3 camera
+    event_info: Event,
+    clip_info: Clip,
+    folder_timestamps: tuple[datetime, datetime],
+    video_settings: dict[str, Any],
+    clip_number: int,
+) -> bool:
+    """Create intermediate movie files. This is the merging of the camera
 
-    video files into 1 video file. """
-    # We first stack (combine the 3 different camera video files into 1
+    video files into 1 video file."""
+    # We first stack (combine the different camera video files into 1
     # and then we concatenate.
-    front_camera = None
-    left_camera = None
-    right_camera = None
-    rear_camera = None
+    clip_filenames: dict[str, str] = {}
+    video_layout: MovieLayout = video_settings["video_layout"]
 
+    # Loop through the camera clips and get the filenames.
     for camera_name, camera_info in clip_info.cameras:
-        if camera_info.include:
-            camera_filename = os.path.join(event_info.folder, camera_info.filename)
-            if camera_name == "Front":
-                front_camera = camera_filename
-            elif camera_name == "Left":
-                left_camera = camera_filename
-            elif camera_name == "Right":
-                right_camera = camera_filename
-            elif camera_name == "Rear":
-                rear_camera = camera_filename
+        camera_filename = os.path.join(event_info.folder, camera_info.filename)
+        clip_filenames.update({camera_name: camera_filename})
 
-    if (
-        front_camera is None
-        and left_camera is None
-        and right_camera is None
-        and rear_camera is None
-    ):
+        # The ratio can be different, so we'll be storing the largest one we can find.
+        # For example, on Model 3 Highlander the front camera is 2896x1876 instead of
+        # 1280x960 hence ratio is about 4/2.65 instead of 4/3.
+        camera_element: Camera = video_layout.cameras(camera_name)
+        if (
+            camera_element.clip_ratio is not None
+            and camera_element.clip_ratio < camera_info.ratio
+        ):
+            camera_element.clip_ratio = camera_info.ratio
+
+    if len(clip_filenames) == 0:
         _LOGGER.debug(
-            f"No valid front, left, right, and rear camera clip exist for "
-            f'{clip_info.timestamp.astimezone(get_localzone()).strftime("%Y-%m-%dT%H-%M-%S")}'
+            "No valid front, left, right, left-pillar, right-pillar, and rear camera "
+            "clip exist for %s",
+            clip_info.timestamp.astimezone(get_localzone()).strftime(
+                "%Y-%m-%dT%H-%M-%S"
+            ),
         )
         return True
 
-    if video_settings["video_layout"].swap_left_right:
-        left_camera, right_camera = right_camera, left_camera
-
-    if video_settings["video_layout"].swap_front_rear:
-        front_camera, rear_camera = rear_camera, front_camera
-
-    # Determine if this clip is to be included based on potential start and end timestamp/offsets that were provided.
+    # Determine if this clip is to be included based on potential start and end
+    # timestamp/offsets that were provided.
     # Clip starting time is between the start&end times we're looking for
     # or Clip end time is between the start&end time we're looking for.
     # or Starting time is between start&end clip time
     # or End time is between start&end clip time
-    starting_timestamp = clip_info.start_timestamp
-    ending_timestamp = clip_info.end_timestamp
+    starting_timestamp: datetime = clip_info.start_timestamp
+    ending_timestamp: datetime = clip_info.end_timestamp
     if not (
         folder_timestamps[0] <= starting_timestamp <= folder_timestamps[1]
         or folder_timestamps[0] <= ending_timestamp <= folder_timestamps[1]
@@ -1782,14 +2837,17 @@ def create_intermediate_movie(
     ):
         # This clip is not in-between the timestamps we want, skip it.
         _LOGGER.debug(
-            f"Clip timestamp from {starting_timestamp} to {ending_timestamp} not "
-            f"between {folder_timestamps[0]} and {folder_timestamps[1]}"
+            "Clip timestamp from %s to %s not between %s and %s",
+            starting_timestamp,
+            ending_timestamp,
+            folder_timestamps[0],
+            folder_timestamps[1],
         )
         return True
 
     # Determine if we need to do an offset of the starting timestamp
-    ffmpeg_offset_command = []
-    clip_duration = clip_info.duration
+    ffmpeg_offset_command: list[str] = []
+    clip_duration: float = clip_info.duration
 
     # This clip falls in between the start and end timestamps to include.
     # Set offsets if required
@@ -1800,8 +2858,8 @@ def create_intermediate_movie(
         clip_duration = (ending_timestamp - starting_timestamp).total_seconds()
         ffmpeg_offset_command = ["-ss", str(starting_offset)]
         _LOGGER.debug(
-            f"Clip start offset by {starting_offset} seconds due to start timestamp "
-            f"requested."
+            "Clip start offset by %d seconds due to start timestamp requested.",
+            starting_offset,
         )
 
     # Adjust duration if end of clip's timestamp is after ending timestamp we need.
@@ -1811,105 +2869,96 @@ def create_intermediate_movie(
         clip_duration = (ending_timestamp - starting_timestamp).total_seconds()
         ffmpeg_offset_command += ["-t", str(clip_duration)]
         _LOGGER.debug(
-            f"Clip duration reduced from {prev_clip_duration} "
-            f"to {clip_duration} seconds due to end timestamp requested."
+            "Clip duration reduced from %d to %d seconds due to end timestamp "
+            "requested.",
+            prev_clip_duration,
+            clip_duration,
         )
 
     # Make sure our duration does not end up with 0, if it does then do not continue.
-    if clip_duration <= 0:
+    if int(clip_duration) <= 0:
         _LOGGER.debug(
-            f"Clip duration is {clip_duration}, not processing as no valid video."
+            "Clip duration is %d, not processing as no valid video.",
+            clip_duration,
         )
         return True
 
-    # Confirm if files exist, if not replace with nullsrc
-    input_count = 0
-    if left_camera is not None:
-        ffmpeg_left_command = ffmpeg_offset_command + ["-i", left_camera]
-        ffmpeg_left_camera = (
-            ";[" + str(input_count) + ":v] " + video_settings["left_camera"]
-        )
-        input_count += 1
-    else:
-        ffmpeg_left_command = []
-        ffmpeg_left_camera = (
-            video_settings["background"].format(
-                duration=clip_duration,
-                speed=video_settings["movie_speed"],
-                width=video_settings["video_layout"].cameras("Left").width,
-                height=video_settings["video_layout"].cameras("Left").height,
-            )
-            + "[left]"
-            if video_settings["video_layout"].cameras("Left").include
-            else ""
-        )
+    ffmpeg_camera_commands: list[str] = []
+    ffmpeg_camera_filters: list[str] = []
+    ffmpeg_camera_positions: list[str] = []
 
-    if front_camera is not None:
-        ffmpeg_front_command = ffmpeg_offset_command + ["-i", front_camera]
-        ffmpeg_front_camera = (
-            ";[" + str(input_count) + ":v] " + video_settings["front_camera"]
-        )
-        input_count += 1
-    else:
-        ffmpeg_front_command = []
-        ffmpeg_front_camera = (
-            video_settings["background"].format(
-                duration=clip_duration,
-                speed=video_settings["movie_speed"],
-                width=video_settings["video_layout"].cameras("Front").width,
-                height=video_settings["video_layout"].cameras("Front").height,
-            )
-            + "[front]"
-            if video_settings["video_layout"].cameras("Front").include
-            else ""
-        )
+    # Inform the layout of the current event as this will be used to determine if
+    # clips should be included or not.
+    video_layout.event = event_info
 
-    if right_camera is not None:
-        ffmpeg_right_command = ffmpeg_offset_command + ["-i", right_camera]
-        ffmpeg_right_camera = (
-            ";[" + str(input_count) + ":v] " + video_settings["right_camera"]
-        )
-        input_count += 1
-    else:
-        ffmpeg_right_command = []
-        ffmpeg_right_camera = (
-            video_settings["background"].format(
-                duration=clip_duration,
-                speed=video_settings["movie_speed"],
-                width=video_settings["video_layout"].cameras("Right").width,
-                height=video_settings["video_layout"].cameras("Right").height,
-            )
-            + "[right]"
-            if video_settings["video_layout"].cameras("Right").include
-            else ""
-        )
+    black_base = "color=duration={duration}:"
+    black_size = (
+        f"s={{width}}x{{height}}:c={video_layout.background_color}, "
+        f"fps={str(video_settings['fps'])} "
+    )
+    ffmpeg_black_video = ";" + black_base + black_size
 
-    if rear_camera is not None:
-        ffmpeg_rear_command = ffmpeg_offset_command + ["-i", rear_camera]
-        ffmpeg_rear_camera = (
-            ";[" + str(input_count) + ":v] " + video_settings["rear_camera"]
-        )
-        input_count += 1
-    else:
-        ffmpeg_rear_command = []
-        ffmpeg_rear_camera = (
-            video_settings["background"].format(
-                duration=clip_duration,
-                speed=video_settings["movie_speed"],
-                width=video_settings["video_layout"].cameras("Rear").width,
-                height=video_settings["video_layout"].cameras("Rear").height,
-            )
-            + "[rear]"
-            if video_settings["video_layout"].cameras("Rear").include
-            else ""
-        )
+    # Always starting from base.
+    input_clip: str = "base"
+    camera: str = ""
+    input_counter: int = 0
+    for camera in video_layout.clip_order:
+        # Is this camera to be included?
+        camera_element = video_layout.cameras(camera)
+        if camera_element.include:
+            # We have a camera clip for this camera, use it.
+            if (clip_filename := clip_filenames.get(camera)) is None:
+                # We do not have a camera clip for this camera, use background instead.
+                ffmpeg_camera_filters.append(
+                    ffmpeg_black_video.format(
+                        duration=clip_duration,
+                        speed=video_settings["movie_speed"],
+                        width=camera_element.width,
+                        height=camera_element.height,
+                    )
+                    + f"[{camera}]"
+                )
+                ffmpeg_camera_positions.append(
+                    f";[{input_clip}][{camera}]"
+                    + " overlay=eof_action=pass:repeatlast=0"
+                    + f":x={str(camera_element.xpos)}"
+                    + f":y={str(camera_element.ypos)}, setsar=1"
+                    + f" [{camera}1]"
+                )
+                input_clip = f"{camera}1"
+            else:
+                # Got a valid clip for this camera and to be included
+                ffmpeg_camera_commands.extend(
+                    ffmpeg_offset_command + ["-i", clip_filename]
+                )
+                ffmpeg_camera_filters.append(
+                    ";["
+                    + str(input_counter)
+                    + ":v] "
+                    + "setpts=PTS-STARTPTS, setsar=1, "
+                    + f"scale={camera_element.scale_width}x"
+                    + f"{camera_element.scale_height}"
+                    + f"{camera_element.mirror_text}"
+                    + f"{camera_element.options}"
+                    + f" [{camera}]"
+                )
+                input_counter += 1
 
-    local_timestamp = clip_info.timestamp.astimezone(get_localzone())
+                ffmpeg_camera_positions.append(
+                    f";[{input_clip}][{camera}]"
+                    + " overlay=eof_action=pass:repeatlast=0"
+                    + f":x={str(camera_element.xpos)}"
+                    + f":y={str(camera_element.ypos)}"
+                    + f" [{camera}1]"
+                )
+                input_clip = f"{camera}1"
+
+    local_timestamp: datetime = clip_info.timestamp.astimezone(get_localzone())
 
     # Check if target video file exist if skip existing.
-    file_already_exist = False
+    file_already_exist: bool = False
     if video_settings["skip_existing"]:
-        temp_movie_name = (
+        temp_movie_name: str = (
             os.path.join(
                 video_settings["target_folder"],
                 local_timestamp.strftime("%Y-%m-%dT%H-%M-%S"),
@@ -1934,19 +2983,23 @@ def create_intermediate_movie(
 
         if file_already_exist:
             print(
-                f"{get_current_timestamp()}\t\tSkipping clip {clip_number + 1}/{event_info.count} from "
-                f"{local_timestamp.strftime('%x %X')} and {int(clip_duration)} seconds as it already exist."
+                f"{get_current_timestamp()}\t\tSkipping clip {clip_number + 1}/"
+                f"{event_info.count} from {local_timestamp.strftime('%x %X')} and "
+                f"{int(clip_duration)} seconds as it already exist."
             )
             clip_info.filename = temp_movie_name
             clip_info.start_timestamp = starting_timestamp
             clip_info.end_timestamp = ending_timestamp
-            # Get actual duration of our new video, required for chapters when concatenating.
+            # Get actual duration of our new video, required for chapters when
+            # concatenating.
             metadata = get_metadata(video_settings["ffmpeg_exec"], [temp_movie_name])
-            clip_info.duration = metadata[0]["duration"] if metadata else None
+            if metadata:
+                clip_info.duration = metadata[0].duration
+                clip_info.video_metadata = metadata[0]
 
             return True
     else:
-        target_folder = (
+        target_folder: str = (
             video_settings["temp_dir"]
             if not video_settings["keep_intermediate"]
             and video_settings["temp_dir"] is not None
@@ -1957,157 +3010,188 @@ def create_intermediate_movie(
         )
 
     print(
-        f"{get_current_timestamp()}\t\tProcessing clip {clip_number + 1}/{event_info.count} from "
-        f"{local_timestamp.strftime('%x %X')} and {int(clip_duration)} seconds long."
+        f"{get_current_timestamp()}\t\tProcessing clip {clip_number + 1}/"
+        f"{event_info.count} from {local_timestamp.strftime('%x %X')} and "
+        f"{int(clip_duration)} seconds long."
     )
 
-    starting_epoch_timestamp = int(starting_timestamp.timestamp())
+    starting_epoch_timestamp: int = int(starting_timestamp.timestamp())
 
-    ffmpeg_text = video_settings["ffmpeg_text_overlay"]
-    user_formatted_text = video_settings["text_overlay_format"]
+    ffmpeg_text: str = video_settings["ffmpeg_text_overlay"].format(
+        input_clip=input_clip
+    )
+    user_formatted_text: str = video_settings["text_overlay_format"]
     user_timestamp_format = video_settings["timestamp_format"]
-    ffmpeg_user_timestamp_format = user_timestamp_format.replace(":", "\\\:")
+    ffmpeg_user_timestamp_format = user_timestamp_format.replace(":", r"\\\:")
 
     # Replace variables in user provided text overlay
-    replacement_strings = {
+    replacement_strings: dict[str, str | float] = {
         "start_timestamp": starting_timestamp.astimezone(get_localzone()).strftime(
             user_timestamp_format
         ),
         "end_timestamp": ending_timestamp.astimezone(get_localzone()).strftime(
             user_timestamp_format
         ),
-        "local_timestamp_rolling": f"%{{pts:localtime:{starting_epoch_timestamp}:{ffmpeg_user_timestamp_format}}}",
+        "local_timestamp_rolling": (
+            f"%{{pts\\:localtime\\:{starting_epoch_timestamp}\\:"
+            f"{ffmpeg_user_timestamp_format}}}"
+        ),
         "event_timestamp_countdown": "n/a",
         "event_timestamp_countdown_rolling": "n/a",
         "event_timestamp": "n/a",
         "event_city": "n/a",
+        "event_street": "n/a",
         "event_reason": "n/a",
         "event_latitude": 0.0,
         "event_longitude": 0.0,
     }
 
-    if event_info.metadata.get("event_timestamp") is not None:
-        event_epoch_timestamp = int(event_info.metadata["event_timestamp"].timestamp())
+    if event_info.event_metadata.timestamp:
+        event_epoch_timestamp = int(event_info.timestamp.timestamp())
         replacement_strings["event_timestamp"] = (
-            event_info.metadata["event_timestamp"]
-            .astimezone(get_localzone())
-            .strftime(user_timestamp_format)
+            event_info.event_metadata.timestamp.astimezone(get_localzone()).strftime(
+                user_timestamp_format
+            )
         )
 
         # Calculate the time until the event
         replacement_strings["event_timestamp_countdown"] = (
             starting_epoch_timestamp - event_epoch_timestamp
         )
-        replacement_strings[
-            "event_timestamp_countdown_rolling"
-        ] = "%{{pts:hms:{event_timestamp_countdown}}}".format(
-            event_timestamp_countdown=replacement_strings["event_timestamp_countdown"]
+        replacement_strings["event_timestamp_countdown_rolling"] = (
+            f"%{{pts\\:hms\\:{replacement_strings['event_timestamp_countdown']}}}"
         )
 
-    replacement_strings["event_city"] = event_info.metadata.get("city") or "n/a"
-    replacement_strings["event_reason"] = event_info.metadata.get("reason") or "n/a"
-    replacement_strings["event_latitude"] = event_info.metadata.get("latitude") or 0.0
-    replacement_strings["event_longitude"] = event_info.metadata.get("longitude") or 0.0
+    replacement_strings["event_city"] = event_info.event_metadata.city or "n/a"
+    replacement_strings["event_street"] = event_info.event_metadata.street or "n/a"
+    replacement_strings["event_reason"] = event_info.event_metadata.reason or "n/a"
+    replacement_strings["event_latitude"] = event_info.event_metadata.latitude or 0.0
+    replacement_strings["event_longitude"] = event_info.event_metadata.longitude or 0.0
 
     try:
         # Try to replace strings!
         user_formatted_text = user_formatted_text.format(**replacement_strings)
     except KeyError as e:
-        user_formatted_text = "Bad string format: Invalid variable {stderr}".format(
-            stderr=str(e)
-        )
+        user_formatted_text = f"Bad string format: Invalid variable {str(e)}"
         _LOGGER.warning(user_formatted_text)
 
     # Escape characters ffmpeg needs
-    user_formatted_text = user_formatted_text.replace(":", "\:")
+    user_formatted_text = escape_drawtext_literals(user_formatted_text)
     user_formatted_text = user_formatted_text.replace("\\n", os.linesep)
 
     ffmpeg_text = ffmpeg_text.replace("__USERTEXT__", user_formatted_text)
 
-    ffmpeg_filter = (
-        video_settings["base"].format(
-            duration=clip_duration, speed=video_settings["movie_speed"]
+    ffmpeg_base: str = (
+        black_base
+        + black_size.format(
+            width=video_layout.video_width, height=video_layout.video_height
         )
-        + ffmpeg_left_camera
-        + ffmpeg_front_camera
-        + ffmpeg_right_camera
-        + ffmpeg_rear_camera
-        + video_settings["clip_positions"]
-        + ffmpeg_text
-        + video_settings["ffmpeg_speed"]
-        + video_settings["ffmpeg_motiononly"]
-        + video_settings["ffmpeg_hwupload"]
+        + "[base]"
     )
 
-    title_timestamp = (
+    ffmpeg_filter: str = ffmpeg_base.format(
+        duration=clip_duration, speed=video_settings["movie_speed"]
+    )
+
+    # Add the respective camera filters.
+    for ffmpeg_camera_filter in ffmpeg_camera_filters:
+        ffmpeg_filter += ffmpeg_camera_filter
+
+    # Add the respective camera positions.
+    ffmpeg_position: str = ""
+    for ffmpeg_camera_position in ffmpeg_camera_positions:
+        ffmpeg_position += ffmpeg_camera_position
+
+    ffmpeg_filter += (
+        ffmpeg_position
+        + ffmpeg_text
+        + video_settings["ffmpeg_speed"].format(input_clip=input_clip)
+        + video_settings["ffmpeg_motiononly"].format(input_clip=input_clip)
+        + video_settings["ffmpeg_hwupload"].format(input_clip=input_clip)
+    )
+
+    title_timestamp: str = str(
         replacement_strings["event_timestamp"]
-        if event_info.metadata.get("reason") == "SENTRY"
+        if event_info.event_metadata.reason == "SENTRY"
         and replacement_strings["event_timestamp"] != "n/a"
         else replacement_strings["start_timestamp"]
     )
-    title = (
+    title: str = (
         f"{replacement_strings['event_reason']}: {title_timestamp}"
         if replacement_strings["event_reason"] != "n/a"
         else title_timestamp
     )
 
-    ffmpeg_metadata = [
+    ffmpeg_metadata: list[str] = [
         "-metadata",
-        f"creation_time={starting_timestamp.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.000000Z')}",
+        f"creation_time={
+            starting_timestamp.astimezone(timezone.utc).strftime(
+                '%Y-%m-%dT%H:%M:%S.000000Z'
+            )
+        }",
         "-metadata",
         f"description=Created by tesla_dashcam {VERSION_STR}",
         "-metadata",
         f"title={title}",
     ]
 
-    ffmpeg_command = (
+    ffmpeg_command: list[str] = (
         [video_settings["ffmpeg_exec"]]
         + ["-loglevel", "info"]
         + video_settings["ffmpeg_hwdev"]
         + video_settings["ffmpeg_hwout"]
-        + ffmpeg_left_command
-        + ffmpeg_front_command
-        + ffmpeg_right_command
-        + ffmpeg_rear_command
-        + ["-filter_complex", ffmpeg_filter]
+    )
+
+    ffmpeg_command.extend(ffmpeg_camera_commands)
+
+    ffmpeg_command += (
+        ["-filter_complex", ffmpeg_filter]
         + ["-map", f"[{video_settings['input_clip']}]"]
         + video_settings["other_params"]
         + ffmpeg_metadata
     )
 
     ffmpeg_command = ffmpeg_command + ["-y", temp_movie_name]
-    _LOGGER.debug(f"FFMPEG Command: {ffmpeg_command}")
+    _LOGGER.debug("FFMPEG Command: %s", ffmpeg_command)
+
     # Run the command.
     try:
-        ffmpeg_output = run(
-            ffmpeg_command, capture_output=True, check=True, universal_newlines=True
-        )
+        ffmpeg_output = run(ffmpeg_command, capture_output=True, check=True, text=True)
     except CalledProcessError as exc:
         print(
             f"{get_current_timestamp()}\t\t\tError trying to create clip for "
-            f"{os.path.join(event_info.folder, local_timestamp.strftime('%Y-%m-%dT%H-%M-%S') + '.mp4')}."
+            f"{
+                os.path.join(
+                    event_info.folder,
+                    local_timestamp.strftime('%Y-%m-%dT%H-%M-%S') + '.mp4',
+                )
+            }."
             f"RC: {exc.returncode}\n"
             f"{get_current_timestamp()}\t\t\tCommand: {exc.cmd}\n"
             f"{get_current_timestamp()}\t\t\tError: {exc.stderr}\n\n"
         )
         return False
-    _LOGGER.debug("FFMPEG output:\n %s", ffmpeg_output.stdout)
-    _LOGGER.debug("FFMPEG error output:\n %s", ffmpeg_output.stderr)
+    if FFMPEG_DEBUG:
+        _LOGGER.debug("FFMPEG output:\n %s", ffmpeg_output.stdout)
+        _LOGGER.debug("FFMPEG stderr output:\n %s", ffmpeg_output.stderr)
 
     clip_info.filename = temp_movie_name
     clip_info.start_timestamp = starting_timestamp
     clip_info.end_timestamp = ending_timestamp
     # Get actual duration of our new video, required for chapters when concatenating.
-    metadata = get_metadata(video_settings["ffmpeg_exec"], [temp_movie_name])
-    clip_info.duration = metadata[0]["duration"] if metadata else None
+    if metadata := get_metadata(video_settings["ffmpeg_exec"], [temp_movie_name]):
+        clip_info.duration = metadata[0].duration
+        clip_info.video_metadata = metadata[0]
 
     return True
 
 
-def create_title_screen(events, video_settings):
-    """ Create a map centered around the event """
-    _LOGGER.debug(f"Creating map based on {len(events)}")
-    if events == None or len(events) == 0:
+def create_title_screen(
+    events: list[Event], video_settings: dict[str, Any]
+) -> Image | None:
+    """Create a map centered around the event"""
+    _LOGGER.debug("Creating map based on %d event.", len(events))
+    if len(events) == 0:
         _LOGGER.debug("No events provided to create map for.")
         return None
 
@@ -2116,32 +3200,41 @@ def create_title_screen(events, video_settings):
         video_settings["video_layout"].video_height,
     )
 
-    coordinates = []
+    coordinates: list[tuple[float, float]] = []
     for event in events:
-        if (
-            event.metadata.get("longitude") is None
-            or event.metadata.get("latitude") is None
-        ):
+        if not event.event_metadata.longitude or not event.event_metadata.latitude:
             continue
 
         try:
-            lon = float(event.metadata["longitude"])
-            lat = float(event.metadata["latitude"])
-        except:
+            lon: float = float(event.event_metadata.longitude)
+        except (ValueError, TypeError) as exc:
             _LOGGER.debug(
-                f"Error trying to convert {event.metadata['longitude']} or {event.metadata['latitude']} into a float"
+                "Error trying to convert longitude (%s) into a float. exc: %s",
+                event.event_metadata.longitude,
+                exc,
             )
             continue
 
-        # Sometimes event info has a very small (i.e. 2.35754e-311) or 0 value, we ignore if both are 0.
+        try:
+            lat: float = float(event.event_metadata.latitude)
+        except (ValueError, TypeError) as exc:
+            _LOGGER.debug(
+                "Error trying to convert latitude (%s) into a float. exc: %s",
+                event.event_metadata.latitude,
+                exc,
+            )
+            continue
+
+        # Sometimes event info has a very small (i.e. 2.35754e-311) or 0 value, we
+        # ignore if both are 0.
         # 0,0 is in the ocean near Africa.
         if round(lon, 5) == 0 and round(lat, 5) == 0:
             _LOGGER.debug(
-                f"Skipping as longitude {lon} and/or latidude {lat} are invalid."
+                "Skipping as longitude %s and/or latidude %s are invalid.", lon, lat
             )
             continue
 
-        coordinate = [lon, lat]
+        coordinate: tuple[float, float] = (lon, lat)
         coordinates.append(coordinate)
 
         # Add marker for each point
@@ -2166,37 +3259,56 @@ def create_title_screen(events, video_settings):
 
 
 def create_movie(
-    movie, event_info, movie_filename, video_settings, chapter_offset, title_screen_map
+    movie: Event | Movie,
+    event_info: list[Event],
+    movie_filename: str,
+    video_settings: dict[str, Any],
+    chapter_offset: int,
+    title_screen_map: bool,
 ):
-    """ Concatenate provided movie files into 1."""
+    """Concatenate provided movie files into 1."""
     # Just return if there are no clips.
     if movie.count <= 0:
-        _LOGGER.debug(f"Movie list is empty")
-        return True
+        _LOGGER.debug("Movie list is empty")
+        return False
 
-    title_video_filename = None
+    # Determine the scale of the video, for now this is based on the largest video
+    # in the list.
+    movie_scale = SimpleNamespace(
+        width=video_settings["video_layout"].video_width,
+        height=video_settings["video_layout"].video_height,
+    )
+    movie_scale.width = movie.width
+    movie_scale.height = movie.height
+
+    title_video_filename: str | None = None
+    title_image_filename: str | None = None
+    file_content: list[SimpleNamespace] = []
+    meta_start: int = 0
+    total_videoduration: int = 0
+    ffmpeg_params: list[str] = []
     if title_screen_map:
-        title_image = create_title_screen(
-            events=event_info, video_settings=video_settings
-        )
-
-        title_image_filename = None
-        if title_image is not None:
+        if (
+            title_image := create_title_screen(
+                events=event_info, video_settings=video_settings
+            )
+        ) is not None:
             _, title_image_filename = mkstemp(suffix=".png", text=False)
 
             try:
                 title_image.save(title_image_filename)
             except (ValueError, OSError) as exc:
                 print(
-                    f"{get_current_timestamp()}\t\t\tError trying to save title image. RC: {str(exc)}"
+                    f"{get_current_timestamp()}\t\t\tError trying to save title image. "
+                    f"RC: {str(exc)}"
                 )
                 title_image_filename = None
             else:
-                _LOGGER.debug(f"Title image saved to {title_image_filename}")
+                _LOGGER.debug("Title image saved to %s", title_image_filename)
 
         if title_image_filename is not None:
             _, title_video_filename = mkstemp(suffix=".mp4", text=False)
-            _LOGGER.debug(f"Creating movie for title image to {title_video_filename}")
+            _LOGGER.debug("Creating movie for title image to %s", title_video_filename)
             ffmpeg_params = [
                 "-loop",
                 "1",
@@ -2209,12 +3321,12 @@ def create_movie(
                 title_image_filename,
                 "-vf",
                 f"fps={video_settings['fps']},"
-                f"scale={video_settings['video_layout'].video_width}x{video_settings['video_layout'].video_height}",
-                #                "-pix_fmt",
-                #                "yuv420p",
+                f"scale={movie_scale.width}x{movie_scale.height}",
+                "-pix_fmt",
+                "yuv420p",
             ]
 
-            ffmpeg_command = (
+            ffmpeg_command: list[str] = (
                 [video_settings["ffmpeg_exec"]]
                 + ["-loglevel", "info"]
                 + video_settings["ffmpeg_hwdev"]
@@ -2225,74 +3337,96 @@ def create_movie(
 
             ffmpeg_command = ffmpeg_command + ["-y", title_video_filename]
 
-            _LOGGER.debug(f"FFMPEG Command: {ffmpeg_command}")
+            _LOGGER.debug("FFMPEG Command: %s", ffmpeg_command)
             try:
                 ffmpeg_output = run(
                     ffmpeg_command,
                     capture_output=True,
                     check=True,
-                    universal_newlines=True,
+                    text=True,
                 )
             except CalledProcessError as exc:
                 print(
-                    f"{get_current_timestamp()}\t\t\tError trying to create title clip. RC: {exc.returncode}\n"
+                    f"{get_current_timestamp()}\t\t\tError trying to create title clip."
+                    f" RC: {exc.returncode}\n"
                     f"{get_current_timestamp()}\t\t\tCommand: {exc.cmd}\n"
                     f"{get_current_timestamp()}\t\t\tError: {exc.stderr}\n\n"
                 )
                 title_video_filename = None
 
-                # Now remove the title image
-                try:
-                    os.remove(title_image_filename)
-                except:
-                    _LOGGER.debug(f"Failed to remove {title_image_filename}")
-                    pass
             else:
-                _LOGGER.debug("FFMPEG output:\n %s", ffmpeg_output.stdout)
-                _LOGGER.debug("FFMPEG error output:\n %s", ffmpeg_output.stderr)
+                if FFMPEG_DEBUG:
+                    _LOGGER.debug("FFMPEG output:\n %s", ffmpeg_output.stdout)
+                    _LOGGER.debug("FFMPEG stderr output:\n %s", ffmpeg_output.stderr)
+                file_content = [
+                    SimpleNamespace(
+                        filename=title_video_filename,
+                        width=movie_scale.width,
+                        height=movie_scale.height,
+                    )
+                ]
+                total_videoduration += 3 * 1000000000
+                meta_start += 3 * 1000000000 + 1
 
-    # Go through the list of clips to create the command and content for chapter meta file.
-    total_clips = 0
-    meta_content = ""
-    file_content = ""
-    meta_start = 0
-    total_videoduration = 0
-    start_timestamp = None
-    end_timestamp = None
+            # Now remove the title image
+            try:
+                os.remove(title_image_filename)
+            except (OSError, IOError):
+                _LOGGER.debug("Failed to remove %s", title_image_filename)
+
+    # Go through the list of clips to create the command and content for
+    # chapter meta file.
+    total_clips: int = 0
+    meta_content: str = ""
+    start_timestamp: datetime = datetime.max.replace(tzinfo=get_localzone())
+    end_timestamp: datetime = datetime.min.replace(tzinfo=get_localzone())
     chapter_offset = chapter_offset * 1000000000
-
-    if title_video_filename:
-        file_content = (
-            f"file 'file:{title_video_filename.replace(os.sep, '/')}'{os.linesep}"
-        )
-        total_videoduration += 3 * 1000000000
-        meta_start += 3 * 1000000000 + 1
+    complex_concat: bool = False
+    ffmpeg_params = []
 
     # Loop through the list sorted by video timestamp.
-    for movie_item in movie.sorted:
-        video_clip = movie.item(movie_item)
+    for video_clip in movie.items_sorted:
         # Check that this item was included for processing or not.
         if video_clip.filename is None:
             continue
 
         if not os.path.isfile(video_clip.filename):
             print(
-                f"{get_current_timestamp()}\t\tFile {video_clip.filename} does not exist anymore, skipping."
+                f"{get_current_timestamp()}\t\tFile {video_clip.filename} does not "
+                "exist anymore, skipping."
             )
             continue
         _LOGGER.debug(
-            f"Video file {video_clip.filename} will be added to " f"{movie_filename}"
+            "Video file %s will be added to %s", video_clip.filename, movie_filename
         )
-        # Add this file in our join list.
-        # NOTE: Recent ffmpeg changes requires Windows paths in this file to look like
-        # file 'file:<actual path>'
-        # https://trac.ffmpeg.org/ticket/2702
-        file_content = (
-            file_content
-            + f"file 'file:{video_clip.filename.replace(os.sep, '/')}'{os.linesep}"
+
+        # Check if this video has to be re-scaled.
+        if (
+            video_clip.width != movie_scale.width
+            or video_clip.height != movie_scale.height
+        ):
+            _LOGGER.debug(
+                "Video %s will be rescaled from %dx%d to %dx%d",
+                video_clip.filename,
+                video_clip.width,
+                video_clip.height,
+                movie_scale.width,
+                movie_scale.height,
+            )
+            complex_concat = True
+
+        # Add file information to our list.
+        file_content.append(
+            SimpleNamespace(
+                filename=video_clip.filename,
+                width=video_clip.width,
+                height=video_clip.height,
+            )
         )
+
         total_clips = total_clips + 1
-        title = video_clip.start_timestamp.astimezone(get_localzone())
+        title_dt: datetime = video_clip.start_timestamp.astimezone(get_localzone())
+
         # For duration need to also calculate if video was sped-up or slowed down.
         video_duration = int(video_clip.duration * 1000000000)
         total_videoduration += video_duration
@@ -2303,7 +3437,8 @@ def create_movie(
             elif chapter_offset > 0:
                 chapter_start = chapter_start + chapter_offset
 
-        # We need to add an initial chapter if our "1st" chapter is not at the beginning of the movie.
+        # We need to add an initial chapter if our "1st" chapter is not at the
+        # beginning of the movie.
         if total_clips == 1 and chapter_start > 0:
             meta_content = (
                 "[CHAPTER]{linesep}"
@@ -2320,88 +3455,74 @@ def create_movie(
             f"TIMEBASE=1/1000000000{os.linesep}"
             f"START={chapter_start}{os.linesep}"
             f"END={meta_start + video_duration}{os.linesep}"
-            f"title={title.strftime(video_settings['timestamp_format'])}{os.linesep}"
+            f"title={title_dt.strftime(video_settings['timestamp_format'])}{os.linesep}"
         )
         meta_start = meta_start + 1 + video_duration
 
-        if start_timestamp is None:
-            start_timestamp = video_clip.start_timestamp
-        else:
-            start_timestamp = (
-                video_clip.start_timestamp
-                if start_timestamp > video_clip.start_timestamp
-                else start_timestamp
-            )
+        start_timestamp = (
+            video_clip.start_timestamp
+            if start_timestamp > video_clip.start_timestamp
+            else start_timestamp
+        )
 
-        if end_timestamp is None:
-            end_timestamp = video_clip.end_timestamp
-        else:
-            end_timestamp = (
-                video_clip.end_timestamp
-                if end_timestamp < video_clip.end_timestamp
-                else end_timestamp
-            )
+        end_timestamp = (
+            video_clip.end_timestamp
+            if end_timestamp < video_clip.end_timestamp
+            else end_timestamp
+        )
 
     if total_clips == 0:
         print(f"{get_current_timestamp()}\t\tError: No valid clips to merge found.")
-        return True
+        return False
 
-    # Write out the video files file
-    ffmpeg_join_filehandle, ffmpeg_join_filename = mkstemp(suffix=".txt", text=True)
-    with os.fdopen(ffmpeg_join_filehandle, "w") as fp:
-        fp.write(file_content)
-
-    _LOGGER.debug("Video file contains:\n%s", file_content)
     # Write out the meta data file.
     meta_content = ";FFMETADATA1" + os.linesep + meta_content
-
     ffmpeg_meta_filehandle, ffmpeg_meta_filename = mkstemp(suffix=".txt", text=True)
     with os.fdopen(ffmpeg_meta_filehandle, "w") as fp:
         fp.write(meta_content)
 
     _LOGGER.debug("Meta file contains:\n%s", meta_content)
 
-    ffmpeg_params = [
-        "-f",
-        "concat",
-        "-safe",
-        "0",
-        "-i",
-        ffmpeg_join_filename,
-        "-i",
-        ffmpeg_meta_filename,
-        "-map_metadata",
-        "1",
-        "-map_chapters",
-        "1",
-    ]
     if video_settings["movflags_faststart"]:
         ffmpeg_params = ffmpeg_params + ["-movflags", "+faststart"]
 
-    ffmpeg_params = ffmpeg_params + ["-c", "copy"]
     user_timestamp_format = video_settings["timestamp_format"]
     if len(event_info) == 1:
         title_timestamp = (
             event_info[0]
-            .metadata["event_timestamp"]
-            .astimezone(get_localzone())
+            .event_metadata.timestamp.astimezone(get_localzone())
             .strftime(user_timestamp_format)
-            if event_info[0].metadata.get("reason") == "SENTRY"
-            and event_info[0].metadata.get("event_timestamp") is not None
+            if event_info[0].event_metadata.reason == "SENTRY"
+            and event_info[0].event_metadata.timestamp
             else start_timestamp.astimezone(get_localzone()).strftime(
                 user_timestamp_format
             )
         )
-        title = f"{event_info[0].metadata.get('reason', title_timestamp) or title_timestamp}: {title_timestamp}"
+        title: str = (
+            f"{event_info[0].event_metadata.reason or title_timestamp}: "
+            f"{title_timestamp}"
+        )
     else:
         title = (
-            f"{start_timestamp.astimezone(get_localzone()).strftime(user_timestamp_format)} - "
-            f"{end_timestamp.astimezone(get_localzone()).strftime(user_timestamp_format)}"
+            f"{
+                start_timestamp.astimezone(get_localzone()).strftime(
+                    user_timestamp_format
+                )
+            } - "
+            f"{
+                end_timestamp.astimezone(get_localzone()).strftime(
+                    user_timestamp_format
+                )
+            }"
         )
 
     ffmpeg_metadata = [
         "-metadata",
-        f"creation_time={start_timestamp.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.000000Z')}",
+        f"creation_time={
+            start_timestamp.astimezone(timezone.utc).strftime(
+                '%Y-%m-%dT%H:%M:%S.000000Z'
+            )
+        }",
         "-metadata",
         f"description=Created by tesla_dashcam {VERSION_STR}",
         "-metadata",
@@ -2410,24 +3531,32 @@ def create_movie(
 
     # Go through the events and add the 1st valid coordinations for location to metadata
     for event in event_info:
-
         if (
-            event.metadata.get("longitude") is None
-            or event.metadata.get("latitude") is None
+            event.event_metadata.longitude is None
+            or event.event_metadata.latitude is None
         ):
             continue
 
         try:
-            lon = float(event.metadata["longitude"])
-            lat = float(event.metadata["latitude"])
-        except:
-            pass
+            lon = float(event.event_metadata.longitude)
+            lat = float(event.event_metadata.latitude)
+        except (ValueError, TypeError) as exc:
+            _LOGGER.debug(
+                "Error trying to convert longitude/latitude (%s, %s) into a float. "
+                "exc: %s",
+                event.event_metadata.longitude,
+                event.event_metadata.latitude,
+                exc,
+            )
         else:
-            # Sometimes event info has a very small (i.e. 2.35754e-311) or 0 value, we ignore if both are 0.
+            # Sometimes event info has a very small (i.e. 2.35754e-311) or 0 value, we
+            # ignore if both are 0.
             # 0,0 is in the ocean near Africa.
             if round(lon, 5) == 0 and round(lat, 5) == 0:
                 _LOGGER.debug(
-                    f"Skipping as longitude {lon} and/or latidude {lat} are invalid."
+                    "Skipping as longitude %s and/or latidude %s are invalid.",
+                    lon,
+                    lat,
                 )
                 continue
 
@@ -2442,34 +3571,70 @@ def create_movie(
             )
             break
 
-    ffmpeg_command = (
-        [video_settings["ffmpeg_exec"]]
-        + ["-loglevel", "info"]
-        + ffmpeg_params
-        + ffmpeg_metadata
-        + ["-y", movie_filename]
-    )
-
-    _LOGGER.debug(f"FFMPEG Command: {ffmpeg_command}")
+    # Now start creating the movie.
+    movie_file_created: bool = False
     try:
-        ffmpeg_output = run(
-            ffmpeg_command, capture_output=True, check=True, universal_newlines=True
+        ffmpeg_output = create_movie_ffmpeg(
+            movie_filename=movie_filename,
+            video_settings=video_settings,
+            movie_scale=movie_scale,
+            ffmpeg_params=ffmpeg_params,
+            complex_concat=complex_concat,
+            file_content=file_content,
+            ffmpeg_meta_filename=ffmpeg_meta_filename,
+            ffmpeg_metadata=ffmpeg_metadata,
         )
-    except CalledProcessError as exc:
-        print(
-            f"{get_current_timestamp()}\t\t\tError trying to create movie {movie_filename}. RC: {exc.returncode}\n"
-            f"{get_current_timestamp()}\t\t\tCommand: {exc.cmd}\n"
-            f"{get_current_timestamp()}\t\t\tError: {exc.stderr}\n\n"
-        )
+    except CalledProcessError as outer_exc:
+        # Creation failed, if we were doing simple concat then try complex now instead.
+        if not complex_concat:
+            # Try with ffmpeg_complex instead.
+            _LOGGER.debug(
+                "Creating movie %s failed using simple concatenation, using complex "
+                "concatenation instead.",
+                movie_filename,
+            )
+            try:
+                ffmpeg_output = create_movie_ffmpeg(
+                    movie_filename=movie_filename,
+                    video_settings=video_settings,
+                    movie_scale=movie_scale,
+                    ffmpeg_params=ffmpeg_params,
+                    complex_concat=True,
+                    file_content=file_content,
+                    ffmpeg_meta_filename=ffmpeg_meta_filename,
+                    ffmpeg_metadata=ffmpeg_metadata,
+                )
+            except CalledProcessError as inner_exc:
+                print(
+                    f"{get_current_timestamp()}\t\t\tError trying to create movie "
+                    f"{movie_filename}. RC: {inner_exc.returncode}\n"
+                    f"{get_current_timestamp()}\t\t\tCommand: {inner_exc.cmd}\n"
+                    f"{get_current_timestamp()}\t\t\tError: {inner_exc.stderr}\n\n"
+                )
+            else:
+                # Using complex concatenation instead worked.
+                movie_file_created = True
+        else:
+            print(
+                f"{get_current_timestamp()}\t\t\tError trying to create movie "
+                f"{movie_filename}. RC: {outer_exc.returncode}\n"
+                f"{get_current_timestamp()}\t\t\tCommand: {outer_exc.cmd}\n"
+                f"{get_current_timestamp()}\t\t\tError: {outer_exc.stderr}\n\n"
+            )
     else:
-        _LOGGER.debug("FFMPEG output:\n %s", ffmpeg_output.stdout)
-        _LOGGER.debug("FFMPEG error output:\n %s", ffmpeg_output.stderr)
-        # Get actual duration of our new video, required for chapters when concatenating.
-        metadata = get_metadata(video_settings["ffmpeg_exec"], [movie_filename])
-        movie.duration = metadata[0]["duration"] if metadata else None
+        movie_file_created = True
+
+    # If we were able to create the movie file then get data and perform some additional
+    # post-processing.
+    if movie_file_created:
         movie.filename = movie_filename
         movie.start_timestamp = start_timestamp
         movie.end_timestamp = end_timestamp
+        # Get actual duration of our new video, required for chapters when concatenating
+        metadata = get_metadata(video_settings["ffmpeg_exec"], [movie_filename])
+        if metadata:
+            movie.duration = metadata[0].duration
+            movie.video_metadata = metadata[0]
 
         # Set the file timestamp if to be set based on timestamp event
         if video_settings["set_moviefile_timestamp"] != "RENDER":
@@ -2479,43 +3644,34 @@ def create_movie(
             elif (
                 video_settings["set_moviefile_timestamp"] == "SENTRY"
                 and len(event_info) == 1
-                and event_info[0].metadata.get("timestamp") is not None
+                and event_info[0].event_metadata.timestamp is not None
             ):
-                moviefile_timestamp = (
-                    event_info[0].metadata["timestamp"].astimezone(get_localzone())
+                moviefile_timestamp = event_info[0].event_metadata.timestamp.astimezone(
+                    get_localzone()
                 )
 
             _LOGGER.debug(
-                f"Setting timestamp for movie file {movie_filename} to "
-                f"{moviefile_timestamp.strftime('%Y-%m-%dT%H-%M-%S')}"
+                "Setting timestamp for movie file %s to %s ",
+                movie_filename,
+                moviefile_timestamp.strftime("%Y-%m-%dT%H-%M-%S"),
             )
-            moviefile_timestamp = mktime(moviefile_timestamp.timetuple())
-            os.utime(movie_filename, (moviefile_timestamp, moviefile_timestamp))
+            moviefile_unix_timestamp: float = mktime(moviefile_timestamp.timetuple())
+            os.utime(
+                movie_filename, (moviefile_unix_timestamp, moviefile_unix_timestamp)
+            )
 
     # Remove temp join file.
-    # noinspection PyBroadException,PyPep8
-    try:
-        os.remove(ffmpeg_join_filename)
-    except:
-        _LOGGER.debug(f"Failed to remove {ffmpeg_join_filename}")
-        pass
-
-    # Remove temp join file.
-    # noinspection PyBroadException,PyPep8
     try:
         os.remove(ffmpeg_meta_filename)
-    except:
-        _LOGGER.debug(f"Failed to remove {ffmpeg_meta_filename}")
-        pass
+    except (OSError, IOError) as exc:
+        _LOGGER.debug("Failed to remove %s: %s", ffmpeg_meta_filename, exc)
 
-    # Remove image video
+    # Remove title video temp file
     if title_video_filename:
-        # noinspection PyBroadException,PyPep8
         try:
             os.remove(title_video_filename)
-        except:
-            _LOGGER.debug(f"Failed to remove {title_video_filename}")
-            pass
+        except (OSError, IOError) as exc:
+            _LOGGER.debug("Failed to remove %s: %s", title_video_filename, exc)
 
     if movie.filename is None:
         return False
@@ -2523,82 +3679,261 @@ def create_movie(
     return True
 
 
-def make_folder(parameter, folder):
+def create_movie_ffmpeg(
+    movie_filename: str,
+    video_settings: dict[str, Any],
+    movie_scale: SimpleNamespace,
+    ffmpeg_params: list[str],
+    complex_concat,
+    file_content: list[SimpleNamespace],
+    ffmpeg_meta_filename: str,
+    ffmpeg_metadata: list[str],
+) -> CompletedProcess[str]:
+    chapter_file: int = 1
+    metadata_file_index: int = 1
+    ffmpeg_join_filename: str | None = None
+    video_string: str = ""
+    ffmpeg_complex: str = ""
+    file_content_string: str = ""
+    ffmpeg_params_files: list[str] = []
+    for file_number, video_file in enumerate(file_content):
+        if complex_concat:
+            # We need to do a complex concatenation.
+            ffmpeg_scale: str = ""
+            if (
+                video_file.width != movie_scale.width
+                or video_file.height != movie_scale.height
+            ):
+                # This video needs to be rescaled.
+                ffmpeg_scale = (
+                    f"scale={movie_scale.width}:{movie_scale.height}:"
+                    "force_original_aspect_ratio=decrease,"
+                    f"pad={movie_scale.width}:{movie_scale.height}:"
+                    f"({movie_scale.width}-iw)/2:"
+                    f"({movie_scale.height}-ih)/2:black,"
+                )
+
+            ffmpeg_complex += (
+                f"[{file_number}:v]{ffmpeg_scale}setpts=PTS-STARTPTS, "
+                f"setsar=1[v{file_number}];"
+            )
+            ffmpeg_params_files.extend(
+                [
+                    "-i",
+                    video_file.filename.strip(),
+                ]
+            )
+            video_string += f"[v{file_number}]"
+
+        else:
+            # We're doing simple concatenation.
+            ffmpeg_complex += f"[{file_number}:v]setpts=PTS-STARTPTS[v{file_number}];"
+            # Add this file in our join list.
+            # NOTE: Recent ffmpeg changes requires Windows paths in this file to look
+            # like file 'file:<actual path>'
+            # https://trac.ffmpeg.org/ticket/2702
+            # Write out the video files file
+            # Escape single quotes in file paths per ffmpeg concat syntax
+            join_path = video_file.filename.strip().replace(os.sep, "/")
+            join_path = join_path.replace("'", "'\\''")
+            file_content_string += f"file '{join_path}'" + os.linesep
+
+    if complex_concat:
+        # Final items to be added for a complex concatenation.
+        _LOGGER.debug("Using ffmpeg complex for %s", movie_filename)
+        ffmpeg_params_files.extend(
+            [
+                "-f",
+                "ffmetadata",
+                "-i",
+                ffmpeg_meta_filename,
+            ]
+        )
+        chapter_file = len(file_content)
+        metadata_file_index = chapter_file
+        ffmpeg_params_files.extend(
+            [
+                "-filter_complex",
+                (
+                    f"{ffmpeg_complex}{video_string}concat=n={len(file_content)}"
+                    ":v=1:a=0[outv]"
+                ),
+                "-map",
+                "[outv]",
+            ]
+        )
+        # Complex concat re-encodes; apply encoder/quality and hardware
+        # acceleration flags here via other_params.
+        ffmpeg_params_files += video_settings["other_params"]
+    else:
+        # Final items to be added for a simple concatenation.
+        _LOGGER.debug(
+            "Using concat demuxer as no video rescaling is required for %s",
+            movie_filename,
+        )
+        ffmpeg_params_files = [
+            "-f",
+            "concat",
+            "-safe",
+            "0",
+            "-xerror",
+        ]
+
+        _LOGGER.debug("Video file contains:\n%s", file_content_string)
+        ffmpeg_join_filehandle, ffmpeg_join_filename = mkstemp(suffix=".txt", text=True)
+        with os.fdopen(ffmpeg_join_filehandle, "w") as fp:
+            fp.write(file_content_string)
+
+        ffmpeg_params_files.extend(
+            [
+                "-i",
+                ffmpeg_join_filename,
+                "-f",
+                "ffmetadata",
+                "-i",
+                ffmpeg_meta_filename,
+            ]
+        )
+
+        # Stream copy to avoid re-encoding when using concat demuxer
+        ffmpeg_params_files.extend(["-c", "copy"])
+
+    ffmpeg_params_files.extend(
+        [
+            "-map_metadata",
+            f"{metadata_file_index}",
+            "-map_chapters",
+            f"{chapter_file}",
+        ]
+    )
+
+    ffmpeg_command = (
+        [video_settings["ffmpeg_exec"]]
+        + ["-loglevel", "info"]
+        + video_settings["ffmpeg_hwdev"]
+        + video_settings["ffmpeg_hwout"]
+        + ffmpeg_params_files
+        + ffmpeg_params
+        + ffmpeg_metadata
+        + ["-y", movie_filename]
+    )
+
+    _LOGGER.debug("FFMPEG Command: %s", ffmpeg_command)
+    try:
+        ffmpeg_output = run(ffmpeg_command, capture_output=True, check=True, text=True)
+    except CalledProcessError:
+        # Remove temp join file.
+        if ffmpeg_join_filename is not None:
+            try:
+                os.remove(ffmpeg_join_filename)
+            except (OSError, IOError) as cleanup_exc:
+                _LOGGER.debug(
+                    "Failed to remove %s: %s", ffmpeg_join_filename, cleanup_exc
+                )
+        raise
+
+    if FFMPEG_DEBUG:
+        _LOGGER.debug("FFMPEG output:\n %s", ffmpeg_output.stdout)
+        _LOGGER.debug("FFMPEG stderr output:\n %s", ffmpeg_output.stderr)
+
+    # Remove temp join file.
+    if ffmpeg_join_filename is not None:
+        try:
+            os.remove(ffmpeg_join_filename)
+        except (OSError, IOError) as exc:
+            _LOGGER.debug("Failed to remove %s: %s", ffmpeg_join_filename, exc)
+
+    return ffmpeg_output
+
+
+def make_folder(parameter: str, folder: str) -> bool:
     # Create folder if not already existing.
     try:
         os.makedirs(folder, exist_ok=True)
     except OSError:
         print(
-            f"{get_current_timestamp()}Error creating folder {folder} for parameter {parameter}"
+            f"{get_current_timestamp()}Error creating folder {folder} for parameter "
+            f"{parameter}"
         )
         return False
 
     return True
 
 
-def delete_intermediate(movie_files):
-    """ Delete the files provided in list """
+def delete_intermediate(movie_files: list[str]) -> None:
+    """Delete the files provided in list"""
     for file in movie_files:
         if file is not None:
             if os.path.isfile(file):
-                _LOGGER.debug(f"Deleting file {file}.")
+                _LOGGER.debug("Deleting file %s.", file)
                 try:
                     os.remove(file)
-                except OSError as exc:
+                except (OSError, IOError) as exc:
                     print(
-                        f"{get_current_timestamp()}\t\tError trying to remove file {file}: {exc}"
+                        f"{get_current_timestamp()}\t\tError trying to remove file "
+                        f"{file}: {exc}"
                     )
             elif os.path.isdir(file):
-                _LOGGER.debug(f"Deleting folder {file}.")
+                _LOGGER.debug("Deleting folder %s.", file)
                 # This is more specific for Mac but won't hurt on other platforms.
                 if os.path.exists(os.path.join(file, ".DS_Store")):
-                    # noinspection PyBroadException,PyPep8
                     try:
                         os.remove(os.path.join(file, ".DS_Store"))
-                    except:
-                        _LOGGER.debug(f"Failed to remove .DS_Store from {file}")
-                        pass
+                    except (OSError, IOError) as exc:
+                        _LOGGER.debug(
+                            "Failed to remove .DS_Store from %s: %s", file, exc
+                        )
 
                 try:
-
                     os.rmdir(file)
-                except OSError as exc:
+                except (OSError, IOError) as exc:
                     print(
-                        f"{get_current_timestamp()}\t\tError trying to remove folder {file}: {exc}"
+                        f"{get_current_timestamp()}\t\tError trying to remove folder "
+                        f"{file}: {exc}"
                     )
 
 
-def process_folders(source_folders, video_settings, delete_source):
-    """ Process all clips found within folders. """
+def process_folders(
+    source_folders: list[str], video_settings: dict[str, Any], delete_source: bool
+) -> None:
+    """Process all clips found within folders."""
 
     # Retrieve all the video files within the folders provided.
-    event_list = get_movie_files(source_folders, video_settings)
+    event_list: dict[str, Event] = get_movie_files(source_folders, video_settings)
 
     if event_list is None:
         print(f"{get_current_timestamp()}No video files found to process.")
         return
 
-    start_time = timestamp()
+    start_time: float = timestamp()
 
-    total_clips = 0
-    for _, (event_folder, event_info) in enumerate(event_list.items()):
-        total_clips = total_clips + event_info.count
+    total_clips: int = sum(event.count for event in event_list.values())
     print(
-        f"{get_current_timestamp()}There are {len(event_list)} event folder(s) with {total_clips} clips to process."
+        f"{get_current_timestamp()}There are {len(event_list)} event folder(s) with "
+        f"{total_clips} clips to process."
     )
 
     # Loop through all the events (folders) sorted.
-    movies = {}
-    merge_group_template = video_settings["merge_group_template"]
-    timestamp_format = video_settings["merge_timestamp_format"]
+    movies: dict[str, Movie] = {}
+    merge_group_template: str | None = video_settings["merge_group_template"]
+    timestamp_format: str = video_settings["merge_timestamp_format"]
 
+    event_folder: str
     for event_count, event_folder in enumerate(sorted(event_list)):
-        event_info = event_list.get(event_folder)
+        event_info: Event = event_list[event_folder]
 
         # Get the start and ending timestamps, we add duration to
         # last timestamp to get true ending.
-        first_clip_tmstp = event_info.start_timestamp
-        last_clip_tmstp = event_info.end_timestamp
+        first_clip_tmstp: datetime = event_info.start_timestamp
+        last_clip_tmstp: datetime = event_info.end_timestamp
+
+        _LOGGER.debug(
+            f"Processing folder {event_folder}: first_clip={first_clip_tmstp}, last_clip={last_clip_tmstp}"
+        )
+        if video_settings["start_timestamp"] is not None:
+            _LOGGER.debug(
+                f"  Comparing last_clip {last_clip_tmstp} < start_timestamp {video_settings['start_timestamp']}"
+            )
 
         # Skip this folder if we it does not fall within provided timestamps.
         if (
@@ -2607,8 +3942,9 @@ def process_folders(source_folders, video_settings, delete_source):
         ):
             # Clips from this folder are from before start timestamp requested.
             _LOGGER.debug(
-                f"Clips in folder end at {last_clip_tmstp} which is still before "
-                f'start timestamp {video_settings["start_timestamp"]}'
+                "Clips in folder end at %s which is still before start timestamp %s",
+                last_clip_tmstp,
+                video_settings["start_timestamp"],
             )
             continue
 
@@ -2618,38 +3954,40 @@ def process_folders(source_folders, video_settings, delete_source):
         ):
             # Clips from this folder are from after end timestamp requested.
             _LOGGER.debug(
-                f"Clips in folder start at {first_clip_tmstp} which is after "
-                f'end timestamp {video_settings["end_timestamp"]}'
+                "Clips in folder start at %s which is after end timestamp %s",
+                first_clip_tmstp,
+                video_settings["end_timestamp"],
             )
             continue
 
-        # No processing, add to list of movies to merge if what was provided is just a file
+        # No processing, add to list of movies to merge if what was provided is just a
+        # file
         if event_info.isfile:
-            key = event_info.template(
+            key: str = event_info.template(
                 merge_group_template, timestamp_format, video_settings
             )
-            if movies.get(key) is None:
-                movies.update({key: Movie()})
-
-            movies.get(key).set_event(event_info)
+            movies.setdefault(key, Movie()).set_event(event_info)
             continue
 
         _LOGGER.debug(
-            f"Processing event with start timestamp {first_clip_tmstp} and end timestamp {last_clip_tmstp}"
+            "Processing event with start timestamp %s and end timestamp %s",
+            first_clip_tmstp,
+            last_clip_tmstp,
         )
 
-        # Determine the starting and ending timestamps for the clips in this folder based on start/end timestamps
-        # provided and offsets.
-        # If set for Sentry then offset is only used for clips with reason Sentry and having a event timestamp.
+        # Determine the starting and ending timestamps for the clips in this folder
+        # based on start/end timestamps provided and offsets.
+        # If set for Sentry then offset is only used for clips with reason Sentry and
+        # having a event timestamp.
         start_offset: int | None = None
         end_offset: int | None = None
-        offset_start_timestamp = first_clip_tmstp
-        offset_end_timestamp = last_clip_tmstp
+        offset_start_timestamp: datetime = first_clip_tmstp
+        offset_end_timestamp: datetime = last_clip_tmstp
 
         # Determine offset to use.
         if (
-            event_info.metadata.get("reason") == "SENTRY"
-            and event_info.metadata.get("event_timestamp") is not None
+            event_info.event_metadata.reason == "SENTRY"
+            and event_info.event_metadata.timestamp is not None
         ):
             # This is a sentry event and we have an event timestamp.
 
@@ -2661,20 +3999,28 @@ def process_folders(source_folders, video_settings, delete_source):
                 # They were, start and end offset are set to their values.
                 start_offset = video_settings["sentry_start_offset"]
                 end_offset = video_settings["sentry_end_offset"]
-                offset_start_timestamp = event_info.metadata["event_timestamp"]
-                offset_end_timestamp = event_info.metadata["event_timestamp"]
+                offset_start_timestamp = event_info.event_metadata.timestamp
+                offset_end_timestamp = event_info.event_metadata.timestamp
                 _LOGGER.debug(
-                    f"Offsets based on sentry event with sentry start offset {start_offset}, sentry end offset {end_offset} and sentry event timestamp {offset_start_timestamp}"
+                    "Offsets based on sentry event with sentry start offset %d, sentry "
+                    "end offset %s and sentry event timestamp %s",
+                    start_offset,
+                    end_offset,
+                    offset_start_timestamp,
                 )
             elif video_settings["sentry_offset"]:
                 # Otherwise, was it set to use
                 # with the --sentry_offset legacy parameter?
                 start_offset = video_settings["start_offset"] or 60
                 end_offset = video_settings["end_offset"] or 30
-                offset_start_timestamp = event_info.metadata["event_timestamp"]
-                offset_end_timestamp = event_info.metadata["event_timestamp"]
+                offset_start_timestamp = event_info.event_metadata.timestamp
+                offset_end_timestamp = event_info.event_metadata.timestamp
                 _LOGGER.debug(
-                    f"Offsets for sentry event based on standard offsets with start offset {start_offset}, end offset {end_offset} and sentry event timestamp {offset_start_timestamp}"
+                    "Offsets for sentry event based on standard offsets with start "
+                    "offset %d, end offset %d and sentry event timestamp %s",
+                    start_offset,
+                    end_offset,
+                    offset_start_timestamp,
                 )
 
         # Do we not yet have a start_offset but --start_offset was provided?
@@ -2686,7 +4032,9 @@ def process_folders(source_folders, video_settings, delete_source):
                 first_clip_tmstp if start_offset >= 0 else last_clip_tmstp
             )
             _LOGGER.debug(
-                f"Starting offset {start_offset} and timestamp {offset_start_timestamp}"
+                "Starting offset %d and timestamp %s",
+                start_offset,
+                offset_start_timestamp,
             )
 
         # Do we not yet have a start_offset but --start_offset was provided?
@@ -2698,15 +4046,15 @@ def process_folders(source_folders, video_settings, delete_source):
                 first_clip_tmstp if end_offset >= 0 else last_clip_tmstp
             )
             _LOGGER.debug(
-                f"Ending offset {end_offset} and timestamp {offset_end_timestamp}"
+                "Ending offset %s and timestamp %s", end_offset, offset_end_timestamp
             )
 
-        event_start_timestamp = (
+        event_start_timestamp: datetime = (
             offset_start_timestamp + timedelta(seconds=start_offset)
             if start_offset is not None
             else first_clip_tmstp
         )
-        event_end_timestamp = (
+        event_end_timestamp: datetime = (
             offset_end_timestamp + timedelta(seconds=end_offset)
             if end_offset is not None
             else last_clip_tmstp
@@ -2714,23 +4062,32 @@ def process_folders(source_folders, video_settings, delete_source):
 
         if event_start_timestamp != first_clip_tmstp:
             _LOGGER.debug(
-                f"Clip starting timestamp changed to {event_start_timestamp} "
-                f"from {first_clip_tmstp} due to start offset {start_offset} and offset timestamp {offset_start_timestamp}"
+                "Clip starting timestamp changed to %s from %s due to start offset %s "
+                "and offset timestamp %s",
+                event_start_timestamp,
+                first_clip_tmstp,
+                start_offset,
+                offset_start_timestamp,
             )
 
         if event_end_timestamp != last_clip_tmstp:
             _LOGGER.debug(
-                f"Clip ending timestamp changed to {event_end_timestamp} "
-                f"from {last_clip_tmstp} due to end offset {end_offset} and offset timestamp {offset_end_timestamp}"
+                "Clip ending timestamp changed to %s from %s due to end offset %s "
+                "and offset timestamp %s",
+                event_end_timestamp,
+                last_clip_tmstp,
+                end_offset,
+                offset_end_timestamp,
             )
 
         # Make sure that our event start timestamp is not after our end timestamp
         if event_start_timestamp > event_end_timestamp:
             # Start timestamp is greater then end timestamp, we'll switch them
             _LOGGER.debug(
-                f"Clip start timestamp {event_start_timestamp} "
-                f" was after clip end timestamp {event_end_timestamp} "
-                ", swapping them."
+                "Clip start timestamp %s was after clip end timestamp %s, swapping "
+                "them.",
+                event_start_timestamp,
+                event_end_timestamp,
             )
             event_start_timestamp, event_end_timestamp = (
                 event_end_timestamp,
@@ -2740,24 +4097,55 @@ def process_folders(source_folders, video_settings, delete_source):
         # Make sure that our event start timestamp is equal to or after
         # our clip start timestamp and before our event end timestamp.
         if not (first_clip_tmstp <= event_start_timestamp <= last_clip_tmstp):
-            # Event start timestamp is either before clip start timestamp or after clip end timestamp
+            # Event start timestamp is either before clip start timestamp or
+            # after clip end timestamp
             # Setting it back to clip start timestamp
             event_start_timestamp = first_clip_tmstp
             _LOGGER.debug(
-                f"Clip start timestamp changed back to {first_clip_tmstp} as "
-                f"updated offset timestamp was before clip start timestamp or after clip end timestamp"
+                "Clip start timestamp changed back to %s as updated offset timestamp "
+                "was before clip start timestamp or after clip end timestamp",
+                first_clip_tmstp,
             )
 
         # Make sure that our event end timestamp is equal to or after
         # our clip start timestamp and before our event end timestamp.
         if not (first_clip_tmstp <= event_end_timestamp <= last_clip_tmstp):
-            # Event end timestamp is either before clip start timestamp or after clip end timestamp
+            # Event end timestamp is either before clip start timestamp or
+            # after clip end timestamp
             # Setting it back to clip end timestamp
             event_end_timestamp = last_clip_tmstp
             _LOGGER.debug(
-                f"Clip end timestamp changed back to {last_clip_tmstp} as "
-                f"updated offset timestamp was before clip start timestamp or after clip end timestamp"
+                "Clip end timestamp changed back to %s as updated offset timestamp "
+                "was before clip start timestamp or after clip end timestamp",
+                last_clip_tmstp,
             )
+
+        # Clamp event timestamps to user-requested start/end timestamp window
+        if video_settings["start_timestamp"] is not None:
+            _LOGGER.debug(
+                f"Comparing event_start_timestamp {event_start_timestamp} < user start {video_settings['start_timestamp']}"
+            )
+            if event_start_timestamp < video_settings["start_timestamp"]:
+                _LOGGER.debug(
+                    "Clip start timestamp changed from %s to %s to match "
+                    "user-requested start timestamp",
+                    event_start_timestamp,
+                    video_settings["start_timestamp"],
+                )
+                event_start_timestamp = video_settings["start_timestamp"]
+
+        if video_settings["end_timestamp"] is not None:
+            _LOGGER.debug(
+                f"Comparing event_end_timestamp {event_end_timestamp} > user end {video_settings['end_timestamp']}"
+            )
+            if event_end_timestamp > video_settings["end_timestamp"]:
+                _LOGGER.debug(
+                    "Clip end timestamp changed from %s to %s to match "
+                    "user-requested end timestamp",
+                    event_end_timestamp,
+                    video_settings["end_timestamp"],
+                )
+                event_end_timestamp = video_settings["end_timestamp"]
 
         # Put them together to create the filename for the folder.
         event_movie_filename = (
@@ -2779,39 +4167,48 @@ def process_folders(source_folders, video_settings, delete_source):
         # the target movie file already exist.
         if video_settings["skip_existing"] and os.path.isfile(event_movie_filename):
             print(
-                f"{get_current_timestamp()}\tSkipping folder {event_folder} as {event_movie_filename} is already "
-                f"created ({event_count + 1}/{len(event_list)})"
+                f"{get_current_timestamp()}\tSkipping folder {event_folder} as "
+                f"{event_movie_filename} is already created "
+                f"({event_count + 1}/{len(event_list)})"
             )
 
-            # Get actual duration of our new video, required for chapters when concatenating.
-            metadata = get_metadata(
-                video_settings["ffmpeg_exec"], [event_movie_filename]
-            )
-            event_info.duration = metadata[0]["duration"] if metadata else None
+            # Get actual duration of our new video, required for chapters when
+            # concatenating.
             event_info.filename = event_movie_filename
             event_info.start_timestamp = event_start_timestamp
             event_info.end_timestamp = event_end_timestamp
+            metadata: list[Video_Metadata] = get_metadata(
+                video_settings["ffmpeg_exec"], [event_movie_filename]
+            )
+            if metadata:
+                event_info.duration = metadata[0].duration
+                event_info.video_metadata = metadata[0]
+
             key = event_info.template(
                 merge_group_template, timestamp_format, video_settings
             )
-            if movies.get(key) is None:
-                movies.update({key: Movie()})
-
-            movies.get(key).set_event(event_info)
+            movies.setdefault(key, Movie()).set_event(event_info)
+            movies.setdefault(key, Movie()).video_metadata = metadata[0]
             continue
 
         print(
-            f"{get_current_timestamp()}\tProcessing {event_info.count} clips in folder {event_folder} "
-            f"({event_count + 1}/{len(event_list)})"
+            f"{get_current_timestamp()}\tProcessing {event_info.count} clips in folder "
+            f"{event_folder} ({event_count + 1}/{len(event_list)})"
         )
 
         # Loop through all the clips within the event.
-        delete_folder_clips = []
-        delete_folder_files = delete_source
-        delete_file_list = []
+        delete_folder_clips: list[str] = []
+        delete_folder_files: bool = delete_source
+        delete_file_list: list[str] = []
 
         for clip_number, clip_timestamp in enumerate(event_info.sorted):
-            clip_info = event_info.clip(clip_timestamp)
+            if (clip_info := event_info.clip(clip_timestamp)) is None:
+                _LOGGER.warning(
+                    "Clip %s in folder %s is not valid, skipping.",
+                    clip_timestamp,
+                    event_folder,
+                )
+                continue
 
             if create_intermediate_movie(
                 event_info,
@@ -2820,8 +4217,10 @@ def process_folders(source_folders, video_settings, delete_source):
                 video_settings,
                 clip_number,
             ):
-
-                if clip_info.filename != event_info.filename:
+                if (
+                    clip_info.filename is not None
+                    and clip_info.filename != event_info.filename
+                ):
                     delete_folder_clips.append(clip_info.filename)
 
                 # Add the files to our list for removal.
@@ -2835,7 +4234,8 @@ def process_folders(source_folders, video_settings, delete_source):
         # All clips for the event  have been processed, merge those clips
         # together now.
         print(
-            f"{get_current_timestamp()}\t\tCreating movie {event_movie_filename}, please be patient."
+            f"{get_current_timestamp()}\t\tCreating movie {event_movie_filename}, "
+            "please be patient."
         )
 
         if create_movie(
@@ -2850,20 +4250,19 @@ def process_folders(source_folders, video_settings, delete_source):
                 key = event_info.template(
                     merge_group_template, timestamp_format, video_settings
                 )
-                if movies.get(key) is None:
-                    movies.update({key: Movie()})
-
-                movies.get(key).set_event(event_info)
+                movies.setdefault(key, Movie()).set_event(event_info)
 
                 print(
-                    f"{get_current_timestamp()}\tMovie {event_info.filename} for folder {event_folder} with "
-                    f"duration {str(timedelta(seconds=int(event_info.duration)))} is ready."
+                    f"{get_current_timestamp()}\tMovie {event_info.filename} for "
+                    f"folder {event_folder} with "
+                    f"duration {str(timedelta(seconds=int(event_info.duration)))} is "
+                    "ready."
                 )
 
                 # Delete the intermediate files we created.
                 if not video_settings["keep_intermediate"]:
                     _LOGGER.debug(
-                        f"Deleting {len(delete_folder_clips)} intermediate files"
+                        "Deleting %d intermediate files", len(delete_folder_clips)
                     )
                     delete_intermediate(delete_folder_clips)
         else:
@@ -2873,7 +4272,8 @@ def process_folders(source_folders, video_settings, delete_source):
         # We only do so if there were no issues in processing the clips
         if delete_folder_files:
             print(
-                f"{get_current_timestamp()}\t\tDeleting {len(delete_file_list) + 2} files and folder {event_folder}"
+                f"{get_current_timestamp()}\t\tDeleting {len(delete_file_list) + 2} "
+                "files and folder {event_folder}"
             )
             delete_intermediate(delete_file_list)
             # Delete the metadata (event.json) and picture (thumb.png) files.
@@ -2888,15 +4288,18 @@ def process_folders(source_folders, video_settings, delete_source):
             delete_intermediate([event_folder])
 
     # Now that we have gone through all the folders merge.
-    # We only do this if merge is enabled OR if we only have 1 movie with 1 event clip and for
-    # output a specific filename was provided not matching the filename for the event clip
-    movies_list = None
+    # We only do this if merge is enabled OR if we only have 1 movie with 1 event clip
+    # and for output a specific filename was provided not matching the filename for the
+    # event clip
+    movies_list: list[tuple[str | None, str]] | None = None
     if movies:
-        if video_settings["merge_subdirs"] or (
+        first_item = list(movies.values())[0].first_item if len(movies) > 0 else None
+        merge_subdirs: bool = video_settings["merge_subdirs"]
+        if merge_subdirs or (
             video_settings["target_filename"] is not None
-            and len(movies) == 1
-            and len(list(movies.values())[0].items) == 1
-            and list(movies.values())[0].first_item.filename
+            and first_item is not None
+            and first_item.filename is not None
+            and first_item.filename
             != os.path.join(
                 video_settings["target_folder"], video_settings["target_filename"]
             )
@@ -2905,13 +4308,15 @@ def process_folders(source_folders, video_settings, delete_source):
             merge_group_template = video_settings["merge_group_template"]
             if merge_group_template is not None or merge_group_template == "":
                 _LOGGER.debug(
-                    f"Merging video files in groups based on template "
-                    f"{merge_group_template}, {len(movies)} will be created."
+                    "Merging video files in groups based on template "
+                    "%s, %d will be created.",
+                    merge_group_template,
+                    len(movies),
                 )
-            elif video_settings["merge_subdirs"]:
+            elif merge_subdirs:
                 _LOGGER.debug(
-                    f"Merging video files into video file "
-                    f"{video_settings['movie_filename']}."
+                    "Merging video files into video file %s.",
+                    video_settings["movie_filename"],
                 )
 
             for movie in sorted(movies.keys()):
@@ -2928,68 +4333,76 @@ def process_folders(source_folders, video_settings, delete_source):
                     video_settings["target_folder"], movie_filename
                 )
                 print(
-                    f"{get_current_timestamp()}\tCreating movie {movie_filename}, please be patient."
+                    f"{get_current_timestamp()}\tCreating movie {movie_filename}, "
+                    "please be patient."
                 )
 
-                # Only set title screen map if requested and # of events for this movie is greater then 1
-                title_screen_map = (
+                # Only set title screen map if requested and # of events for this movie
+                # is greater then 1
+                title_screen_map: bool = (
                     video_settings["video_layout"].title_screen_map
-                    and movies.get(movie).count > 1
+                    and movies[movie].count > 1
                 )
 
                 if create_movie(
-                    movies.get(movie),
-                    movies.get(movie).items_sorted,
+                    movies[movie],
+                    movies[movie].items_sorted,
                     movie_filename,
                     video_settings,
                     video_settings["chapter_offset"],
                     title_screen_map,
                 ):
-
-                    if movies.get(movie).filename is not None:
+                    if movies[movie].filename is not None:
                         movies_list.append(
                             (
-                                movies.get(movie).filename,
-                                str(timedelta(seconds=int(movies.get(movie).duration))),
+                                movies[movie].filename,
+                                str(
+                                    timedelta(seconds=int(movies[movie].duration or 0))
+                                ),
                             )
                         )
 
-                        # Delete the 1 event movie if we created the movie because there was only 1 folder.
-                        if not video_settings["merge_subdirs"]:
+                        # Delete the 1 event movie if we created the movie because
+                        # there was only 1 folder.
+                        if (
+                            not merge_subdirs
+                            and first_item is not None
+                            and first_item.filename is not None
+                        ):
                             _LOGGER.debug(
-                                f"Deleting "
-                                f"{list(movies.values())[0].first_item.filename} event file"
+                                "Deleting %d event file",
+                                first_item.filename,
                             )
-                            delete_intermediate(
-                                [list(movies.values())[0].first_item.filename]
-                            )
+                            delete_intermediate([first_item.filename])
                         elif not video_settings["keep_events"]:
                             # Delete the event files now.
                             delete_file_list = []
-                            for _, event_info in movies.get(movie).items:
-                                delete_file_list.append(event_info.filename)
+                            for _, event_info in movies[movie].items:
+                                if event_info.filename is not None:
+                                    delete_file_list.append(event_info.filename)
                             _LOGGER.debug(
-                                f"Deleting {len(delete_file_list)} event files"
+                                "Deleting %d event files", len(delete_file_list)
                             )
                             delete_intermediate(delete_file_list)
         else:
             print(
-                f"{get_current_timestamp()}All folders have been processed, resulting movie files are located in "
-                f"{video_settings['target_folder']}"
+                f"{get_current_timestamp()}All folders have been processed, resulting "
+                f"movie files are located in {video_settings['target_folder']}"
             )
     else:
         print(f"{get_current_timestamp()}No clips found.")
 
     end_time = timestamp()
     print(
-        f"{get_current_timestamp()}Total processing time: {str(timedelta(seconds=int((end_time - start_time))))}"
+        f"{get_current_timestamp()}Total processing time: "
+        f"{str(timedelta(seconds=int((end_time - start_time))))}"
     )
     if video_settings["notification"]:
         if movies_list is None:
             # No merging of movies occurred.
             message = (
-                "{total_folders} folder{folders} with {total_clips} clip{clips} have been processed, "
-                "{target_folder} contains resulting files.".format(
+                "{total_folders} folder{folders} with {total_clips} clip{clips} have"
+                "been processed, {target_folder} contains resulting files.".format(
                     folders="" if len(event_list) < 2 else "s",
                     total_folders=len(event_list),
                     clips="" if total_clips < 2 else "s",
@@ -3001,8 +4414,8 @@ def process_folders(source_folders, video_settings, delete_source):
             if len(movies_list) == 1:
                 # Only 1 movie was created.
                 print(
-                    f"{get_current_timestamp()} Movie {movies_list[0][0]} with duration {movies_list[0][0]} "
-                    f"has been created."
+                    f"{get_current_timestamp()} Movie {movies_list[0][0]} with "
+                    f"duration {movies_list[0][0]} has been created."
                 )
 
             else:
@@ -3010,14 +4423,16 @@ def process_folders(source_folders, video_settings, delete_source):
                 print(f"{get_current_timestamp()} Following movies have been created:")
                 for movie_entry in movies_list:
                     print(
-                        f"{get_current_timestamp()}\t{movie_entry[0]} with duration {movie_entry[1]}"
+                        f"{get_current_timestamp()}\t{movie_entry[0]} with "
+                        f"duration {movie_entry[1]}"
                     )
 
             if len(movies) == len(movies_list):
                 # Number of movies created matches how many we should have created.
                 message = (
-                    "{total_folders} folder{folders} with {total_clips} clip{clips} have been processed, "
-                    "{total_movies} movie {movies} been created.".format(
+                    "{total_folders} folder{folders} with {total_clips} clip{clips} "
+                    "have been processed, {total_movies} movie {movies} been "
+                    "created.".format(
                         folders="" if len(event_list) < 2 else "s",
                         total_folders=len(event_list),
                         clips="" if total_clips < 2 else "s",
@@ -3029,8 +4444,9 @@ def process_folders(source_folders, video_settings, delete_source):
             else:
                 # Seems creation of some movies failed.
                 message = (
-                    "{total_folders} folder{folders} with {total_clips} clip{clips} have been processed, "
-                    "{total_movies} {movies} been created out of {all_movies}.".format(
+                    "{total_folders} folder{folders} with {total_clips} clip{clips} "
+                    "have been processed, {total_movies} {movies} been created out of "
+                    "{all_movies}.".format(
                         folders="" if len(event_list) < 2 else "s",
                         total_folders=len(event_list),
                         clips="" if total_clips < 2 else "s",
@@ -3048,7 +4464,7 @@ def process_folders(source_folders, video_settings, delete_source):
 
 
 def resource_path(relative_path):
-    """ Return absolute path for provided relative item based on location
+    """Return absolute path for provided relative item based on location
 
     of program.
     """
@@ -3059,61 +4475,44 @@ def resource_path(relative_path):
 
 
 def notify_macos(title, subtitle, message):
-    """ Notification on MacOS """
+    """Notification on MacOS"""
     try:
         run(
             [
                 "osascript",
-                '-e display notification "{message}" with title "{title}" '
-                'subtitle "{subtitle}"'
-                "".format(message=message, title=title, subtitle=subtitle),
-            ]
+                f'-e display notification "{message}" with title "{title}" '
+                f'subtitle "{subtitle}"',
+            ],
+            check=True,
         )
-    except Exception as exc:
-        print(f"{get_current_timestamp()}Failed in notifification: {str(exc)}")
+    except CalledProcessError as exc:
+        _LOGGER.error("Failed in notifification: %s", exc)
 
 
 def notify_windows(title, subtitle, message):
-    """ Notification on Windows """
+    """Notification on Windows"""
 
-    # Section commented out, waiting to see if it really does not work on Windows 7
-    # This works only on Windows 10 9r Windows Server 2016/2019. Skipping for everything else
-    #    from platform import win32_ver
-    #    if win32_ver()[0] != 10:
-    #        return
-    global TOASTER_INSTANCE
-
-    # noinspection PyBroadException
     try:
-        # noinspection PyUnresolvedReferences,PyPackageRequirements
-        from win10toast import ToastNotifier
-
-        if TOASTER_INSTANCE is None:
-            TOASTER_INSTANCE = ToastNotifier()
-
-        TOASTER_INSTANCE.show_toast(
-            threaded=True,
+        toast(
             title=f"{title} {subtitle}",
-            msg=message,
-            duration=5,
-            icon_path=resource_path("tesla_dashcam.ico"),
+            body=message,
+            duration="short",
+            icon=resource_path("tesla_dashcam.ico"),
         )
-
-        run(["notify-send", f'"{title} {subtitle}"', f'"{message}"'])
-    except Exception:
-        pass
+    except CalledProcessError as exc:
+        _LOGGER.error("Failed in notifification: %s", exc)
 
 
 def notify_linux(title, subtitle, message):
-    """ Notification on Linux """
+    """Notification on Linux"""
     try:
-        run(["notify-send", f'"{title} {subtitle}"', f'"{message}"'])
-    except Exception as exc:
-        print(f"{get_current_timestamp()}Failed in notifification: {str(exc)}")
+        run(["notify-send", f'"{title} {subtitle}"', f'"{message}"'], check=True)
+    except CalledProcessError as exc:
+        _LOGGER.error("Failed in notifification: %s", exc)
 
 
 def notify(title, subtitle, message):
-    """ Call function to send notification based on OS """
+    """Call function to send notification based on OS"""
     if PLATFORM == "darwin":
         notify_macos(title, subtitle, message)
     elif PLATFORM == "win32":
@@ -3123,15 +4522,13 @@ def notify(title, subtitle, message):
 
 
 def main() -> int:
-    """ Main function """
+    """Main function"""
 
     loglevels = dict(
         (logging.getLevelName(level), level) for level in [10, 20, 30, 40, 50]
     )
 
-    movie_folder = os.path.join(str(Path.home()), MOVIE_HOMEDIR.get(PLATFORM), "")
-
-    global display_ts
+    movie_folder = os.path.join(str(Path.home()), MOVIE_HOMEDIR.get(PLATFORM, ""), "")
 
     # Check if ffmpeg exist, if not then hope it is in default path or
     # provided.
@@ -3143,9 +4540,11 @@ def main() -> int:
         ffmpeg_default = FFMPEG.get(PLATFORM, "ffmpeg")
 
     epilog = (
-        "This program leverages ffmpeg which is included. See https://ffmpeg.org/ for more information on ffmpeg"
+        "This program leverages ffmpeg which is included. See https://ffmpeg.org/ for "
+        "more information on ffmpeg"
         if internal_ffmpeg
-        else "This program requires ffmpeg which can be downloaded from: https://ffmpeg.org/download.html"
+        else "This program requires ffmpeg which can be downloaded from: "
+        "https://ffmpeg.org/download.html"
     )
 
     parser = MyArgumentParser(
@@ -3159,8 +4558,8 @@ def main() -> int:
         "source",
         type=str,
         nargs="*",
-        help="Folder(s) (events) containing the saved camera files. Filenames can be provided as well to manage "
-        "individual clips.",
+        help="Folder(s) (events) containing the saved camera files. Filenames can be "
+        "provided as well to manage individual clips.",
     )
 
     parser.add_argument(
@@ -3174,19 +4573,25 @@ def main() -> int:
         help="Logging level.",
     )
     parser.add_argument(
+        "--ffmpeg_debug",
+        action="store_true",
+        help="Include output from ffmpeg when loglevel is set to debug.OUTPUT.",
+    )
+    parser.add_argument(
         "--temp_dir", required=False, type=str, help="R|Path to store temporary files."
     )
     parser.add_argument(
         "--no-notification",
         dest="system_notification",
         action="store_false",
-        help="Do not create a notification upon " "completion.",
+        help="Do not create a notification upon completion.",
     )
 
     parser.add_argument(
         "--display_ts",
         action="store_true",
-        help="Display timestamps on tesla_dashcam text output. DOES NOT AFFECT VIDEO OUTPUT.",
+        help="Display timestamps on tesla_dashcam text output. DOES NOT AFFECT VIDEO "
+        "OUTPUT.",
     )
 
     input_group = parser.add_argument_group(
@@ -3197,8 +4602,8 @@ def main() -> int:
         "--skip_existing",
         dest="skip_existing",
         action="store_true",
-        help="Skip creating encoded video file if it already exist. Note that only existence is checked, not if "
-        "layout etc. are the same.",
+        help="Skip creating encoded video file if it already exist. Note that only "
+        "existence is checked, not if layout etc. are the same.",
     )
     input_group.add_argument(
         "--delete_source",
@@ -3215,7 +4620,8 @@ def main() -> int:
 
     monitor_group = parser.add_argument_group(
         title="Trigger Monitor",
-        description="Parameters for monitoring of insertion of TeslaCam drive, folder, or file existence.",
+        description="Parameters for monitoring of insertion of TeslaCam drive, folder, "
+        "or file existence.",
     )
     monitor_group.add_argument(
         "--monitor",
@@ -3227,15 +4633,17 @@ def main() -> int:
         "--monitor_once",
         dest="monitor_once",
         action="store_true",
-        help="Enable monitoring and exit once drive with TeslaCam folder has been attached and files processed.",
+        help="Enable monitoring and exit once drive with TeslaCam folder has been "
+        "attached and files processed.",
     )
     monitor_group.add_argument(
         "--monitor_trigger",
         required=False,
         type=str,
-        help="Trigger file to look for instead of waiting for drive to be attached. Once file is discovered then "
-        "processing will start, file will be deleted when processing has been completed. If source is not "
-        "provided then folder where file is located will be used as source.",
+        help="Trigger file to look for instead of waiting for drive to be attached. "
+        "Once file is discovered then processing will start, file will be deleted when "
+        "processing has been completed. If source is not provided then folder where "
+        "file is located will be used as source.",
     )
 
     layout_group = parser.add_argument_group(
@@ -3245,18 +4653,94 @@ def main() -> int:
     layout_group.add_argument(
         "--layout",
         required=False,
-        choices=["WIDESCREEN", "FULLSCREEN", "PERSPECTIVE", "CROSS", "DIAMOND"],
+        choices=[
+            "MOSAIC",
+            "WIDESCREEN",
+            "FULLSCREEN",
+            "PERSPECTIVE",
+            "CROSS",
+            "DIAMOND",
+            "HORIZONTAL",
+        ],
         default="FULLSCREEN",
         type=str.upper,
+        metavar="MOSAIC|FULLSCREEN|PERSPECTIVE|CROSS|DIAMOND|HORIZONTAL",
         help="R|Layout of the created video.\n"
-        "    FULLSCREEN: Front camera center top, "
-        "side cameras underneath it with rear camera between side camera.\n"
-        "    WIDESCREEN: Front camera on top with side and rear cameras smaller underneath it.\n"
-        "    PERSPECTIVE: Similar to FULLSCREEN but then with side cameras in perspective.\n"
-        "    CROSS: Front camera center top, side cameras underneath, and rear camera center bottom.\n"
-        "    DIAMOND: Front camera center top, side cameras below front camera left and right of front, "
-        "and rear camera center bottom.\n",
+        "    FULLSCREEN: Front camera center top with side and rear cameras smaller "
+        "underneath it.\n"
+        "    MOSAIC: Front and rear cameras on top with pillars and side cameras "
+        "smaller underneath it.\n"
+        "    PERSPECTIVE: Similar to FULLSCREEN but then with pillar and repeater "
+        "cameras in perspective.\n"
+        "    CROSS: Front camera center top, pillar cameras underneath, then side "
+        "cameras underneath, and rear camera center bottom.\n"
+        "    DIAMOND: Front camera center top, pillar cameras on left/right of front "
+        "smaller, side cameras below on left/right of rear smaller, and rear camera "
+        "center bottom.\n"
+        "    HORIZONTAL: All cameras in horizontal line: left, left pillar, front, "
+        "rear, right pillar, right.\n",
     )
+    layout_group.add_argument(
+        "--camera_position",
+        dest="clip_pos",
+        type=str.lower,
+        nargs="+",
+        action="append",
+        help="R|Set camera clip position within video. Selecting this will override the"
+        " layout selected!\n"
+        "The camera clip scale will be set to 1280x960, use scale to adjust "
+        "accordingly.\n"
+        "Default layout is:\n"
+        "    Front: 0x0\n"
+        "    Rear: <front x-pos + width>x0\n"
+        "    Left Pillar: 0x<max(front y-pos + height,rear y-pos + height)>\n"
+        "    Right Pillar: <left pillar x-pos + width>x<max(front y-pos + height,rear "
+        "ypos + height)>\n"
+        "    Left: 0x<max(<left pillar y-pos + height>, <right pillar y-pos + height>\n"
+        "    Right: <left-pillar x-pos + width>x<max(<left pillar y-pos + height>, "
+        "<right pillar y-pos + height>\n"
+        "Using this together with argument camera_order allows one to completely "
+        "customize the layout\n"
+        "Note that layout chosen also determines camera clip size and thus default "
+        "position. See scale for respective sizing.\n"
+        "Further, changing the scale of a camera clip would further impact potential "
+        "positioning."
+        "for example:\n"
+        "  --camera_position camera=left 640x480                          Position "
+        "left camera at 640x480\n"
+        "  --camera_position camera=right x_pos=640                        Position "
+        "right camera at x-position 640, y-position based on layout\n"
+        "  --camera_position camera=front y_pos=480                        Position "
+        "front camera at x-position based on layout, y-position at 480\n"
+        "  --camera_position camera=rear  1280x960                        Position "
+        "rear camera at 1280x960\n"
+        "  --camera_position camera=left_pillar 0x960                     Position "
+        "left pillar camera at 0x960\n",
+    )
+
+    layout_group.add_argument(
+        "--camera_order",
+        dest="clip_order",
+        type=str.lower,
+        help="R|Determines the order of processing the camera. Normally this is not "
+        "required unless there is overlap.\n"
+        "When using argument camera_position it is possible to overlap cameras "
+        "partially or completely, by then\n"
+        "leveraging this argument one can determine which camera will be on top and "
+        "which one will be bottom."
+        " Default order is: left, right, front, rear, left_pillar, right_pillar. If "
+        "there is no overlap then the order does not matter.\n"
+        " If not all cameras are specified then default order will be followed for "
+        "those not specified, and thus be more on top."
+        "for example:\n"
+        "  --camera_order front,rear,left,right,left_pillar,right_pillar    Makes it "
+        "that right_pillar will be on top, then left_pillar, then right, then left, "
+        "then rear, and front at the bottom.\n",
+    )
+    layout_group.set_defaults(
+        clip_order="front,rear,left,right,left_pillar,right_pillar"
+    )
+
     layout_group.add_argument(
         "--perspective",
         dest="perspective",
@@ -3270,26 +4754,35 @@ def main() -> int:
         type=str.lower,
         nargs="+",
         action="append",
-        help="R|Set camera clip scale for all clips, scale of 1 is 1280x960 camera clip.\n"
-        "If provided with value then it is default for all cameras, to set the scale for a specific "
-        "camera provide camera=<front, left, right,rear> <scale>\n"
+        help="R|Set camera clip scale for all clips, scale of 1 is 1280x960 camera "
+        "clip.\n"
+        "If provided with value then it is default for all cameras, to set the scale "
+        "for a specific "
+        "camera provide camera=<front, left, right, rear, left_pillar, right_pillar> "
+        "<scale>\n"
         "for example:\n"
         "  --scale 0.5                                             all are 640x480\n"
         "  --scale 640x480                                         all are 640x480\n"
-        "  --scale 0.5 --scale camera=front 1                      all are 640x480 except front at 1280x960\n"
-        "  --scale camera=left .25 --scale camera=right 320x240    left and right are set to 320x240\n"
+        "  --scale 0.5 --scale camera=front 1                      all are 640x480 "
+        "except front at 1280x960\n"
+        "  --scale camera=left .25 --scale camera=right 320x240    left and right are "
+        "set to 320x240\n"
+        "  --scale camera=left_pillar 0.25                         left pillar camera "
+        "is set to 320x240\n"
         "Defaults:\n"
-        "    WIDESCREEN: 1/2 (front 1280x960, others 640x480, video is 1920x1920)\n"
+        "    MOSAIC: 1/2 (all cameras 640x480 base, front/rear boosted to 1216x912, "
+        "video is 2496x1824)\n"
         "    FULLSCREEN: 1/2 (640x480, video is 1920x960)\n"
-        "    CROSS: 1/2 (640x480, video is 1280x1440)\n"
-        "    DIAMOND: 1/2 (640x480, video is 1920x976)\n",
+        "    CROSS: 1/2 (640x480, video is 1280x1920)\n"
+        "    DIAMOND: 1/2 (640x480, video is 2560x1920)\n",
     )
     layout_group.add_argument(
         "--mirror",
         dest="rear_or_mirror",
         action="store_const",
         const=1,
-        help="Video from side and rear cameras as if being viewed through the mirror. Default when not providing "
+        help="Video from side and rear cameras as if being viewed through the mirror. "
+        "Default when not providing "
         "parameter --no-front. Cannot be used in combination with --rear.",
     )
     layout_group.add_argument(
@@ -3297,7 +4790,8 @@ def main() -> int:
         dest="rear_or_mirror",
         action="store_const",
         const=0,
-        help="Video from side and rear cameras as if looking backwards. Default when providing parameter --no-front. "
+        help="Video from side and rear cameras as if looking backwards. Default when "
+        "providing parameter --no-front. "
         "Cannot be used in combination with --mirror.",
     )
     layout_group.add_argument(
@@ -3305,7 +4799,8 @@ def main() -> int:
         dest="swap_leftright",
         action="store_const",
         const=1,
-        help="Swap left and right cameras in output, default when side and rear cameras are as if looking backwards. "
+        help="Swap left and right cameras in output, default when side and rear cameras"
+        " are as if looking backwards. "
         "See --rear parameter.",
     )
     layout_group.add_argument(
@@ -3313,7 +4808,8 @@ def main() -> int:
         dest="swap_leftright",
         action="store_const",
         const=0,
-        help="Do not swap left and right cameras, default when side and rear cameras are as if looking through a "
+        help="Do not swap left and right cameras, default when side and rear cameras "
+        "are as if looking through a "
         "mirror. Also see --mirror parameter",
     )
     layout_group.add_argument(
@@ -3322,19 +4818,29 @@ def main() -> int:
         action="store_true",
         help="Swap front and rear cameras in output.",
     )
+
+    layout_group.add_argument(
+        "--swap_pillar",
+        dest="swap_pillar",
+        action="store_true",
+        help="Swap left- and right pillar cameras in output.",
+    )
     layout_group.add_argument(
         "--background",
         dest="background",
         default="black",
         type=str.lower,
-        help="Background color for video. Can be a color string or RGB value. Also see --fontcolor.",
+        help="Background color for video. Can be a color string or RGB value. Also see "
+        "--fontcolor.",
     )
 
     layout_group.add_argument(
         "--title_screen_map",
         dest="title_screen_map",
         action="store_true",
-        help="Show a map of the event location for the first 3 seconds of the event movie, when merging events it will also create map with lines linking the events",
+        help="Show a map of the event location for the first 3 seconds of the event "
+        "movie, when merging events it will also create map with lines linking the "
+        "events",
     )
 
     camera_group = parser.add_argument_group(
@@ -3363,6 +4869,18 @@ def main() -> int:
         dest="no_rear",
         action="store_true",
         help="Exclude rear camera from video.",
+    )
+    camera_group.add_argument(
+        "--no-left-pillar",
+        dest="no_left_pillar",
+        action="store_true",
+        help="Exclude left pillar camera from video.",
+    )
+    camera_group.add_argument(
+        "--no-right-pillar",
+        dest="no_right_pillar",
+        action="store_true",
+        help="Exclude right pillar camera from video.",
     )
 
     text_overlay_group = parser.add_argument_group(
@@ -3400,21 +4918,24 @@ def main() -> int:
         "--fontsize",
         required=False,
         type=int,
-        help="Font size for timestamp. Default is scaled based on resulting video size.",
+        help="Font size for timestamp. Default is scaled based on resulting video "
+        "size.",
     )
     text_overlay_group.add_argument(
         "--fontcolor",
         required=False,
         type=str.lower,
         default="white",
-        help="R|Font color for timestamp. Any color is accepted as a color string or RGB value.\n"
+        help="R|Font color for timestamp. Any color is accepted as a color string or "
+        "RGB value.\n"
         "Some potential values are:\n"
         "    white\n"
         "    yellowgreen\n"
         "    yellowgreen@0.9\n"
         "    Red\n:"
         "    0x2E8B57\n"
-        "For more information on this see ffmpeg documentation for color: https://ffmpeg.org/ffmpeg-utils.html#Color",
+        "For more information on this see ffmpeg documentation for color: "
+        "https://ffmpeg.org/ffmpeg-utils.html#Color",
     )
     text_overlay_group.add_argument(
         "--text_overlay_fmt",
@@ -3428,12 +4949,15 @@ def main() -> int:
         "    {local_timestamp_rolling} - Local time which continuously updates "
         "(shorthand for '%%{{pts:localtime:{local_timestamp}:%%x %%X}}'), string\n"
         "    {event_timestamp} - Timestamp from events.json (if provided), string\n"
-        "    {event_timestamp_countdown_rolling} - Local time which continuously updates "
-        "(shorthand for '%%{{hms:localtime:{event_timestamp}}}'), string\n"
+        "    {event_timestamp_countdown_rolling} - Local time which continuously "
+        "updates (shorthand for '%%{{hms:localtime:{event_timestamp}}}'), string\n"
         "    {event_city} - City name from events.json (if provided), string\n"
+        "    {event_street} - Street name from events.json (if provided), string\n"
         "    {event_reason} - Recording reason from events.json (if provided), string\n"
-        "    {event_latitude} - Estimated latitude from events.json (if provided), float\n"
-        "    {event_longitude} - Estimated longitude from events.json (if provided), float\n"
+        "    {event_latitude} - Estimated latitude from events.json (if provided), "
+        "float\n"
+        "    {event_longitude} - Estimated longitude from events.json (if provided), "
+        "float\n"
         "    \n"
         "    All valid ffmpeg 'text expansion' syntax is accepted here.\n"
         "    More info: http://ffmpeg.org/ffmpeg-filters.html#Text-expansion\n",
@@ -3444,14 +4968,17 @@ def main() -> int:
         type=str,
         default="%x %X",
         help="R|Format for timestamps.\n "
-        "Determines how timestamps should be represented. Any valid value from strftime is accepted."
-        "Default is set '%%x %%X' which is locale's appropriate date and time representation"
+        "Determines how timestamps should be represented. Any valid value from strftime"
+        " is accepted."
+        "Default is set '%%x %%X' which is locale's appropriate date and time "
+        "representation"
         "More info: https://strftime.org",
     )
 
     filter_group = parser.add_argument_group(
         title="Timestamp Restriction",
-        description="Restrict video to be between start and/or end timestamps. Timestamp to be provided in a ISO-8601 "
+        description="Restrict video to be between start and/or end timestamps. "
+        "Timestamp to be provided in a ISO-8601 "
         "format (see https://fits.gsfc.nasa.gov/iso-time.html for examples)",
     )
     filter_group.add_argument(
@@ -3472,20 +4999,23 @@ def main() -> int:
         "--start_offset",
         dest="start_offset",
         type=int,
-        help="Set starting time for resulting video. Default is 0 seconds, 60 seconds if --sentry_offset is provided.",
+        help="Set starting time for resulting video. Default is 0 seconds, 60 seconds "
+        "if --sentry_offset is provided.",
     )
     offset_group.add_argument(
         "--end_offset",
         dest="end_offset",
         type=int,
-        help="Set ending time for resulting video. Default is 0 seconds, 30 seconds if --sentry_offset is provided.",
+        help="Set ending time for resulting video. Default is 0 seconds, 30 seconds if"
+        " --sentry_offset is provided.",
     )
 
     offset_group.add_argument(
         "--sentry_offset",
         dest="sentry_offset",
         action="store_true",
-        help="R|start_offset and end_offset will be based on when timestamp of object detection occurred for Sentry"
+        help="R|start_offset and end_offset will be based on when timestamp of object "
+        "detection occurred for Sentry"
         "events instead of start/end of event.\n"
         "Ignored if either --sentry_start_offset or --senty_end_offset are provided.\n"
         "Note, legacy option that will be removed in future.",
@@ -3495,13 +5025,15 @@ def main() -> int:
         "--sentry_start_offset",
         dest="sentry_start_offset",
         type=int,
-        help="Set starting time for resulting video. Default is 0 seconds, 60 seconds if --sentry_offset is provided.",
+        help="Set starting time for resulting video. Default is 0 seconds, 60 seconds "
+        "if --sentry_offset is provided.",
     )
     offset_group.add_argument(
         "--sentry_end_offset",
         dest="sentry_end_offset",
         type=int,
-        help="Set ending time for resulting video. Default is 0 seconds, 30 seconds if --sentry_offset is provided.",
+        help="Set ending time for resulting video. Default is 0 seconds, 30 seconds "
+        "if --sentry_offset is provided.",
     )
 
     output_group = parser.add_argument_group(
@@ -3512,8 +5044,8 @@ def main() -> int:
         required=False,
         default=movie_folder,
         type=str,
-        help="R|Path/Filename for the new movie file. Event files will be stored in same folder."
-        + os.linesep,
+        help="R|Path/Filename for the new movie file. Event files will be stored in "
+        "same folder." + os.linesep,
     )
     output_group.add_argument(
         "--motion_only",
@@ -3526,15 +5058,16 @@ def main() -> int:
         dest="slow_down",
         type=float,
         default=argparse.SUPPRESS,
-        help="Slow down video output. Accepts a number that is then used as multiplier, providing 2 means half the "
-        "speed.",
+        help="Slow down video output. Accepts a number that is then used as multiplier,"
+        " providing 2 means half the speed.",
     )
     output_group.add_argument(
         "--speedup",
         dest="speed_up",
         type=float,
         default=argparse.SUPPRESS,
-        help="Speed up the video. Accepts a number that is then used as a multiplier, providing 2 means "
+        help="Speed up the video. Accepts a number that is then used as a multiplier, "
+        "providing 2 means "
         "twice the speed.",
     )
     output_group.add_argument(
@@ -3542,8 +5075,10 @@ def main() -> int:
         dest="chapter_offset",
         type=int,
         default=0,
-        help="Offset in seconds for chapters in merged video. Negative offset is # of seconds before the end of the "
-        "subdir video, positive offset if # of seconds after the start of the subdir video.",
+        help="Offset in seconds for chapters in merged video. Negative offset is # of "
+        "seconds before the end of the "
+        "subdir video, positive offset if # of seconds after the start of the subdir "
+        "video.",
     )
 
     output_group.add_argument(
@@ -3554,14 +5089,17 @@ def main() -> int:
         nargs="?",
         const="",
         default=argparse.SUPPRESS,
-        help="R|Merge the video files from different folders (events) into 1 big video file.\n"
-        "Optionally add a template string to group events in different video files based on the template.\n"
+        help="R|Merge the video files from different folders (events) into 1 big video "
+        "file.\n"
+        "Optionally add a template string to group events in different video files "
+        "based on the template.\n"
         "Valid format variables:\n"
         "    {layout} - Layout of the created movie (see --layout)\n"
         "    {start_timestamp} - Local time the event started at\n"
         "    {end_timestamp} - Local time the event ends at\n"
         "    {event_timestamp} - Timestamp from events.json (if provided), string\n"
         "    {event_city} - City name from events.json (if provided), string\n"
+        "    {event_street} - Street name from events.json (if provided), string\n"
         "    {event_reason} - Recording reason from events.json (if provided), string\n"
         "    {event_latitude} - Latitude from events.json (if provided), float\n"
         "    {event_longitude} - Longitude from events.json (if provided), float\n",
@@ -3573,7 +5111,8 @@ def main() -> int:
         type=str,
         default="%Y-%m-%d_%H_%M",
         help="R|Format for timestamps in merge_template.\n "
-        "Determines how timestamps should be represented within merge_template. Any valid value from strftime is accepted."
+        "Determines how timestamps should be represented within merge_template. Any "
+        "valid value from strftime is accepted."
         "Default is set '%%Y-%%m-%%d_%%H_%%M'"
         "More info: https://strftime.org",
     )
@@ -3589,7 +5128,8 @@ def main() -> int:
         "--keep-events",
         dest="keep_events",
         action="store_true",
-        help="Do not remove the event video files that are created when merging events into a video file (see --merge)",
+        help="Do not remove the event video files that are created when merging events "
+        "into a video file (see --merge)",
     )
 
     output_group.add_argument(
@@ -3599,8 +5139,9 @@ def main() -> int:
         choices=["START", "STOP", "SENTRY", "RENDER"],
         type=str.upper,
         default="START",
-        help="Match modification timestamp of resulting video files to event timestamp. Use START to match with when "
-        "the event started, STOP for end time of the event, SENTRY for Sentry event timestamp, or RENDER to not change it.",
+        help="Match modification timestamp of resulting video files to event timestamp."
+        " Use START to match with when the event started, STOP for end time of the "
+        "event, SENTRY for Sentry event timestamp, or RENDER to not change it.",
     )
 
     advancedencoding_group = parser.add_argument_group(
@@ -3608,15 +5149,10 @@ def main() -> int:
     )
 
     if PLATFORM == "darwin":
-        if PROCESSOR != "arm":
-            nogpuhelp = "R|Disable use of GPU acceleration, default is to use GPU acceleration.\n"
-            gpuhelp = "R|Use GPU acceleration (this is the default).\n"
-        else:
-            nogpuhelp = "R|Disable use of GPU acceleration, this is the default as currently ffmpeg has issues on Apple Silicon with GPU acceleration.\n"
-            gpuhelp = (
-                "R|Use GPU acceleration.\n"
-                "  Note: ffmpeg currently seems to have issues on Apple Silicon with GPU acceleration resulting in corrupt video.\n"
-            )
+        nogpuhelp = (
+            "R|Disable use of GPU acceleration, default is to use GPU acceleration.\n"
+        )
+        gpuhelp = "R|Use GPU acceleration (this is the default).\n"
 
         advancedencoding_group.add_argument(
             "--no-gpu",
@@ -3658,7 +5194,8 @@ def main() -> int:
             if PLATFORM == "linux"
             else ["nvidia", "intel", "vaapi"],
             type=str.lower,
-            help="Type of graphics card (GPU) in the system. This determines the encoder that will be used."
+            help="Type of graphics card (GPU) in the system. This determines the "
+            "encoder that will be used."
             "This parameter is mandatory if --gpu is provided.",
         )
 
@@ -3666,7 +5203,8 @@ def main() -> int:
         "--no-faststart",
         dest="faststart",
         action="store_true",
-        help="Do not enable flag faststart on the resulting video files. Use this when using a network share and "
+        help="Do not enable flag faststart on the resulting video files. Use this when "
+        "using a network share and "
         "errors occur during encoding.",
     )
 
@@ -3676,7 +5214,8 @@ def main() -> int:
         choices=["LOWEST", "LOWER", "LOW", "MEDIUM", "HIGH"],
         default="LOWER",
         type=str.upper,
-        help="Define the quality setting for the video, higher quality means bigger file size but might "
+        help="Define the quality setting for the video, higher quality means bigger "
+        "file size but might "
         "not be noticeable.",
     )
 
@@ -3696,8 +5235,9 @@ def main() -> int:
         ],
         default="medium",
         type=str.lower,
-        help="Speed to optimize video. Faster speed results in a bigger file. This does not impact the quality of "
-        "the video, just how much time is used to compress it.",
+        help="Speed to optimize video. Faster speed results in a bigger file. This "
+        "does not impact the quality of the video, just how much time is used to "
+        "compress it.",
     )
 
     advancedencoding_group.add_argument(
@@ -3705,8 +5245,9 @@ def main() -> int:
         required=False,
         type=int,
         default=24,
-        help="Frames per second for resulting video. Tesla records at about 33fps hence going higher wouldn't do "
-        "much as frames would just be duplicated. Default is 24fps which is the standard for movies and TV shows",
+        help="Frames per second for resulting video. Tesla records at about 33fps "
+        "hence going higher wouldn't do much as frames would just be duplicated. "
+        "Default is 24fps which is the standard for movies and TV shows",
     )
 
     if internal_ffmpeg:
@@ -3715,7 +5256,7 @@ def main() -> int:
             required=False,
             type=str,
             default=argparse.SUPPRESS,
-            help="Full path and filename for alternative " "ffmpeg.",
+            help="Full path and filename for alternative ffmpeg.",
         )
     else:
         advancedencoding_group.add_argument(
@@ -3733,7 +5274,8 @@ def main() -> int:
         type=str.lower,
         default=argparse.SUPPRESS,
         help="R|Encoding to use for video creation.\n"
-        "    x264: standard encoding, can be viewed on most devices but results in bigger file.\n"
+        "    x264: standard encoding, can be viewed on most devices but results in "
+        "bigger file.\n"
         "    x265: newer encoding standard but not all devices support this yet.\n",
     )
     advancedencoding_group.add_argument(
@@ -3741,9 +5283,10 @@ def main() -> int:
         required=False,
         type=str,
         default=argparse.SUPPRESS,
-        help="R|Provide a custom encoder for video creation. Cannot be used in combination with --encoding.\n"
-        "Note: when using this option the --gpu option is ignored. To use GPU hardware acceleration specify an "
-        "encoding that provides this.",
+        help="R|Provide a custom encoder for video creation. Cannot be used in "
+        "combination with --encoding.\n"
+        "Note: when using this option the --gpu option is ignored. To use GPU hardware "
+        "acceleration specify an encoding that provides this.",
     )
 
     update_check_group = parser.add_argument_group(
@@ -3759,7 +5302,8 @@ def main() -> int:
         "--no-check_for_update",
         dest="no_check_for_updates",
         action="store_true",
-        help="A check for new updates is performed every time. With this parameter that can be disabled",
+        help="A check for new updates is performed every time. With this parameter that"
+        " can be disabled",
     )
     update_check_group.add_argument(
         "--include_test",
@@ -3775,22 +5319,26 @@ def main() -> int:
         format="%(asctime)s:%(levelname)s:\t%(name)s\t%(message)s",
     )
 
-    _LOGGER.debug(f"Arguments : {args}")
-    _LOGGER.debug(f"Platform is {PLATFORM}")
-    _LOGGER.debug(f"Processor is {PROCESSOR}")
+    if args.ffmpeg_debug:
+        global FFMPEG_DEBUG  # pylint: disable=global-statement
+        FFMPEG_DEBUG = True
+
+    _LOGGER.debug("Arguments : %s", args)
+    _LOGGER.debug("Platform is %s", PLATFORM)
+    _LOGGER.debug("Processor is %s", PROCESSOR)
 
     # Check that any mutual exclusive items are not both provided.
     if "speed_up" in args and "slow_down" in args:
         print(
-            f"{get_current_timestamp()}Option --speed_up and option --slow_down cannot be used together, "
-            f"only use one of them."
+            f"{get_current_timestamp()}Option --speed_up and option --slow_down cannot "
+            "be used together, only use one of them."
         )
         return 1
 
     if "enc" in args and "encoding" in args:
         print(
-            f"{get_current_timestamp()}Option --enc and option --encoding cannot be used together, "
-            f"only use one of them."
+            f"{get_current_timestamp()}Option --enc and option --encoding cannot be "
+            "used together, only use one of them."
         )
         return 1
 
@@ -3799,7 +5347,7 @@ def main() -> int:
         if release_info is not None:
             new_version = False
             if release_info.get("tag_name") is not None:
-                github_version = release_info.get("tag_name").split(".")
+                github_version = release_info.get("tag_name", "").split(".")
                 if len(github_version) == 3:
                     # Release tags normally start with v. If that is the case
                     # then strip the v.
@@ -3842,31 +5390,35 @@ def main() -> int:
                         notify(
                             "TeslaCam",
                             "Update available",
-                            f"New {beta}release {release_info.get('tag_name')} is available. You are on version "
-                            f"{VERSION_STR}",
+                            f"New {beta}release {release_info.get('tag_name')} is "
+                            f"available. You are on version {VERSION_STR}",
                         )
                     release_notes = (
-                        "Use --check_for_update to get latest " "release notes."
+                        "Use --check_for_update to get latest release notes."
                     )
 
                 print(
-                    f"{get_current_timestamp()}New {beta}release {release_info.get('tag_name')} is available for "
-                    f"download ({release_info.get('html_url')}). You are currently on {VERSION_STR}. {release_notes}"
+                    f"{get_current_timestamp()}New {beta}release "
+                    f"{release_info.get('tag_name')} is available for download "
+                    f"({release_info.get('html_url')}). You are currently on "
+                    f"{VERSION_STR}. {release_notes}"
                 )
 
                 if args.check_for_updates:
                     print(
-                        f"{get_current_timestamp()}You can download the new release from: "
-                        f"{release_info.get('html_url')}"
+                        f"{get_current_timestamp()}You can download the new release "
+                        f"from: {release_info.get('html_url')}"
                     )
                     print(
-                        f"{get_current_timestamp()}Release Notes:\n {release_info.get('body')}"
+                        f"{get_current_timestamp()}Release Notes:\n "
+                        f"{release_info.get('body')}"
                     )
                     return 0
             else:
                 if args.check_for_updates:
                     print(
-                        f"{get_current_timestamp()}{VERSION_STR} is the latest release available."
+                        f"{get_current_timestamp()}{VERSION_STR} is the latest release "
+                        "available."
                     )
                     return 0
         else:
@@ -3876,202 +5428,139 @@ def main() -> int:
     ffmpeg = getattr(args, "ffmpeg", ffmpeg_default) or ""
     if not internal_ffmpeg and (ffmpeg == "" or which(ffmpeg) is None):
         print(
-            f"{get_current_timestamp()}ffmpeg is a requirement, unable to find {ffmpeg} executable. Please ensure it exist and is located "
-            f"within PATH environment or provide full path using parameter --ffmpeg."
+            f"{get_current_timestamp()}ffmpeg is a requirement, unable to find {ffmpeg}"
+            " executable. Please ensure it exist and is located within PATH "
+            "environment or provide full path using parameter --ffmpeg."
         )
         return 1
 
-    if internal_ffmpeg and PLATFORM == "darwin" and PROCESSOR == "arm":
-        print(
-            "Internal ffmpeg version is used which has been compiled for Intel Macs. Better results in both "
-            "performance and size can be achieved by downloading an Apple Silicon compiled ffmpeg from: https://www.osxexperts.net "
-            "and providing it leveraging the --ffmpeg parameter."
-        )
-
-    if args.layout == "PERSPECTIVE":
+    if args.clip_pos:
+        # If clip positions have been provided it is custom.
+        layout_settings = MovieLayout()
+    elif args.layout == "PERSPECTIVE":
         layout_settings = FullScreen()
         layout_settings.perspective = True
     else:
-        if args.layout == "WIDESCREEN":
-            layout_settings = WideScreen()
-        elif args.layout == "FULLSCREEN":
+        # Map legacy WIDESCREEN to MOSAIC
+        layout_name = "MOSAIC" if args.layout == "WIDESCREEN" else args.layout
+        if layout_name == "MOSAIC":
+            layout_settings = Mosaic()
+        elif layout_name == "FULLSCREEN":
             layout_settings = FullScreen()
-        elif args.layout == "CROSS":
+        elif layout_name == "CROSS":
             layout_settings = Cross()
-        elif args.layout == "DIAMOND":
+        elif layout_name == "DIAMOND":
             layout_settings = Diamond()
+        elif layout_name == "HORIZONTAL":
+            layout_settings = Horizontal()
         else:
             layout_settings = FullScreen()
 
         layout_settings.perspective = args.perspective
 
-    layout_settings.cameras("Front").include = not args.no_front
-    layout_settings.cameras("Left").include = not args.no_left
-    layout_settings.cameras("Right").include = not args.no_right
-    layout_settings.cameras("Rear").include = not args.no_rear
+    # Determine if left and right cameras should be swapped or not.
+    # No more arguments related to cameras (i.e .scale, include or not) can be
+    # processed from now on.
+    # Up till now left means left camera and right means right camera.
+    # From this point forward left can mean right camera if we're swapping output.
+    layout_settings.swap_front_rear = args.swap_frontrear
+
+    if layout_settings.swap_front_rear:
+        layout_settings.cameras("front").include = not args.no_rear
+        layout_settings.cameras("rear").include = not args.no_front
+    else:
+        layout_settings.cameras("front").include = not args.no_front
+        layout_settings.cameras("rear").include = not args.no_rear
 
     # Check if either rear or mirror argument has been provided.
     # If front camera then default to mirror, if no front camera then default to rear.
     side_camera_as_mirror = (
-        layout_settings.cameras("Front").include
-        if args.rear_or_mirror is None
-        else args.rear_or_mirror
+        not args.no_front if args.rear_or_mirror is None else args.rear_or_mirror
     )
-    mirror_sides = ", hflip" if side_camera_as_mirror else ""
-
-    # For scale first set the main clip one if provided, this than allows camera specific ones to override for
-    # that camera.
-    scaling = parser.args_to_dict(args.clip_scale, "scale")
-    main_scale = search_dict(None, "camera", scaling)
-
-    if main_scale is not None:
-        layout_settings.scale = main_scale.get("scale", layout_settings.scale)
-
-    for scale in scaling:
-        if scale.get("camera", "").lower() in ["front", "left", "right", "rear"]:
-            camera_scale = scale.get("scale")
-            if camera_scale is not None:
-                layout_settings.cameras(
-                    scale["camera"].lower().capitalize()
-                ).scale = camera_scale
-
-    layout_settings.font.halign = (
-        args.halign if args.halign is not None else layout_settings.font.halign
+    layout_settings.cameras("left").mirror = side_camera_as_mirror
+    layout_settings.cameras("right").mirror = side_camera_as_mirror
+    layout_settings.cameras("front").mirror = (
+        layout_settings.cameras("left").mirror
+        if layout_settings.swap_front_rear
+        else False
     )
-    layout_settings.font.valign = (
-        args.valign if args.valign is not None else layout_settings.font.valign
+    layout_settings.cameras("front").mirror = (
+        True if layout_settings.swap_front_rear and side_camera_as_mirror else False
+    )
+    layout_settings.cameras("rear").mirror = (
+        True if not layout_settings.swap_front_rear and side_camera_as_mirror else False
     )
 
-    # Determine if left and right cameras should be swapped or not.
-    # No more arguments related to cameras (i.e .scale, include or not) can be processed from now on.
-    # Up till now Left means left camera and Right means Right camera.
-    # From this point forward Left can mean Right camera if we're swapping output.
     layout_settings.swap_left_right = (
         not side_camera_as_mirror
         if args.swap_leftright is None
         else args.swap_leftright
     )
 
-    layout_settings.swap_front_rear = args.swap_frontrear
+    if layout_settings.swap_left_right:
+        layout_settings.cameras("left").include = not args.no_right
+        layout_settings.cameras("right").include = not args.no_left
+    else:
+        layout_settings.cameras("left").include = not args.no_left
+        layout_settings.cameras("right").include = not args.no_right
+
+    layout_settings.swap_pillar = args.swap_pillar
+
+    if layout_settings.swap_pillar:
+        layout_settings.cameras("left_pillar").include = not args.no_right_pillar
+        layout_settings.cameras("right_pillar").include = not args.no_left_pillar
+    else:
+        layout_settings.cameras("left_pillar").include = not args.no_left_pillar
+        layout_settings.cameras("right_pillar").include = not args.no_right_pillar
+
+    # For scale first set the main clip one if provided, this than allows camera
+    # specific ones to override for that camera.
+    scaling = parser.args_to_dict(args.clip_scale, "scale")
+    main_scale = search_dict("camera", scaling, None)
+
+    if main_scale is not None:
+        layout_settings.scale = main_scale.get("scale", layout_settings.scale)
+
+    for scale in scaling:
+        camera = scale.get("camera", "").lower()
+        if camera in ["front", "left", "right", "rear", "left_pillar", "right_pillar"]:
+            if camera_scale := scale.get("scale"):
+                layout_settings.cameras(camera).scale = camera_scale
+
+    for pos in parser.args_to_dict(args.clip_pos, "x_y_pos"):
+        camera = pos.get("camera", "").lower()
+        if camera in ["front", "left", "right", "rear", "left_pillar", "right_pillar"]:
+            x_pos, y_pos = None, None
+            if x_y_pos := pos.get("x_y_pos"):
+                x_y_pos = x_y_pos.split("x")
+                x_pos = x_y_pos[0]
+                if len(x_y_pos) == 2:
+                    y_pos = x_y_pos[1]
+
+            x_pos = pos.get("x_pos", x_pos)
+            y_pos = pos.get("y_pos", y_pos)
+
+            if x_pos is not None and x_pos.isnumeric():
+                layout_settings.cameras(camera).xpos = x_pos
+
+            if y_pos is not None and y_pos.isnumeric():
+                layout_settings.cameras(camera).ypos = y_pos
+
+    layout_settings.clip_order = args.clip_order.split(",")
+
+    if args.halign is not None:
+        layout_settings.font.halign = args.halign
+
+    if args.valign is not None:
+        layout_settings.font.valign = args.valign
+
     layout_settings.title_screen_map = args.title_screen_map
 
+    layout_settings.background_color = args.background
     layout_settings.font.font = args.font
     layout_settings.font.color = args.fontcolor
     if args.fontsize is not None and args.fontsize > 0:
         layout_settings.font.size = args.fontsize
-
-    black_base = "color=duration={duration}:"
-    black_size = f"s={{width}}x{{height}}:c={args.background}, fps={args.fps} "
-
-    ffmpeg_base = (
-        black_base
-        + black_size.format(
-            width=layout_settings.video_width, height=layout_settings.video_height
-        )
-        + "[base]"
-    )
-
-    ffmpeg_black_video = ";" + black_base + black_size
-
-    input_clip = "base"
-    ffmpeg_video_position = ""
-
-    ffmpeg_left_camera = ""
-    camera = "Left"
-    if layout_settings.cameras(camera).include:
-        ffmpeg_left_camera = (
-            "setpts=PTS-STARTPTS, "
-            "scale={clip_width}x{clip_height} {mirror}{options}"
-            " [left]".format(
-                clip_width=layout_settings.cameras(camera).width,
-                clip_height=layout_settings.cameras(camera).height,
-                mirror=mirror_sides,
-                options=layout_settings.cameras(camera).options,
-            )
-        )
-
-        ffmpeg_video_position = (
-            ffmpeg_video_position
-            + ";[{input_clip}][left] overlay=eof_action=pass:repeatlast=0:"
-            "x={x_pos}:y={y_pos} [left1]".format(
-                input_clip=input_clip,
-                x_pos=layout_settings.cameras(camera).xpos,
-                y_pos=layout_settings.cameras(camera).ypos,
-            )
-        )
-        input_clip = "left1"
-
-    ffmpeg_front_camera = ""
-    camera = "Front"
-    if layout_settings.cameras(camera).include:
-        ffmpeg_front_camera = (
-            "setpts=PTS-STARTPTS, "
-            "scale={clip_width}x{clip_height} {options}"
-            " [front]".format(
-                clip_width=layout_settings.cameras(camera).width,
-                clip_height=layout_settings.cameras(camera).height,
-                options=layout_settings.cameras(camera).options,
-            )
-        )
-        ffmpeg_video_position = (
-            ffmpeg_video_position
-            + ";[{input_clip}][front] overlay=eof_action=pass:repeatlast=0:"
-            "x={x_pos}:y={y_pos} [front1]".format(
-                input_clip=input_clip,
-                x_pos=layout_settings.cameras(camera).xpos,
-                y_pos=layout_settings.cameras(camera).ypos,
-            )
-        )
-        input_clip = "front1"
-
-    ffmpeg_right_camera = ""
-    camera = "Right"
-    if layout_settings.cameras(camera).include:
-        ffmpeg_right_camera = (
-            "setpts=PTS-STARTPTS, "
-            "scale={clip_width}x{clip_height} {mirror}{options}"
-            " [right]".format(
-                clip_width=layout_settings.cameras(camera).width,
-                clip_height=layout_settings.cameras(camera).height,
-                mirror=mirror_sides,
-                options=layout_settings.cameras(camera).options,
-            )
-        )
-        ffmpeg_video_position = (
-            ffmpeg_video_position
-            + ";[{input_clip}][right] overlay=eof_action=pass:repeatlast=0:"
-            "x={x_pos}:y={y_pos} [right1]".format(
-                input_clip=input_clip,
-                x_pos=layout_settings.cameras(camera).xpos,
-                y_pos=layout_settings.cameras(camera).ypos,
-            )
-        )
-        input_clip = "right1"
-
-    ffmpeg_rear_camera = ""
-    camera = "Rear"
-    if layout_settings.cameras(camera).include:
-        ffmpeg_rear_camera = (
-            "setpts=PTS-STARTPTS, "
-            # "crop=512:798:225:26, "
-            "scale={clip_width}x{clip_height} {mirror}{options}"
-            " [rear]".format(
-                clip_width=layout_settings.cameras(camera).width,
-                clip_height=layout_settings.cameras(camera).height,
-                mirror=mirror_sides,
-                options=layout_settings.cameras(camera).options,
-            )
-        )
-        ffmpeg_video_position = (
-            ffmpeg_video_position
-            + ";[{input_clip}][rear] overlay=eof_action=pass:repeatlast=0:"
-            "x={x_pos}:y={y_pos} [rear1]".format(
-                input_clip=input_clip,
-                x_pos=layout_settings.cameras(camera).xpos,
-                y_pos=layout_settings.cameras(camera).ypos,
-            )
-        )
-        input_clip = "rear1"
 
     # Text Overlay
     text_overlay_format = (
@@ -4084,39 +5573,54 @@ def main() -> int:
     )
 
     filter_counter = 0
+    # input_clip is going to be last identifier set for cameras and positions and is
+    # dynamic during processing.
+    # Thus setting it like this here so that later it is replaced with the actual
+    # input clip.
+    input_clip = "{input_clip}"
     filter_string = ";[{input_clip}] {filter} [tmp{filter_counter}]"
     ffmpeg_timestamp = ""
     if not args.no_timestamp and text_overlay_format is not None:
         if layout_settings.font.font is None:
             print(
-                f"{get_current_timestamp()}Unable to get a font file for platform {PLATFORM}. Please provide valid font file using "
-                f"--font or disable timestamp using --no-timestamp."
+                f"{get_current_timestamp()}Unable to get a font file for platform "
+                f"{PLATFORM}. Please provide valid font file using --font or disable "
+                "timestamp using --no-timestamp."
             )
             return 0
 
-        # noinspection PyPep8
         temp_font_file = (
-            f"c:\{layout_settings.font.font}"
+            rf"c:\{layout_settings.font.font}"
             if PLATFORM == "win32"
             else layout_settings.font.font
         )
+        if temp_font_file is None or temp_font_file == "":
+            print(
+                f"{get_current_timestamp()}Font file is not set for platform "
+                f"{PLATFORM}. Please provide valid font file using --font."
+            )
+            return 0
+
+        # Check if the font file exists.
+        # If it does not exist then we cannot use it.
+        # If it does not exist then we can also not use the timestamp.
         if not os.path.isfile(temp_font_file):
             print(
-                f"{get_current_timestamp()}Font file {temp_font_file} does not exist. Provide a valid font file using --font or"
-                f" disable timestamp using --no-timestamp"
+                f"{get_current_timestamp()}Font file {temp_font_file} does not exist. "
+                "Provide a valid font file using --font or disable timestamp using "
+                "--no-timestamp"
             )
             if PLATFORM == "linux":
                 print(
-                    f"{get_current_timestamp()}You can also install the fonts using for example: "
-                    f"apt-get install ttf-freefont"
+                    f"{get_current_timestamp()}You can also install the fonts using for"
+                    " example: apt-get install ttf-freefont"
                 )
             return 0
 
-        # noinspection PyPep8,PyPep8,PyPep8
         ffmpeg_timestamp = (
             ffmpeg_timestamp + f"drawtext=fontfile={layout_settings.font.font}:"
-            f"fontcolor={layout_settings.font.color}:fontsize={layout_settings.font.size}:"
-            "borderw=2:bordercolor=black@1.0:"
+            f"fontcolor={layout_settings.font.color}:"
+            f"fontsize={layout_settings.font.size}:borderw=2:bordercolor=black@1.0:"
             f"x={layout_settings.font.halign}:y={layout_settings.font.valign}:"
             "text='__USERTEXT__'"
         )
@@ -4145,25 +5649,31 @@ def main() -> int:
     if args.motion_only:
         ffmpeg_motiononly = filter_string.format(
             input_clip=input_clip,
-            filter=f"mpdecimate=hi=64*48, setpts=N/FRAME_RATE/TB",
+            filter="mpdecimate=hi=64*48, setpts=N/FRAME_RATE/TB, format=yuv420p",
             filter_counter=filter_counter,
         )
-        input_clip = f"tmp{filter_counter}"
-        filter_counter += 1
+    else:
+        ffmpeg_motiononly = filter_string.format(
+            input_clip=input_clip,
+            filter="format=yuv420p",
+            filter_counter=filter_counter,
+        )
+    input_clip = f"tmp{filter_counter}"
+    filter_counter += 1
 
     ffmpeg_params = ["-preset", args.compression, "-crf", MOVIE_QUALITY[args.quality]]
 
     use_gpu = (
         getattr(args, "gpu", True)
-        if PLATFORM == "darwin" and PROCESSOR != "arm"
+        if PLATFORM == "darwin"
         else getattr(args, "gpu", False)
     )
 
-    video_encoding = []
-    ffmpeg_hwdev = []
-    ffmpeg_hwout = []
-    ffmpeg_hwupload = ""
-    if not "enc" in args:
+    video_encoding: list[str] = []
+    ffmpeg_hwdev: list[str] = []
+    ffmpeg_hwout: list[str] = []
+    ffmpeg_hwupload: str = ""
+    if "enc" not in args:
         encoding = args.encoding if "encoding" in args else "x264"
 
         # For x265 add QuickTime compatibility
@@ -4180,8 +5690,8 @@ def main() -> int:
             else:
                 if args.gpu_type is None:
                     print(
-                        f"{get_current_timestamp()}Parameter --gpu_type is mandatory when parameter "
-                        f"--use_gpu is used."
+                        f"{get_current_timestamp()}Parameter --gpu_type is mandatory "
+                        "when parameter --use_gpu is used."
                     )
                     return 0
 
@@ -4189,18 +5699,21 @@ def main() -> int:
                 if MOVIE_ENCODING.get(encoding + "_" + args.gpu_type) is None:
                     # It is not, defaulting then to no GPU
                     print(
-                        f"{get_current_timestamp()}GPU acceleration not available for encoding {encoding} and GPU type {args.gpu_type}. GPU acceleration disabled."
+                        f"{get_current_timestamp()}GPU acceleration not available for "
+                        f"encoding {encoding} and GPU type {args.gpu_type}. GPU "
+                        "acceleration disabled."
                     )
                 else:
                     print(f"{get_current_timestamp()}GPU acceleration is enabled.")
                     encoding = encoding + "_" + args.gpu_type
 
-                    # If using vaapi hw acceleration this takes the decoding and filter processing done in software
-                    # and passes it up to the GPU for hw accelerated encoding.
+                    # If using vaapi hw acceleration this takes the decoding and filter
+                    # processing done in softwareand passes it up to the GPU for
+                    # hw accelerated encoding.
                     if args.gpu_type == "vaapi":
                         ffmpeg_hwupload = filter_string.format(
                             input_clip=input_clip,
-                            filter=f"format=nv12,hwupload",
+                            filter="format=nv12,hwupload",
                             filter_counter=filter_counter,
                         )
                         input_clip = f"tmp{filter_counter}"
@@ -4215,7 +5728,7 @@ def main() -> int:
                                 "-hwaccel_output_format",
                                 "vaapi",
                             ]
-                    elif args.gpu_type == "qvc":
+                    elif args.gpu_type == "qsv":
                         if PLATFORM == "linux":
                             ffmpeg_hwdev = ffmpeg_hwdev + [
                                 "-qsv_device",
@@ -4278,7 +5791,8 @@ def main() -> int:
 
     # Set the display timestamp boolean.
     if args.display_ts:
-        display_ts = True
+        global DISPLAY_TS  # pylint: disable=global-statement
+        DISPLAY_TS = True
 
     # If no source provided then set to MONITOR_ONCE and we're only going to
     # take SavedClips and SentryClips
@@ -4292,11 +5806,19 @@ def main() -> int:
     if args.start_timestamp is not None:
         try:
             start_timestamp = isoparse(args.start_timestamp)
+            _LOGGER.debug(
+                f"Parsed start_timestamp: {start_timestamp}, tzinfo: {start_timestamp.tzinfo}"
+            )
             if start_timestamp.tzinfo is None:
                 start_timestamp = start_timestamp.astimezone(get_localzone())
+                _LOGGER.debug(f"After local timezone conversion: {start_timestamp}")
+            # Normalize to UTC for internal comparisons
+            start_timestamp = start_timestamp.astimezone(timezone.utc)
+            _LOGGER.debug(f"After UTC conversion: {start_timestamp}")
         except ValueError as e:
             print(
-                f"{get_current_timestamp()}Start timestamp ({args.start_timestamp}) provided is in an incorrect "
+                f"{get_current_timestamp()}Start timestamp ({args.start_timestamp}) "
+                "provided is in an incorrect "
                 f"format. Parsing error: {str(e)}."
             )
             return 1
@@ -4305,12 +5827,19 @@ def main() -> int:
     if args.end_timestamp is not None:
         try:
             end_timestamp = isoparse(args.end_timestamp)
+            _LOGGER.debug(
+                f"Parsed end_timestamp: {end_timestamp}, tzinfo: {end_timestamp.tzinfo}"
+            )
             if end_timestamp.tzinfo is None:
                 end_timestamp = end_timestamp.astimezone(get_localzone())
+                _LOGGER.debug(f"After local timezone conversion: {end_timestamp}")
+            # Normalize to UTC for internal comparisons
+            end_timestamp = end_timestamp.astimezone(timezone.utc)
+            _LOGGER.debug(f"After UTC conversion: {end_timestamp}")
         except ValueError as e:
             print(
-                f"{get_current_timestamp()}End timestamp ({args.end_timestamp}) provided is in an incorrect "
-                f"format. Parsing error: {str(e)}."
+                f"{get_current_timestamp()}End timestamp ({args.end_timestamp}) "
+                f"provided is in an incorrect format. Parsing error: {str(e)}."
             )
             return 1
 
@@ -4340,13 +5869,10 @@ def main() -> int:
         "fps": args.fps,
         "movie_compression": args.compression,
         "movie_quality": args.quality,
-        "background": ffmpeg_black_video,
         "ffmpeg_exec": ffmpeg,
         "ffmpeg_hwdev": ffmpeg_hwdev,
         "ffmpeg_hwout": ffmpeg_hwout,
-        "base": ffmpeg_base,
         "video_layout": layout_settings,
-        "clip_positions": ffmpeg_video_position,
         "ffmpeg_text_overlay": ffmpeg_timestamp,
         "text_overlay_format": text_overlay_format,
         "timestamp_format": timestamp_format,
@@ -4356,10 +5882,6 @@ def main() -> int:
         "movflags_faststart": not args.faststart,
         "input_clip": input_clip,
         "other_params": ffmpeg_params,
-        "left_camera": ffmpeg_left_camera,
-        "front_camera": ffmpeg_front_camera,
-        "right_camera": ffmpeg_right_camera,
-        "rear_camera": ffmpeg_rear_camera,
         "start_timestamp": start_timestamp,
         "end_timestamp": end_timestamp,
         "start_offset": getattr(args, "start_offset", None),
@@ -4391,6 +5913,7 @@ def main() -> int:
         "event_timestamp_countdown_rolling": "event_timestamp_countdown_rolling",
         "event_timestamp": "event_timestamp",
         "event_city": "event_city",
+        "event_street": "event_street",
         "event_reason": "event_reason",
         "event_latitude": "event_latitude",
         "event_longitude": "event_longitude",
@@ -4406,22 +5929,22 @@ def main() -> int:
         )
         return 1
 
-    _LOGGER.debug(f"Video Settings {video_settings}")
-    _LOGGER.debug(f"Layout Settings {layout_settings}")
+    _LOGGER.debug("Video Settings %s", get_class_properties(video_settings))
 
     # If we constantly run and monitor for drive added or not.
     if video_settings["run_type"] in ["MONITOR", "MONITOR_ONCE"]:
-
         video_settings.update({"skip_existing": True})
 
         trigger_exist = False
         if monitor_file is None:
             print(
-                f"{get_current_timestamp()}Monitoring for TeslaCam Drive to be inserted. Press CTRL-C to stop"
+                f"{get_current_timestamp()}Monitoring for TeslaCam Drive to be "
+                "inserted. Press CTRL-C to stop"
             )
         else:
             print(
-                f"{get_current_timestamp()}Monitoring for trigger {monitor_file} to exist. Press CTRL-C to stop"
+                f"{get_current_timestamp()}Monitoring for trigger {monitor_file} to "
+                "exist. Press CTRL-C to stop"
             )
         while True:
             try:
@@ -4432,11 +5955,12 @@ def main() -> int:
                         # Nothing found, sleep for 1 minute and check again.
                         if trigger_exist:
                             print(
-                                f"{get_current_timestamp()}TeslaCam drive has been ejected."
+                                f"{get_current_timestamp()}TeslaCam drive has been "
+                                "ejected."
                             )
                             print(
-                                f"{get_current_timestamp()}Monitoring for TeslaCam Drive to be inserted. "
-                                f"Press CTRL-C to stop"
+                                f"{get_current_timestamp()}Monitoring for TeslaCam "
+                                "Drive to be inserted. Press CTRL-C to stop"
                             )
 
                         sleep(MONITOR_SLEEP_TIME)
@@ -4446,7 +5970,7 @@ def main() -> int:
                     # As long as TeslaCam drive is still attached we're going to
                     # keep on waiting.
                     if trigger_exist:
-                        _LOGGER.debug(f"TeslaCam Drive still attached")
+                        _LOGGER.debug("TeslaCam Drive still attached")
                         sleep(MONITOR_SLEEP_TIME)
                         continue
 
@@ -4465,7 +5989,7 @@ def main() -> int:
                 else:
                     # Wait till trigger file exist (can also be folder).
                     if not os.path.exists(monitor_file):
-                        _LOGGER.debug(f"Trigger file {monitor_file} does not exist.")
+                        _LOGGER.debug("Trigger file %s does not exist.", monitor_file)
                         sleep(MONITOR_SLEEP_TIME)
                         trigger_exist = False
                         continue
@@ -4474,25 +5998,29 @@ def main() -> int:
                         sleep(MONITOR_SLEEP_TIME)
                         continue
 
-                    message = f"Trigger {monitor_file} exist."
+                    message = "Trigger {monitor_file} exist."
                     trigger_exist = True
 
-                    # Set monitor path, make sure what was provided is a file first otherwise get path.
+                    # Set monitor path, make sure what was provided is a file first
+                    # otherwise get path.
                     monitor_path = monitor_file
                     if os.path.isfile(monitor_file):
                         monitor_path, _ = os.path.split(monitor_file)
 
-                    # If . is provided then source folder is path where monitor file exist.
+                    # If . is provided then source folder is path where monitor file
+                    # exist.
                     source_folder_list = []
                     for folder in video_settings["source_folder"]:
                         if folder == ".":
                             source_folder_list.append(monitor_path)
                         else:
-                            # If source path provided is absolute then use that for source path
+                            # If source path provided is absolute then use that for
+                            # source path
                             if os.path.isabs(folder):
                                 source_folder_list.append(folder)
                             else:
-                                # Path provided is relative, hence based on path of trigger file.
+                                # Path provided is relative, hence based on path of
+                                # trigger file.
                                 source_folder_list.append(
                                     os.path.join(monitor_path, folder)
                                 )
@@ -4503,13 +6031,15 @@ def main() -> int:
 
                 if len(source_folder_list) == 1:
                     print(
-                        f"{get_current_timestamp()}Retrieving all files from {source_folder_list[0]}"
+                        f"{get_current_timestamp()}Retrieving all files from "
+                        f"{source_folder_list[0]}"
                     )
                 else:
                     print(f"{get_current_timestamp()}Retrieving all files from: ")
                     for folder in source_folder_list:
                         print(
-                            f"{get_current_timestamp()}                          {folder}"
+                            f"{get_current_timestamp()}                          "
+                            f"{folder}"
                         )
 
                 if video_settings["run_type"] == "MONITOR":
@@ -4530,7 +6060,7 @@ def main() -> int:
                         else video_settings["target_filename"]
                     )
                 _LOGGER.debug(
-                    f"video_settings attribute movie_filename set to {movie_filename}."
+                    "video_settings attribute movie_filename set to %s.", movie_filename
                 )
                 video_settings.update({"movie_filename": movie_filename})
 
@@ -4550,19 +6080,21 @@ def main() -> int:
                                 os.remove(monitor_file)
                             except OSError as exc:
                                 print(
-                                    f"{get_current_timestamp()}Error trying to remove trigger file "
-                                    f"{monitor_file}: {exc}"
+                                    f"{get_current_timestamp()}Error trying to remove "
+                                    f"trigger file {monitor_file}: {exc}"
                                 )
 
                     print(
-                        f"{get_current_timestamp()}Exiting monitoring as asked process once."
+                        f"{get_current_timestamp()}Exiting monitoring as asked process "
+                        "once."
                     )
                     break
 
                 if monitor_file is None:
                     trigger_exist = True
                     print(
-                        f"{get_current_timestamp()}Waiting for TeslaCam Drive to be ejected. Press CTRL-C to stop"
+                        f"{get_current_timestamp()}Waiting for TeslaCam Drive to be "
+                        "ejected. Press CTRL-C to stop"
                     )
                 else:
                     if os.path.isfile(monitor_file):
@@ -4570,17 +6102,20 @@ def main() -> int:
                             os.remove(monitor_file)
                         except OSError as exc:
                             print(
-                                f"{get_current_timestamp()}Error trying to remove trigger file {monitor_file}: {exc}"
+                                f"{get_current_timestamp()}Error trying to remove "
+                                f"trigger file {monitor_file}: {exc}"
                             )
                             break
                         trigger_exist = False
 
                         print(
-                            f"{get_current_timestamp()}Monitoring for trigger {monitor_file}. Press CTRL-C to stop"
+                            f"{get_current_timestamp()}Monitoring for trigger "
+                            f"{monitor_file}. Press CTRL-C to stop"
                         )
                     else:
                         print(
-                            f"{get_current_timestamp()}Waiting for trigger {monitor_file} to be removed. "
+                            f"{get_current_timestamp()}Waiting for trigger "
+                            f"{monitor_file} to be removed. "
                             f"Press CTRL-C to stop"
                         )
 
@@ -4594,18 +6129,20 @@ def main() -> int:
             else video_settings["target_filename"]
         )
         _LOGGER.debug(
-            f"video_settings attribute movie_filename set to {movie_filename}."
+            "video_settings attribute movie_filename set to %s.", movie_filename
         )
         video_settings.update({"movie_filename": movie_filename})
 
         process_folders(
             video_settings["source_folder"], video_settings, args.delete_source
         )
+    return 0
 
 
-if sys.version_info < (3, 8):
+if sys.version_info < (3, 13):
     print(
-        f"{get_current_timestamp()}Python version 3.8 or higher is required, you have: {sys.version}. Please update your Python version."
+        f"{get_current_timestamp()}Python version 3.8 or higher is required, you have: "
+        f"{sys.version}. Please update your Python version."
     )
     sys.exit(1)
 

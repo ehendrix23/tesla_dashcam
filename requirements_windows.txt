@@ -1,2 +1,2 @@
 -r requirements.txt
-win10toast==0.9
+win11toast==0.36.2

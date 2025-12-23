@@ -1,29 +1,30 @@
-FROM jrottenberg/ffmpeg:4.4-vaapi2004 as build-stage
-FROM python:3-bullseye
-
-COPY --from=build-stage /usr/local/bin /usr/local/bin
-COPY --from=build-stage /usr/local/share /usr/local/share
-COPY --from=build-stage /usr/local/include /usr/local/include
-COPY --from=build-stage /usr/local/lib /usr/local/lib
+FROM python:3-slim
 
 WORKDIR /usr/src/app/tesla_dashcam
 
+# Install FFmpeg with VAAPI support and other dependencies
 RUN apt-get update -y \
-    && apt-get install -y \
-        fonts-freefont-ttf \
-        libnotify-bin \
-        libva2 \
-        libva-drm2 \
+    && apt-get install -y --no-install-recommends \
+    # FFmpeg with VAAPI support
+    ffmpeg \
+    # VAAPI runtime libraries
+    libva2 \
+    libva-drm2 \
+    i965-va-driver \
+    intel-media-va-driver \
+    mesa-va-drivers \
+    vainfo \
+    # Application dependencies
+    fonts-freefont-ttf \
+    libnotify-bin \
     && apt-get remove --purge --auto-remove -y && rm -rf /var/lib/apt/lists/*
 
-ENV LIBRARY_PATH=/lib:/usr/lib
-
-COPY . /usr/src/app/tesla_dashcam
-RUN pip install -r requirements.txt
+# Install tesla_dashcam
+RUN pip install --no-cache-dir tesla_dashcam
 
 # Enable Logs to show on run
-ENV PYTHONUNBUFFERED=true 
+ENV PYTHONUNBUFFERED=true
 # Provide a default timezone
 ENV TZ=America/New_York
 
-ENTRYPOINT [ "python3", "tesla_dashcam/tesla_dashcam.py" ]
+ENTRYPOINT [ "python3", "-m", "tesla_dashcam" ]
