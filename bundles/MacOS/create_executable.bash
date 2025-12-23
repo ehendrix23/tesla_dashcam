@@ -31,7 +31,7 @@ echo "Creating tesla_dashcam executable"
 	--icon tesla_dashcam/tesla_dashcam.ico \
 	--add-data="tesla_dashcam/tesla_dashcam.ico:." \
 	--add-binary="bundles/MacOS/ffmpeg:." \
-	--exclude-module win10toast \
+	--exclude-module win11toast \
 	tesla_dashcam/tesla_dashcam.py
 #	--windowed
 # pyinstaller  --clean \
