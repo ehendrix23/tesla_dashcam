@@ -58,7 +58,7 @@ mkdir "%ZIP_STAGING%"
 REM Copy payload into staging
 copy bundles\Windows\tesla_dashcam\tesla_dashcam.exe "%ZIP_STAGING%\"
 copy README.html "%ZIP_STAGING%\"
-copy LICENSE.txt "%ZIP_STAGING%\"
+copy LICENSE "%ZIP_STAGING%\LICENSE.txt"
 copy ffmpeg_LICENSE.txt "%ZIP_STAGING%\"
 
 REM Create ZIP using PowerShell
