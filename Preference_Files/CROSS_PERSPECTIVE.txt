@@ -2,7 +2,7 @@
 # tesla_dashcam <Location of video files> --output <Location to store encoded video files> @CROSS_PERSPECTIVE.txt
 
 # Skip if encoded file already exist.
---skip_existing
+# --skip_existing
 
 # Delete processed files when video file is encoded.
 # --delete_source
@@ -17,7 +17,7 @@
 --halign LEFT --valign BOTTOM
 
 # Output city and rolling timestamp
---text_overlay_fmt "City: {event_city}\nDate/Time: {local_timestamp_rolling}"
+--text_overlay_fmt "Location: {event_street}, {event_city}\nDate/Time: {local_timestamp_rolling}"
 
 # Fast forward through portions where there is no motion detected
 --motion_only

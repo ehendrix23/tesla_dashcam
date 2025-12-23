@@ -4,6 +4,7 @@
 
 # Folder(s) to scan for clips
 InputFolders='/Volumes/TeslaCam/TeslaCam/SentryClips /Volumes/TeslaCam/TeslaCam/SavedClips'
+# InputFolders='/Volumes/TeslaCam/TeslaCam_Debug'
 
 # Folder to store resulting movie files.
 OutputFolder='/Volumes/TeslaCam/Movies'
@@ -35,7 +36,6 @@ if [ "${OutputFolder}" != "" ]; then
 	if [ ! -d ${OutputFolder} ]; then
 		mkdir ${OutputFolder}
 	fi
-	OutputFolder="--output ""${OutputFolder}""" 
 fi
 
 if [ "${StartTimestamp}" != "" ]; then
@@ -49,12 +49,25 @@ if [ "${LogLevel}" != "" ]; then
 	LogLevel="--loglevel ${LogLevel}"
 fi
 
+keep_events=""
+# keep_events="--keep-events"
+keep_intermediate=""
+# keep_intermediate="--keep-intermediate"
+
 for preferencefile in ${PreferenceFolder}/*; do
 	filename="${preferencefile##*/}"
 	folder=${filename%%.*}
+	if [ "${OutputFolder}" != "" ]; then
+		preference_OutputFolder="${OutputFolder}/${folder}" 
+		if [ ! -d "${preference_OutputFolder}" ]; then
+			mkdir -p "${preference_OutputFolder}"
+		fi
+		preference_OutputFolder="--output ""${preference_OutputFolder}""" 
+
+	fi
 	echo "Using Preference File ${filename}"
-	echo "${Command} ${InputFolders} ${LogLevel} ${OutputFolder} @${preferencefile}  ${StartTimestamp} ${EndTimestamp}"
-	${Command} ${InputFolders} ${LogLevel} ${OutputFolder} @${preferencefile} ${StartTimestamp} ${EndTimestamp}
+	echo "${Command} ${InputFolders} ${LogLevel} ${preference_OutputFolder} ${keep_events} ${keep_intermediate} @${preferencefile}  ${StartTimestamp} ${EndTimestamp}"
+	${Command} ${InputFolders} ${LogLevel} ${preference_OutputFolder} ${keep_events} ${keep_intermediate} @${preferencefile} ${StartTimestamp} ${EndTimestamp}
 	if [ $? -ne 0 ]; then
 		exit 1
 	fi
