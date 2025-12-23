@@ -5435,14 +5435,6 @@ def main() -> int:
         )
         return 1
 
-    if internal_ffmpeg and PLATFORM == "darwin" and PROCESSOR == "arm":
-        print(
-            "Internal ffmpeg version is used which has been compiled for Intel Macs. "
-            "Better results in both performance and size can be achieved by downloading"
-            " an Apple Silicon compiled ffmpeg from: https://www.osxexperts.net and "
-            "providing it leveraging the --ffmpeg parameter."
-        )
-
     if args.clip_pos:
         # If clip positions have been provided it is custom.
         layout_settings = MovieLayout()
