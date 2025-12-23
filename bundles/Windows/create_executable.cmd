@@ -19,7 +19,7 @@ if not exist bundles\Windows\tesla_dashcam\ (
 )
 
 echo "Installing Python requirements"
-pip install -r requirements_create_executable_windows.txt --upgrade
+pip install -r bundles\Windows\requirements_create_executable.txt --upgrade
 
 echo "Creating tesla_dashcam executable"
 python -m PyInstaller --clean ^
