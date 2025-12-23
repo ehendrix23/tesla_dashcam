@@ -87,9 +87,9 @@ parts get used the GPL applies to all of FFmpeg. For more information on
 ffmpeg license please see: <https://www.ffmpeg.org/legal.html>
 
 Windows binary of ffmpeg was downloaded from:
-<https://ffmpeg.zeranoe.com/builds/>
+<https://www.gyan.dev/ffmpeg/builds/>
 
-MacOS binary of ffmpeg was downloaded from: <https://www.osxexperts.net>
+MacOS binary of ffmpeg was downloaded from: <https://ffmpeg.martin-riedl.de>
 
 ## Notes
 
