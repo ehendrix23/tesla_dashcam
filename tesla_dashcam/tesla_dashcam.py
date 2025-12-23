@@ -4494,7 +4494,6 @@ def notify_windows(title, subtitle, message):
 
     try:
         toast(
-            threaded=True,
             title=f"{title} {subtitle}",
             body=message,
             duration=5,
