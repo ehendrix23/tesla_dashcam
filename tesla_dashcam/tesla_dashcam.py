@@ -4496,7 +4496,7 @@ def notify_windows(title, subtitle, message):
         toast(
             title=f"{title} {subtitle}",
             body=message,
-            duration=5,
+            duration="short",
             icon=resource_path("tesla_dashcam.ico"),
         )
     except CalledProcessError as exc:
