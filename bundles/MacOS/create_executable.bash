@@ -112,7 +112,7 @@ mkdir -p "$DMG_STAGING"
 cp bundles/MacOS/tesla_dashcam/tesla_dashcam "$DMG_STAGING"/
 cp README.html "$DMG_STAGING"/
 cp LICENSE "$DMG_STAGING"/
-cp bundles/MacOS/tesla_dashcam/ffmpeg_LICENSE.txt "$DMG_STAGING"/
+cp ffmpeg_LICENSE.txt "$DMG_STAGING"/
 
 # Create temporary read-write DMG
 rm -f "$DMG_RW"

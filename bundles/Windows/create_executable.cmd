@@ -37,7 +37,7 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo "Creating README.html"
-python -m docutils README.rst "bundles\Windows\tesla_dashcam\Tesla_Dashcam - README.html"
+python3 -m markdown -x extra -x toc -x fenced_code -x tables README.md > README.html
 if %ERRORLEVEL% NEQ 0 (
   echo "Failed to create README HTML file"
   goto :eof
@@ -57,9 +57,9 @@ mkdir "%ZIP_STAGING%"
 
 REM Copy payload into staging
 copy bundles\Windows\tesla_dashcam\tesla_dashcam.exe "%ZIP_STAGING%\"
-copy "bundles\Windows\tesla_dashcam\Tesla_Dashcam - README.html" "%ZIP_STAGING%\"
+copy README.html "%ZIP_STAGING%\"
 copy LICENSE.txt "%ZIP_STAGING%\"
-copy bundles\Windows\ffmpeg_LICENSE.txt "%ZIP_STAGING%\"
+copy ffmpeg_LICENSE.txt "%ZIP_STAGING%\"
 
 REM Create ZIP using PowerShell
 powershell -Command "Compress-Archive -Path '%ZIP_STAGING%\*' -DestinationPath '%ZIP_NAME%' -Force"
