@@ -37,7 +37,7 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo "Creating README.html"
-python3 -m markdown -x extra -x toc -x fenced_code -x tables README.md > README.html
+python -m markdown -x extra -x toc -x fenced_code -x tables README.md > README.html
 if %ERRORLEVEL% NEQ 0 (
   echo "Failed to create README HTML file"
   goto :eof
