@@ -2227,14 +2227,16 @@ do my best (time permitting) to provide support.
         not make sense with all cameras.
 -   Changed: Many internal changes, including how layouts are
         calculated, typing, etc.
+-   Changed: start_timestamp and end_timestamp will now also
+        restrict within the clip and not just folder.
+-   Changed: The MacOS executable is now compiled for Apple Silicon.
 -   Changed: Docker: Reduces Docker image sizes by 24-66% by
         switching from jrottenberg/ffmpeg to Debian\'s FFmpeg package on
         python:3-slim base. Contributed by \@magicalyak
 -   Changed: Developer QoL improvements for Windows-based
         contributors. Contributed by \@ozskywalker
--   Changed: start_timestamp and end_timestamp will now also
-        restrict within the clip and not just folder.
--   Changed: The MacOS executable is now compiled for Apple Silicon.
+-   Changed: Docker: Now will use latest tesla_dashcam from pypi instead of requiring downloading it first.
+
 -   Fixed: Issue with GPU type check of qsv for Linux. Contributed
         by \@cjwang18
 -   Fixed: ffmpeg error when swapping front/rear and excluding front

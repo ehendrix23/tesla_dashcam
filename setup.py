@@ -41,7 +41,7 @@ HERE = os.path.abspath(os.path.dirname(__file__))
 
 # Import the README and use it as the long-description.
 # Note: this will only work if 'README.rst' is present in your MANIFEST.in file!
-with io.open(os.path.join(HERE, "README.rst"), encoding="utf-8") as f:
+with io.open(os.path.join(HERE, "README.md"), encoding="utf-8") as f:
     LONG_DESC = "\n" + f.read()
 
 # Load the package's __version__.py module as a dictionary.
@@ -179,7 +179,7 @@ setup(
     version=ABOUT["__version__"],
     description=DESCRIPTION,
     long_description=LONG_DESC,
-    long_description_content_type="text/x-rst",
+    long_description_content_type="text/markdown",
     author=AUTHOR,
     # author_email=EMAIL,
     python_requires=REQUIRES_PYTHON,
