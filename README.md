@@ -2234,6 +2234,7 @@ do my best (time permitting) to provide support.
         contributors. Contributed by \@ozskywalker
 -   Changed: start_timestamp and end_timestamp will now also
         restrict within the clip and not just folder.
+-   Changed: The MacOS executable is now compiled for Apple Silicon.
 -   Fixed: Issue with GPU type check of qsv for Linux. Contributed
         by \@cjwang18
 -   Fixed: ffmpeg error when swapping front/rear and excluding front
