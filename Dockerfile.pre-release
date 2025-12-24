@@ -1,24 +1,40 @@
-FROM python:3-slim
+FROM python:3.13-slim AS builder
 
 WORKDIR /usr/src/app/tesla_dashcam
 
-# Install FFmpeg with GPU support (both VAAPI and NVIDIA) and other dependencies
-# Note: Debian's FFmpeg is compiled with both VAAPI and NVENC support
 RUN apt-get update -y \
     && apt-get install -y --no-install-recommends \
-    # FFmpeg with GPU support
-    ffmpeg \
-    # Application dependencies
-    fonts-freefont-ttf \
-    libnotify-bin \
-    # Build essentials for psutil.
     build-essential \
     python3-dev \
-    # git etc. to get latest pre-release
     git \
     curl \
     jq \
-    # VAAPI runtime libraries (for Intel and AMD GPUs)
+    && rm -rf /var/lib/apt/lists/*
+
+RUN TAG=$(curl -s https://api.github.com/repos/ehendrix23/tesla_dashcam/releases \
+    | jq -r '[.[] | select(.prerelease)] | max_by(.created_at).tag_name') \
+    && git clone --depth 1 --branch "$TAG" https://github.com/ehendrix23/tesla_dashcam.git .
+
+# Install uv
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:$PATH"
+
+# Install from lockfile in the prerelease tag (reproducible for that tag)
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv
+RUN uv sync --frozen --no-dev --no-install-project
+RUN uv pip install --no-deps --prefix /opt/venv .
+
+
+FROM python:3.13-slim AS runtime
+
+WORKDIR /usr/src/app/tesla_dashcam
+
+# Runtime deps only (no git/curl/jq/build tools)
+RUN apt-get update -y \
+    && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    fonts-freefont-ttf \
+    libnotify-bin \
     libva2 \
     libva-drm2 \
     mesa-va-drivers \
@@ -28,20 +44,17 @@ RUN apt-get update -y \
     i965-va-driver intel-media-va-driver; \
     else \
     echo "Skipping Intel VA drivers on $(dpkg --print-architecture)"; \
-    fi \    
-    && apt-get remove --purge --auto-remove -y && rm -rf /var/lib/apt/lists/*
+    fi \
+    && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /usr/src/app/tesla_dashcam
-RUN TAG=$(curl -s https://api.github.com/repos/ehendrix23/tesla_dashcam/releases \
-    | jq -r '[.[] | select(.prerelease)] | max_by(.created_at).tag_name') \
-    && git clone --depth 1 --branch "$TAG" https://github.com/ehendrix23/tesla_dashcam.git .
-
-
-RUN pip install --no-cache-dir -r requirements.txt
+COPY --from=builder /opt/venv /opt/venv
+ENV VIRTUAL_ENV=/opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
 # Enable Logs to show on run
+ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=true
 # Provide a default timezone
 ENV TZ=America/New_York
 
-ENTRYPOINT [ "python3", "tesla_dashcam/tesla_dashcam.py" ]
+ENTRYPOINT [ "python", "-m", "tesla_dashcam" ]

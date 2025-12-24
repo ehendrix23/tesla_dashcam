@@ -4,13 +4,20 @@
 .gitattributes
 
 # Documentation
-*.md
 docs/
 .github/
+
+# Keep README.md (Dockerfiles COPY it)
+!README.md
 
 # Development files
 .vscode/
 .idea/
+.venv/
+.uv/
+.python-version
+.ruff_cache/
+.mypy_cache/
 *.pyc
 __pycache__/
 *.pyo
@@ -29,6 +36,17 @@ build/
 dist/
 *.egg-info/
 .eggs/
+
+# Local/packaging outputs
+*.whl
+*.tar.gz
+*.dmg
+*.zip
+
+# Repo bundle artifacts (not needed for Docker builds)
+bundles/**/ffmpeg*
+bundles/**/tesla_dashcam/**
+build/**
 
 # Docker files (don't include other Dockerfiles in the image)
 Dockerfile*
