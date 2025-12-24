@@ -48,7 +48,9 @@ class TestMovie:
 
         e2 = Event(folder="b")
         e2.set_clip(t0, Clip(timestmp=t0))
-        e2.set_clip(t0 + timedelta(seconds=60), Clip(timestmp=t0 + timedelta(seconds=60)))
+        e2.set_clip(
+            t0 + timedelta(seconds=60), Clip(timestmp=t0 + timedelta(seconds=60))
+        )
 
         m.set_event(e1)
         m.set_event(e2)

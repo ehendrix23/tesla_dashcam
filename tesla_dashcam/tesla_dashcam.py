@@ -36,17 +36,12 @@ from .constants import (
     DEFAULT_FONT,
     DEFAULT_FONT_HALIGN,
     DEFAULT_FONT_VALIGN,
-    FFMPEG_LEFT_PERSPECTIVE,
-    FFMPEG_RIGHT_PERSPECTIVE,
-    HALIGN,
     PLATFORM,
-    VALIGN,
 )
 from .layout import (
     Camera,
     Cross,
     Diamond,
-    Font,
     FullScreen,
     Horizontal,
     Mosaic,

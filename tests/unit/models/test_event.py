@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-import pytest
-
 from tesla_dashcam.models.event import Event, Event_Metadata
 from tesla_dashcam.models.video import Clip, Video_Metadata
 
@@ -82,11 +80,15 @@ class TestEvent:
 
     def test_template_substitution_with_fixed_timezone(self, monkeypatch):
         # Make timezone deterministic
-        monkeypatch.setattr("tesla_dashcam.models.event.get_localzone", lambda: timezone.utc)
+        monkeypatch.setattr(
+            "tesla_dashcam.models.event.get_localzone", lambda: timezone.utc
+        )
 
         e = Event(
             folder="f",
-            event_metadata=Event_Metadata(city="C", street="S", reason="R", latitude=1.0, longitude=2.0),
+            event_metadata=Event_Metadata(
+                city="C", street="S", reason="R", latitude=1.0, longitude=2.0
+            ),
         )
         t0 = datetime(2020, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
         e.start_timestamp = t0
@@ -100,10 +102,16 @@ class TestEvent:
 
         assert out == "LAYOUT 2020-01-01T00:00:00Z 2020-01-01T00:00:10Z C R"
 
-    def test_template_invalid_key_prints_and_falls_back_to_date_range(self, monkeypatch, capsys):
+    def test_template_invalid_key_prints_and_falls_back_to_date_range(
+        self, monkeypatch, capsys
+    ):
         # Make timezone deterministic and timestamp prefix stable
-        monkeypatch.setattr("tesla_dashcam.models.event.get_localzone", lambda: timezone.utc)
-        monkeypatch.setattr("tesla_dashcam.models.event.get_current_timestamp", lambda: "")
+        monkeypatch.setattr(
+            "tesla_dashcam.models.event.get_localzone", lambda: timezone.utc
+        )
+        monkeypatch.setattr(
+            "tesla_dashcam.models.event.get_current_timestamp", lambda: ""
+        )
 
         e = Event(folder="f")
         e.start_timestamp = datetime(2020, 1, 1, tzinfo=timezone.utc)
