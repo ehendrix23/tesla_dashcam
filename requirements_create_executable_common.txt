@@ -1,7 +1,0 @@
--r requirements.txt
-
-wheel>=0.45.1
-pyinstaller>=6.17.0
-sphinx>=9.0.4
-markdown>=3.10.0
-

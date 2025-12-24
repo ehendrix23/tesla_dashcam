@@ -19,10 +19,11 @@ if not exist bundles\Windows\tesla_dashcam\ (
 )
 
 echo "Installing Python requirements"
-pip install -r bundles\Windows\requirements_create_executable.txt --upgrade
+echo "Ensuring build dependencies (uv)"
+uv run --extra exe python -c "import sys; print(sys.version)"
 
 echo "Creating tesla_dashcam executable"
-python -m PyInstaller --clean ^
+uv run --extra exe python -m PyInstaller --clean ^
 	--distpath bundles\Windows\tesla_dashcam ^
 	--workpath build\Windows ^
 	--onefile ^
@@ -37,7 +38,7 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo "Creating README.html"
-python -m markdown -x extra -x toc -x fenced_code -x tables README.md > README.html
+uv run --extra exe python -m markdown -x extra -x toc -x fenced_code -x tables README.md > README.html
 if %ERRORLEVEL% NEQ 0 (
   echo "Failed to create README HTML file"
   goto :eof
@@ -72,3 +73,4 @@ if %ERRORLEVEL% NEQ 0 (
 echo All done.
 
 :eof
+

@@ -115,6 +115,12 @@ For Mac, download the latest: [ffmpeg](https://ffmpeg.martin-riedl.de)
 If not using the executables (Windows and MacOS) then
 [Python](https://www.python.org) 3.13.0 or higher is required.
 
+If you use [uv](https://docs.astral.sh/uv/), you can install Python via:
+
+``` cmd
+uv python install 3.13
+```
+
 ## Installation
 
 Downloading the respective bundle (ZIP for Windows, DMG for MacOS) and
@@ -123,7 +129,7 @@ this.
 
 If downloading the source files (i.e. for Linux) then Python has to be
 installed as well. I recommend in that case to install the package from
-pypi using pip to ensure all package requirements (except for ffmpeg)
+pypi using uv to ensure all package requirements (except for ffmpeg)
 are met.
 
 This package is available from
@@ -131,8 +137,23 @@ This package is available from
 
 Install from pypi is done through:
 
+``` cmd
+# Install Python first (if needed)
+uv python install 3.13
+
+# Install the tesla_dashcam CLI
+uv tool install tesla_dashcam
+```
+
+### Development (uv)
+
+This repository supports a `pyproject.toml` workflow.
+
 ``` bash
-python3 -m pip install tesla_dashcam
+uv sync --extra dev
+uv run tesla_dashcam --help
+uv run pytest
+uv run ruff check .
 ```
 
 ## Docker

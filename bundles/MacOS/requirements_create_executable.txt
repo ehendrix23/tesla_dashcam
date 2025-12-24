@@ -1,3 +1,0 @@
--r ../../requirements_create_executable_common.txt
-pyobjc-framework-Cocoa>=12.0
-

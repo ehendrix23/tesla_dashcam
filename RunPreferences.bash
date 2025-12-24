@@ -30,7 +30,14 @@ if [ -f tesla_dashcam/tesla_dashcam.py ]; then
 else
 	Command="tesla_dashcam.py"
 fi
-Command="python ${Command}"
+
+# Prefer running inside the uv-managed environment when available.
+# Falls back to system python if uv isn't installed.
+if command -v uv >/dev/null 2>&1 && [ -f pyproject.toml ]; then
+	Command="uv run python ${Command}"
+else
+	Command="python ${Command}"
+fi
 
 if [ "${OutputFolder}" != "" ]; then
 	if [ ! -d ${OutputFolder} ]; then

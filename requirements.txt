@@ -1,6 +1,0 @@
-python-dateutil>=2.9.0,<2.10.0
-tzlocal>=5.3.1,<5.4.0
-requests>=2.32.4,<2.33.0
-psutil>=7.0.0,<7.1.0
-staticmap>=0.5.7,<0.6.0
-

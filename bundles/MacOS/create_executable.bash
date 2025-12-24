@@ -22,10 +22,11 @@ if [ ! -d bundles/MacOS/tesla_dashcam ]; then
 fi
 
 echo "Installing Python requirements"
-pip install -r bundles/MacOS/requirements_create_executable.txt --upgrade
+echo "Ensuring build dependencies (uv)"
+uv run --extra exe python -c "import sys; print(sys.version)"
 
 echo "Creating tesla_dashcam executable"
- pyinstaller --clean \
+uv run --extra exe pyinstaller --clean \
 	--distpath bundles/MacOS/tesla_dashcam \
 	--workpath build/MacOS \
 	--onefile \
@@ -47,7 +48,7 @@ if [ $? -ne 0 ]; then
 fi
 
 echo "Creating README.html"
-python3 -m markdown -x extra -x toc -x fenced_code -x tables README.md > README.html
+uv run --extra exe python -m markdown -x extra -x toc -x fenced_code -x tables README.md > README.html
 if [ $? -ne 0 ]; then
   echo "Failed to create README.html."
   exit 1
@@ -62,7 +63,7 @@ fi
 ./bundles/MacOS/tesla_dashcam/tesla_dashcam --version
 
 echo "Setting executable icon"
-python3 - "$ICON_ICNS" "bundles/MacOS/tesla_dashcam/tesla_dashcam" <<'PYTHON'
+uv run --extra exe python - "$ICON_ICNS" "bundles/MacOS/tesla_dashcam/tesla_dashcam" <<'PYTHON'
 import sys
 import os
 from pathlib import Path
