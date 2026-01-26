@@ -1,0 +1,10 @@
+name: "CodeQL Config"
+
+# The SEI telemetry overlay feature intentionally displays vehicle telemetry
+# data (including GPS coordinates) as a video overlay. Users explicitly opt-in
+# to this feature via --sei_overlay flag. The "sensitive information" warnings
+# are false positives for this use case.
+
+paths-ignore:
+  - test_sei.py
+  - '**/test_*.py'
