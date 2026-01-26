@@ -4499,7 +4499,7 @@ def process_folders(
                 # Only 1 movie was created.
                 print(
                     f"{get_current_timestamp()} Movie {movies_list[0][0]} with "
-                    f"duration {movies_list[0][0]} has been created."
+                    f"duration {movies_list[0][1]} has been created."
                 )
 
             else:
@@ -4590,9 +4590,11 @@ def notify_windows(title, subtitle, message):
 def notify_linux(title, subtitle, message):
     """Notification on Linux"""
     try:
-        run(["notify-send", f'"{title} {subtitle}"', f'"{message}"'], check=True)
-    except CalledProcessError as exc:
-        _LOGGER.error("Failed in notifification: %s", exc)
+        import subprocess
+        run(["notify-send", f'"{title} {subtitle}"', f'"{message}"'],
+            stderr=subprocess.DEVNULL)
+    except Exception:
+        pass  # Notifications may not work in Docker/headless environments
 
 
 def notify(title, subtitle, message):
