@@ -3107,6 +3107,8 @@ def create_intermediate_movie(
             speed_unit=video_settings.get("sei_speed_unit", "mph"),
             font_name=font_name,
             font_size=video_settings.get("sei_font_size") or default_font_size,
+            style_preset=video_settings.get("sei_style", "default"),
+            layout_preset=video_settings.get("sei_layout", "compact"),
         )
         sei_ass_file = generate_telemetry_ass(sei_frames, sei_settings)
         if sei_ass_file:
@@ -5116,6 +5118,33 @@ def main() -> int:
         help="Font size for SEI overlay. Default is scaled based on video size.",
     )
     sei_group.add_argument(
+        "--sei_style",
+        dest="sei_style",
+        required=False,
+        choices=["default", "hud", "boxed", "minimal", "bold"],
+        default="default",
+        help="R|Style preset for SEI overlay appearance.\n"
+        "  default - Clean white text with black outline\n"
+        "  hud     - Green heads-up display style\n"
+        "  boxed   - White text on dark background\n"
+        "  minimal - Small, subtle gray text\n"
+        "  bold    - Large bold yellow text",
+    )
+    sei_group.add_argument(
+        "--sei_layout",
+        dest="sei_layout",
+        required=False,
+        choices=["compact", "full", "speed-only", "driving", "location", "performance"],
+        default="compact",
+        help="R|Layout preset for SEI data arrangement.\n"
+        "  compact     - Single line: speed, gear, autopilot\n"
+        "  full        - Multi-line with all key data\n"
+        "  speed-only  - Large speed display only\n"
+        "  driving     - Speed, gear, brake, blinker\n"
+        "  location    - Speed with GPS coordinates\n"
+        "  performance - Speed, throttle, g-forces",
+    )
+    sei_group.add_argument(
         "--sei_export_csv",
         dest="sei_export_csv",
         required=False,
@@ -6044,6 +6073,8 @@ def main() -> int:
         "sei_position": args.sei_position,
         "sei_speed_unit": args.sei_speed_unit,
         "sei_font_size": getattr(args, "sei_font_size", None),
+        "sei_style": getattr(args, "sei_style", "default"),
+        "sei_layout": getattr(args, "sei_layout", "compact"),
         "sei_export_csv": getattr(args, "sei_export_csv", None),
     }
 
