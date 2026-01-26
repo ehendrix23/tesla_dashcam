@@ -17,7 +17,11 @@ RUN apt-get update -y \
     # Application dependencies
     fonts-freefont-ttf \
     libnotify-bin \
-    && apt-get remove --purge --auto-remove -y && rm -rf /var/lib/apt/lists/*
+    dbus \
+    # ASS subtitle support for SEI telemetry overlay
+    libass9 \
+    && apt-get remove --purge --auto-remove -y && rm -rf /var/lib/apt/lists/* \
+    && dbus-uuidgen > /var/lib/dbus/machine-id
 
 # Install tesla_dashcam
 RUN pip install --no-cache-dir tesla_dashcam

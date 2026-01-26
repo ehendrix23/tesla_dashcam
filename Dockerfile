@@ -7,12 +7,16 @@ RUN apt-get update -y \
     # Application dependencies
     fonts-freefont-ttf \
     libnotify-bin \
+    dbus \
+    # ASS subtitle support for SEI telemetry overlay
+    libass9 \
     # Build essentials for psutil.
     build-essential \
-    python3-dev \    
+    python3-dev \
     # git etc. to get latest pre-release
     git \
-    && apt-get remove --purge --auto-remove -y && rm -rf /var/lib/apt/lists/*
+    && apt-get remove --purge --auto-remove -y && rm -rf /var/lib/apt/lists/* \
+    && dbus-uuidgen > /var/lib/dbus/machine-id
 
 ENV LIBRARY_PATH=/lib:/usr/lib
 
