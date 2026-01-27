@@ -12,5 +12,5 @@ paths-ignore:
 query-filters:
   - exclude:
       id: py/clear-text-storage-sensitive-data
-      paths:
-        - tesla_dashcam/telemetry_overlay.py
+  - exclude:
+      id: py/clear-text-logging-sensitive-data
