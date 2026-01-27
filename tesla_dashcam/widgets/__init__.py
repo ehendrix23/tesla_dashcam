@@ -9,6 +9,10 @@ from .speed_display import SpeedDisplayWidget
 from .gear_indicator import GearIndicatorWidget
 from .location_display import LocationDisplayWidget
 from .datetime_display import DateTimeDisplayWidget
+from .autopilot_indicator import AutopilotIndicatorWidget
+from .gforce_display import GForceDisplayWidget
+from .compass_display import CompassDisplayWidget
+from .center_cluster import CenterClusterWidget
 
 __all__ = [
     "Widget",
@@ -23,4 +27,8 @@ __all__ = [
     "GearIndicatorWidget",
     "LocationDisplayWidget",
     "DateTimeDisplayWidget",
+    "AutopilotIndicatorWidget",
+    "GForceDisplayWidget",
+    "CompassDisplayWidget",
+    "CenterClusterWidget",
 ]

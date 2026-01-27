@@ -30,20 +30,53 @@ from .widgets.speed_display import SpeedDisplayWidget
 from .widgets.gear_indicator import GearIndicatorWidget
 from .widgets.location_display import LocationDisplayWidget
 from .widgets.datetime_display import DateTimeDisplayWidget
+from .widgets.autopilot_indicator import AutopilotIndicatorWidget
+from .widgets.gforce_display import GForceDisplayWidget
+from .widgets.compass_display import CompassDisplayWidget
+from .widgets.center_cluster import CenterClusterWidget
 
 _LOGGER = logging.getLogger(__name__)
 
 DEFAULT_FRAME_RATE = 36.0
 
-# Widget cluster dimensions per size preset
-_SIZE_PRESETS = {
+# Dashboard layout size presets
+_DASHBOARD_PRESETS = {
+    "small": {
+        "cluster_h": 120, "speed_w": 100, "speed_h": 80,
+        "gear_w": 90, "gear_h": 32, "turn_w": 70, "turn_h": 24,
+        "datetime_w": 160, "datetime_h": 55,
+        "compass_w": 170, "compass_h": 55,
+        "steering": 70, "gauge_w": 22, "gauge_h": 55,
+        "ap_h": 16, "font_scale": 0.9,
+    },
+    "medium": {
+        "cluster_h": 160, "speed_w": 140, "speed_h": 110,
+        "gear_w": 120, "gear_h": 40, "turn_w": 90, "turn_h": 30,
+        "datetime_w": 210, "datetime_h": 70,
+        "compass_w": 230, "compass_h": 70,
+        "steering": 90, "gauge_w": 28, "gauge_h": 70,
+        "ap_h": 20, "font_scale": 1.2,
+    },
+    "large": {
+        "cluster_h": 210, "speed_w": 180, "speed_h": 145,
+        "gear_w": 150, "gear_h": 50, "turn_w": 110, "turn_h": 36,
+        "datetime_w": 270, "datetime_h": 90,
+        "compass_w": 280, "compass_h": 90,
+        "steering": 120, "gauge_w": 36, "gauge_h": 90,
+        "ap_h": 24, "font_scale": 1.5,
+    },
+}
+
+# Classic layout presets (backward compat)
+_CLASSIC_PRESETS = {
     "small": {"steering": 100, "font_scale": 0.9, "gauge_w": 32, "gauge_h": 90},
     "medium": {"steering": 140, "font_scale": 1.2, "gauge_w": 40, "gauge_h": 120},
     "large": {"steering": 190, "font_scale": 1.6, "gauge_w": 52, "gauge_h": 160},
 }
 
 ALL_WIDGETS = [
-    "steering", "turn", "brake", "accel", "speed", "gear", "location", "datetime",
+    "steering", "turn", "brake", "accel", "speed", "gear",
+    "location", "datetime", "autopilot", "gforce", "compass", "cluster",
 ]
 
 
@@ -59,8 +92,9 @@ class GraphicalOverlaySettings:
     font_path: Optional[str] = None
     frame_rate: float = DEFAULT_FRAME_RATE
     margin_x: int = 30
-    margin_y: int = 25
+    margin_y: int = 15
     start_time: Optional[datetime] = None
+    layout_name: str = "dashboard"
 
 
 def _resolve_widgets(widget_list: List[str]) -> List[str]:
@@ -71,21 +105,123 @@ def _resolve_widgets(widget_list: List[str]) -> List[str]:
     return valid if valid else list(ALL_WIDGETS)
 
 
-def _build_widget_layout(
+def _build_dashboard_layout(
     settings: GraphicalOverlaySettings,
     video_width: int,
     video_height: int,
 ) -> OverlayCanvas:
-    """Create widget instances positioned within the overlay canvas.
+    """Build the dashboard-style top layout.
 
-    Layout inspired by TeslaClip:
-    - Top right: Date/time
-    - Top center: Speed + Gear + Turn signals
-    - Bottom center: Steering wheel with ACC/BRK vertical gauges on sides
-    - Bottom left: Location/heading
+    All telemetry widgets arranged in a horizontal bar across the top:
+    [DateTime] [Speed+AP] [Cluster: Steering+Gauges+GForce] [Gear+Turn] [Compass]
     """
     theme = THEME_PRESETS.get(settings.theme_name, THEME_PRESETS["default"])
-    size = _SIZE_PRESETS.get(settings.size_preset, _SIZE_PRESETS["medium"])
+    sz = _DASHBOARD_PRESETS.get(settings.size_preset, _DASHBOARD_PRESETS["medium"])
+    enabled = _resolve_widgets(settings.widgets)
+
+    mx = settings.margin_x
+    my = settings.margin_y
+    font = settings.font_path
+
+    widgets = []
+
+    # Calculate total bar height from the cluster height
+    bar_h = sz["cluster_h"]
+
+    # === TOP LEFT: Date/Time ===
+    if "datetime" in enabled:
+        dw = sz["datetime_w"]
+        dh = sz["datetime_h"]
+        widgets.append(DateTimeDisplayWidget(
+            mx, my, dw, dh, theme,
+            start_time=settings.start_time,
+            frame_rate=settings.frame_rate,
+            font_path=font,
+        ))
+
+    # === Calculate center zone positions ===
+    # Speed goes left of center, cluster at center, gear+turn right of center
+    speed_w = sz["speed_w"]
+    speed_h = sz["speed_h"]
+    gear_w = sz["gear_w"]
+    gear_h = sz["gear_h"]
+    turn_w = sz["turn_w"]
+    turn_h = sz["turn_h"]
+
+    # Cluster dimensions
+    steer_sz = sz["steering"]
+    gw = sz["gauge_w"]
+    gh = sz["gauge_h"]
+    # Cluster width: steering + padding + gauges area
+    cluster_w = steer_sz + 40  # enough for steering + ACC/BRK below
+    cluster_w = max(cluster_w, gw * 2 + 24)  # at least wide enough for gauges
+    cluster_h = bar_h
+
+    # Center the whole group: [speed] [gap] [cluster] [gap] [gear+turn]
+    gap = 12
+    gear_block_w = max(gear_w, turn_w)
+    total_center_w = speed_w + gap + cluster_w + gap + gear_block_w
+    center_start_x = (video_width - total_center_w) // 2
+
+    # Speed + autopilot badge
+    if "speed" in enabled:
+        show_ap = "autopilot" in enabled
+        sx = center_start_x
+        sy = my
+        widgets.append(SpeedDisplayWidget(
+            sx, sy, speed_w, speed_h, theme,
+            speed_unit=settings.speed_unit,
+            show_autopilot=show_ap,
+            font_path=font,
+        ))
+
+    # Center cluster (steering + angle + ACC/BRK + G-force)
+    if "cluster" in enabled:
+        cx = center_start_x + speed_w + gap
+        cy = my
+        widgets.append(CenterClusterWidget(
+            cx, cy, cluster_w, cluster_h, theme,
+            steering_size=steer_sz, gauge_w=gw, gauge_h=gh,
+            font_path=font,
+        ))
+
+    # Gear indicator + turn signals (stacked vertically)
+    gear_block_x = center_start_x + speed_w + gap + cluster_w + gap
+    if "gear" in enabled:
+        widgets.append(GearIndicatorWidget(
+            gear_block_x, my, gear_w, gear_h, theme, font_path=font,
+        ))
+
+    if "turn" in enabled:
+        turn_y = my + gear_h + 4
+        widgets.append(TurnSignalWidget(
+            gear_block_x, turn_y, turn_w, turn_h, theme,
+        ))
+
+    # === TOP RIGHT: Compass/heading ===
+    if "compass" in enabled:
+        cw = sz["compass_w"]
+        ch = sz["compass_h"]
+        cx = video_width - cw - mx
+        widgets.append(CompassDisplayWidget(
+            cx, my, cw, ch, theme, font_path=font,
+        ))
+
+    return OverlayCanvas(video_width, video_height, widgets)
+
+
+def _build_classic_layout(
+    settings: GraphicalOverlaySettings,
+    video_width: int,
+    video_height: int,
+) -> OverlayCanvas:
+    """Build the classic overlay layout (backward compat).
+
+    Speed at top-center, steering at bottom-center with ACC/BRK flanking,
+    location at bottom-left, datetime at top-right.
+    """
+    theme = THEME_PRESETS.get(settings.theme_name, THEME_PRESETS["default"])
+    size = _CLASSIC_PRESETS.get(settings.size_preset, _CLASSIC_PRESETS["medium"])
     enabled = _resolve_widgets(settings.widgets)
 
     steer_size = size["steering"]
@@ -99,7 +235,6 @@ def _build_widget_layout(
     widgets = []
     font = settings.font_path
 
-    # === TOP ROW: Date/time (right), Speed (center), Gear + Turn signals ===
     top_y = my
 
     if "datetime" in enabled:
@@ -125,7 +260,6 @@ def _build_widget_layout(
     if "gear" in enabled:
         gw = int(120 * scale)
         gh = int(34 * scale)
-        # Place gear to the right of speed
         gx = (video_width + int(140 * scale)) // 2 + 10
         widgets.append(GearIndicatorWidget(
             gx, top_y + 6, gw, gh, theme, font_path=font,
@@ -134,14 +268,12 @@ def _build_widget_layout(
     if "turn" in enabled:
         tw = int(90 * scale)
         th = int(30 * scale)
-        # Place turn signals to the right of gear
         turn_x = (video_width + int(140 * scale)) // 2 + 10
         turn_y = top_y + int(42 * scale)
         widgets.append(TurnSignalWidget(
             turn_x, turn_y, tw, th, theme,
         ))
 
-    # === BOTTOM CENTER: Steering wheel with ACC/BRK gauges on either side ===
     steer_y = video_height - steer_size - my - int(20 * scale)
     steer_x = (video_width - steer_size) // 2
 
@@ -151,7 +283,6 @@ def _build_widget_layout(
             font_path=font,
         ))
 
-    # ACC gauge to the left of steering wheel
     if "accel" in enabled:
         ax = steer_x - gauge_w - 14
         ay = steer_y + (steer_size - gauge_h) // 2
@@ -159,7 +290,6 @@ def _build_widget_layout(
             ax, ay, gauge_w, gauge_h, theme, font_path=font,
         ))
 
-    # BRK gauge to the right of steering wheel
     if "brake" in enabled:
         bx = steer_x + steer_size + 14
         by = steer_y + (steer_size - gauge_h) // 2
@@ -167,7 +297,6 @@ def _build_widget_layout(
             bx, by, gauge_w, gauge_h, theme, font_path=font,
         ))
 
-    # === BOTTOM LEFT: Location/heading ===
     if "location" in enabled:
         lw = int(300 * scale)
         lh = int(44 * scale)
@@ -177,7 +306,27 @@ def _build_widget_layout(
             lx, ly, lw, lh, theme, font_path=font,
         ))
 
+    if "compass" in enabled:
+        cw = int(230 * scale)
+        ch = int(60 * scale)
+        cx = video_width - cw - mx
+        cy = video_height - ch - my
+        widgets.append(CompassDisplayWidget(
+            cx, cy, cw, ch, theme, font_path=font,
+        ))
+
     return OverlayCanvas(video_width, video_height, widgets)
+
+
+def _build_widget_layout(
+    settings: GraphicalOverlaySettings,
+    video_width: int,
+    video_height: int,
+) -> OverlayCanvas:
+    """Build the widget layout based on the layout_name setting."""
+    if settings.layout_name == "classic":
+        return _build_classic_layout(settings, video_width, video_height)
+    return _build_dashboard_layout(settings, video_width, video_height)
 
 
 def generate_graphical_overlay(
@@ -265,11 +414,9 @@ def generate_graphical_overlay(
     with open(concat_path, "w", encoding="utf-8") as f:
         f.write("ffconcat version 1.0\n")
         for png_path, duration in concat_entries:
-            # Use relative paths for portability
             rel = os.path.basename(png_path)
             f.write(f"file {rel}\n")
             f.write(f"duration {duration:.6f}\n")
-        # Repeat last file (FFmpeg concat requires it for proper duration)
         if concat_entries:
             f.write(f"file {os.path.basename(concat_entries[-1][0])}\n")
 

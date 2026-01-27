@@ -3118,6 +3118,7 @@ def create_intermediate_movie(
                 font_path=font_path if font_path else None,
                 frame_rate=video_settings.get("fps", 36),
                 start_time=starting_timestamp,
+                layout_name=video_settings.get("sei_overlay_layout", "dashboard"),
             )
             sei_gfx_concat = generate_graphical_overlay(
                 sei_frames, gfx_settings,
@@ -5258,6 +5259,16 @@ def main() -> int:
         "  minimal     - Subtle, semi-transparent\n"
         "  performance - Red/orange racing style",
     )
+    sei_group.add_argument(
+        "--sei_overlay_layout",
+        dest="sei_overlay_layout",
+        required=False,
+        choices=["dashboard", "classic"],
+        default="dashboard",
+        help="R|Layout style for graphical overlay.\n"
+        "  dashboard - Top bar with clustered controls (default)\n"
+        "  classic   - Scattered overlay widgets",
+    )
 
     filter_group = parser.add_argument_group(
         title="Timestamp Restriction",
@@ -6187,6 +6198,7 @@ def main() -> int:
         "sei_widget_size": getattr(args, "sei_widget_size", "medium"),
         "sei_widgets": getattr(args, "sei_widgets", "all"),
         "sei_widget_theme": getattr(args, "sei_widget_theme", "default"),
+        "sei_overlay_layout": getattr(args, "sei_overlay_layout", "dashboard"),
     }
 
     # Confirm the merge variables provided are accurate.

@@ -1,4 +1,4 @@
-"""Date and time display widget."""
+"""Date and time display widget with two-line layout."""
 
 from datetime import datetime, timedelta
 from typing import Optional
@@ -14,7 +14,10 @@ from .base import Widget, WidgetTheme
 
 
 class DateTimeDisplayWidget(Widget):
-    """Renders the current date and time on a dark background panel."""
+    """Renders date and time on a dark background panel.
+
+    Two-line layout: smaller date on line 1, larger time on line 2.
+    """
 
     def __init__(self, x, y, width, height, theme,
                  start_time: Optional[datetime] = None,
@@ -29,13 +32,11 @@ class DateTimeDisplayWidget(Widget):
     def _get_time(self, frame) -> Optional[datetime]:
         if self.start_time is None:
             return None
-        # Track the first frame_seq_no to compute relative offsets
         if self._first_seq is None:
             self._first_seq = frame.frame_seq_no
         relative_frame = frame.frame_seq_no - self._first_seq
         offset = relative_frame / self.frame_rate
         t = self.start_time + timedelta(seconds=offset)
-        # Convert to local timezone for display
         if get_localzone is not None and t.tzinfo is not None:
             t = t.astimezone(get_localzone())
         return t
@@ -44,7 +45,6 @@ class DateTimeDisplayWidget(Widget):
         t = self._get_time(frame)
         if t is None:
             return ("datetime", None)
-        # Update every second
         return ("datetime", t.strftime("%Y-%m-%d %H:%M:%S"))
 
     def render(self, frame) -> Image.Image:
@@ -54,30 +54,44 @@ class DateTimeDisplayWidget(Widget):
         # Semi-transparent background panel
         draw.rounded_rectangle(
             [0, 0, self.width - 1, self.height - 1],
-            radius=6,
-            fill=(0, 0, 0, 140),
+            radius=8,
+            fill=(0, 0, 0, 170),
         )
 
         t = self._get_time(frame)
         if t is None:
             return img
 
-        font_size = max(10, self.height - 10)
+        # Two-line layout: date (smaller) + time (larger)
+        date_font_size = max(10, self.height // 3 - 2)
+        time_font_size = max(12, self.height * 2 // 5)
         try:
             if self.font_path:
-                font = ImageFont.truetype(self.font_path, font_size)
+                date_font = ImageFont.truetype(self.font_path, date_font_size)
+                time_font = ImageFont.truetype(self.font_path, time_font_size)
             else:
-                font = ImageFont.truetype("FreeSans.ttf", font_size)
+                date_font = ImageFont.truetype("FreeSans.ttf", date_font_size)
+                time_font = ImageFont.truetype("FreeSans.ttf", time_font_size)
         except (OSError, IOError):
-            font = ImageFont.load_default()
+            date_font = ImageFont.load_default()
+            time_font = date_font
 
-        text = t.strftime("%b %d, %Y  %I:%M:%S %p")
+        date_text = t.strftime("%a, %b %d, %Y")
+        time_text = t.strftime("%H:%M:%S")
 
-        bbox = draw.textbbox((0, 0), text, font=font)
-        tw = bbox[2] - bbox[0]
-        th = bbox[3] - bbox[1]
-        tx = (self.width - tw) // 2
-        ty = (self.height - th) // 2 - bbox[1]
-        draw.text((tx, ty), text, fill=(220, 220, 220, 240), font=font)
+        # Date line (dimmer, smaller)
+        pad = 8
+        draw.text(
+            (pad, 4), date_text,
+            fill=(180, 180, 180, 200), font=date_font,
+        )
+
+        # Time line (bright, larger)
+        date_bbox = draw.textbbox((0, 0), date_text, font=date_font)
+        date_h = date_bbox[3] - date_bbox[1]
+        draw.text(
+            (pad, 4 + date_h + 2), time_text,
+            fill=(255, 255, 255, 245), font=time_font,
+        )
 
         return img
