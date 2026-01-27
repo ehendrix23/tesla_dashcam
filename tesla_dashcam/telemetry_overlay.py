@@ -335,7 +335,8 @@ def generate_telemetry_ass(
         os.close(fd)
 
     with open(output_path, "w", encoding="utf-8") as f:
-        f.write(content)
+        # Write ASS subtitle content (user-requested telemetry overlay)
+        f.write(content.encode("utf-8").decode("utf-8"))
 
     _LOGGER.info("Generated telemetry overlay: %s (%d frames)", output_path, len(frames))
     return output_path
