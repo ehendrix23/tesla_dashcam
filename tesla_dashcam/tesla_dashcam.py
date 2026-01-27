@@ -44,6 +44,11 @@ from .telemetry_overlay import (
     get_sei_overlay_stats,
     TelemetryOverlaySettings,
 )
+from .graphical_overlay import (
+    generate_graphical_overlay,
+    cleanup_overlay_dir,
+    GraphicalOverlaySettings,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -3094,25 +3099,49 @@ def create_intermediate_movie(
     sei_stats = get_sei_overlay_stats(sei_frames, video_settings.get("sei_speed_unit", "mph"))
     replacement_strings.update(sei_stats)
 
-    # Generate ASS subtitle file for SEI overlay
+    # Generate SEI overlay (graphical or text-based ASS)
+    sei_gfx_concat = None
     if video_settings.get("sei_overlay") and sei_frames:
-        # Get font name from layout settings
-        font_path = video_settings["video_layout"].font.font
-        font_name = os.path.basename(font_path).replace(".ttf", "").replace(".TTF", "") if font_path else "Arial"
-        # Calculate default font size based on video height if not specified
-        default_font_size = max(18, video_settings["video_layout"].video_height // 45)
-        sei_settings = TelemetryOverlaySettings(
-            format_string=video_settings.get("sei_format", "{speed} {gear} {autopilot}"),
-            position=video_settings.get("sei_position", "bottom-left"),
-            speed_unit=video_settings.get("sei_speed_unit", "mph"),
-            font_name=font_name,
-            font_size=video_settings.get("sei_font_size") or default_font_size,
-            style_preset=video_settings.get("sei_style", "default"),
-            layout_preset=video_settings.get("sei_layout", "compact"),
-        )
-        sei_ass_file = generate_telemetry_ass(sei_frames, sei_settings)
-        if sei_ass_file:
-            _LOGGER.debug(f"Generated SEI overlay ASS file: {sei_ass_file}")
+        if video_settings.get("sei_graphical"):
+            # Graphical overlay: render PNG frames with concat demuxer
+            font_path = video_settings["video_layout"].font.font
+            widget_list = [
+                w.strip()
+                for w in video_settings.get("sei_widgets", "all").split(",")
+            ]
+            gfx_settings = GraphicalOverlaySettings(
+                position=video_settings.get("sei_widget_position", "bottom-left"),
+                size_preset=video_settings.get("sei_widget_size", "medium"),
+                widgets=widget_list,
+                theme_name=video_settings.get("sei_widget_theme", "default"),
+                speed_unit=video_settings.get("sei_speed_unit", "mph"),
+                font_path=font_path if font_path else None,
+                frame_rate=video_settings.get("fps", 36),
+            )
+            sei_gfx_concat = generate_graphical_overlay(
+                sei_frames, gfx_settings,
+                video_width=video_layout.video_width,
+                video_height=video_layout.video_height,
+            )
+            if sei_gfx_concat:
+                _LOGGER.debug(f"Generated graphical overlay: {sei_gfx_concat}")
+        else:
+            # Text-based ASS overlay
+            font_path = video_settings["video_layout"].font.font
+            font_name = os.path.basename(font_path).replace(".ttf", "").replace(".TTF", "") if font_path else "Arial"
+            default_font_size = max(18, video_settings["video_layout"].video_height // 45)
+            sei_settings = TelemetryOverlaySettings(
+                format_string=video_settings.get("sei_format", "{speed} {gear} {autopilot}"),
+                position=video_settings.get("sei_position", "bottom-left"),
+                speed_unit=video_settings.get("sei_speed_unit", "mph"),
+                font_name=font_name,
+                font_size=video_settings.get("sei_font_size") or default_font_size,
+                style_preset=video_settings.get("sei_style", "default"),
+                layout_preset=video_settings.get("sei_layout", "compact"),
+            )
+            sei_ass_file = generate_telemetry_ass(sei_frames, sei_settings)
+            if sei_ass_file:
+                _LOGGER.debug(f"Generated SEI overlay ASS file: {sei_ass_file}")
 
     try:
         # Try to replace strings!
@@ -3148,7 +3177,7 @@ def create_intermediate_movie(
     for ffmpeg_camera_position in ffmpeg_camera_positions:
         ffmpeg_position += ffmpeg_camera_position
 
-    # Build SEI ASS filter if available
+    # Build SEI ASS filter if available (text overlay mode)
     # The ASS filter needs to be inserted into the filter chain properly.
     # ffmpeg_text ends with an output label like [tmp0], so we need to insert
     # the ass filter before that label.
@@ -3163,6 +3192,7 @@ def create_intermediate_movie(
             ffmpeg_text
         )
 
+    # Build the main filter chain
     ffmpeg_filter += (
         ffmpeg_position
         + ffmpeg_text
@@ -3170,6 +3200,26 @@ def create_intermediate_movie(
         + video_settings["ffmpeg_motiononly"].format(input_clip=input_clip)
         + video_settings["ffmpeg_hwupload"].format(input_clip=input_clip)
     )
+
+    # Append graphical overlay at the end of the filter chain
+    final_map_label = video_settings["input_clip"]
+    if sei_gfx_concat:
+        # Add concat demuxer as additional FFmpeg input
+        ffmpeg_camera_commands.extend([
+            "-safe", "0", "-f", "concat", "-i", sei_gfx_concat,
+        ])
+        gfx_input_idx = input_counter
+        input_counter += 1
+
+        # Composite overlay onto the final video output
+        gfx_out = "gfx_out"
+        ffmpeg_filter += (
+            f";[{gfx_input_idx}:v] format=rgba [gfx_in]"
+            f";[{final_map_label}][gfx_in]"
+            f" overlay=eof_action=pass:repeatlast=0:format=auto"
+            f" [{gfx_out}]"
+        )
+        final_map_label = gfx_out
 
     title_timestamp: str = str(
         replacement_strings["event_timestamp"]
@@ -3207,7 +3257,7 @@ def create_intermediate_movie(
 
     ffmpeg_command += (
         ["-filter_complex", ffmpeg_filter]
-        + ["-map", f"[{video_settings['input_clip']}]"]
+        + ["-map", f"[{final_map_label}]"]
         + video_settings["other_params"]
         + ffmpeg_metadata
     )
@@ -3231,23 +3281,27 @@ def create_intermediate_movie(
             f"{get_current_timestamp()}\t\t\tCommand: {exc.cmd}\n"
             f"{get_current_timestamp()}\t\t\tError: {exc.stderr}\n\n"
         )
-        # Clean up temporary ASS file on error
+        # Clean up temporary overlay files on error
         if sei_ass_file and os.path.exists(sei_ass_file):
             try:
                 os.remove(sei_ass_file)
             except OSError:
                 pass
+        if sei_gfx_concat:
+            cleanup_overlay_dir(sei_gfx_concat)
         return False
     if FFMPEG_DEBUG:
         _LOGGER.debug("FFMPEG output:\n %s", ffmpeg_output.stdout)
         _LOGGER.debug("FFMPEG stderr output:\n %s", ffmpeg_output.stderr)
 
-    # Clean up temporary ASS file after successful processing
+    # Clean up temporary overlay files after successful processing
     if sei_ass_file and os.path.exists(sei_ass_file):
         try:
             os.remove(sei_ass_file)
         except OSError:
             pass
+    if sei_gfx_concat:
+        cleanup_overlay_dir(sei_gfx_concat)
 
     # Export SEI data to CSV if requested
     if video_settings.get("sei_export_csv") and sei_frames:
@@ -5154,6 +5208,53 @@ def main() -> int:
         metavar="FILENAME",
         help="Export SEI telemetry data to a CSV file.",
     )
+    sei_group.add_argument(
+        "--sei_graphical",
+        dest="sei_graphical",
+        action="store_true",
+        help="Enable graphical telemetry overlay with steering wheel, gauges, and indicators. "
+        "Replaces the text overlay when used with --sei_overlay.",
+    )
+    sei_group.add_argument(
+        "--sei_widget_position",
+        dest="sei_widget_position",
+        required=False,
+        choices=[
+            "bottom-left", "bottom-center", "bottom-right",
+            "top-left", "top-center", "top-right",
+        ],
+        default="bottom-left",
+        help="Position for graphical widget cluster. Default: bottom-left",
+    )
+    sei_group.add_argument(
+        "--sei_widget_size",
+        dest="sei_widget_size",
+        required=False,
+        choices=["small", "medium", "large"],
+        default="medium",
+        help="Size preset for graphical widgets. Default: medium",
+    )
+    sei_group.add_argument(
+        "--sei_widgets",
+        dest="sei_widgets",
+        required=False,
+        default="all",
+        help="R|Comma-separated list of widgets to display.\n"
+        "Options: steering, turn, brake, accel, speed, gear, location, all\n"
+        "Default: all",
+    )
+    sei_group.add_argument(
+        "--sei_widget_theme",
+        dest="sei_widget_theme",
+        required=False,
+        choices=["default", "hud", "minimal", "performance"],
+        default="default",
+        help="R|Color theme for graphical widgets.\n"
+        "  default     - White with dark background\n"
+        "  hud         - Green heads-up display style\n"
+        "  minimal     - Subtle, semi-transparent\n"
+        "  performance - Red/orange racing style",
+    )
 
     filter_group = parser.add_argument_group(
         title="Timestamp Restriction",
@@ -6078,6 +6179,11 @@ def main() -> int:
         "sei_style": getattr(args, "sei_style", "default"),
         "sei_layout": getattr(args, "sei_layout", "compact"),
         "sei_export_csv": getattr(args, "sei_export_csv", None),
+        "sei_graphical": getattr(args, "sei_graphical", False),
+        "sei_widget_position": getattr(args, "sei_widget_position", "bottom-left"),
+        "sei_widget_size": getattr(args, "sei_widget_size", "medium"),
+        "sei_widgets": getattr(args, "sei_widgets", "all"),
+        "sei_widget_theme": getattr(args, "sei_widget_theme", "default"),
     }
 
     # Confirm the merge variables provided are accurate.
