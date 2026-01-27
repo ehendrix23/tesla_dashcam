@@ -1,4 +1,4 @@
-"""Turn signal indicator widget."""
+"""Turn signal indicator widget - arrows that light up."""
 
 from PIL import Image, ImageDraw
 
@@ -15,34 +15,43 @@ class TurnSignalWidget(Widget):
         img = Image.new("RGBA", (self.width, self.height), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
 
-        arrow_w = self.width // 2 - 4
+        gap = 6
+        arrow_w = (self.width - gap) // 2
         arrow_h = self.height
         mid_y = self.height // 2
 
         # Left arrow
-        left_color = self.theme.accent if frame.blinker_on_left else self.theme.inactive
+        left_active = frame.blinker_on_left
+        left_color = (0, 220, 0, 255) if left_active else (70, 70, 70, 120)
+        shaft_h = arrow_h // 3
+        head_w = arrow_w * 2 // 3
+        shaft_w = arrow_w - head_w
+
+        # Left-pointing arrow
         left_pts = [
-            (0, mid_y),                          # left tip
-            (arrow_w // 2, 2),                   # top
-            (arrow_w // 2, arrow_h // 3),        # inner top
-            (arrow_w, arrow_h // 3),             # right top
-            (arrow_w, arrow_h * 2 // 3),         # right bottom
-            (arrow_w // 2, arrow_h * 2 // 3),    # inner bottom
-            (arrow_w // 2, arrow_h - 2),         # bottom
+            (0, mid_y),                                # tip
+            (head_w, 1),                               # top of head
+            (head_w, mid_y - shaft_h // 2),            # inner top
+            (arrow_w - 1, mid_y - shaft_h // 2),       # shaft top
+            (arrow_w - 1, mid_y + shaft_h // 2),       # shaft bottom
+            (head_w, mid_y + shaft_h // 2),            # inner bottom
+            (head_w, arrow_h - 1),                     # bottom of head
         ]
         draw.polygon(left_pts, fill=left_color)
 
         # Right arrow (mirrored)
-        offset_x = self.width // 2 + 4
-        right_color = self.theme.accent if frame.blinker_on_right else self.theme.inactive
+        right_active = frame.blinker_on_right
+        right_color = (0, 220, 0, 255) if right_active else (70, 70, 70, 120)
+        ox = arrow_w + gap
+
         right_pts = [
-            (offset_x + arrow_w, mid_y),                      # right tip
-            (offset_x + arrow_w // 2, 2),                     # top
-            (offset_x + arrow_w // 2, arrow_h // 3),          # inner top
-            (offset_x, arrow_h // 3),                         # left top
-            (offset_x, arrow_h * 2 // 3),                     # left bottom
-            (offset_x + arrow_w // 2, arrow_h * 2 // 3),      # inner bottom
-            (offset_x + arrow_w // 2, arrow_h - 2),           # bottom
+            (ox + arrow_w, mid_y),                         # tip
+            (ox + arrow_w - head_w, 1),                    # top of head
+            (ox + arrow_w - head_w, mid_y - shaft_h // 2), # inner top
+            (ox + 1, mid_y - shaft_h // 2),                # shaft top
+            (ox + 1, mid_y + shaft_h // 2),                # shaft bottom
+            (ox + arrow_w - head_w, mid_y + shaft_h // 2), # inner bottom
+            (ox + arrow_w - head_w, arrow_h - 1),          # bottom of head
         ]
         draw.polygon(right_pts, fill=right_color)
 

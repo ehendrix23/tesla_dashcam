@@ -17,7 +17,7 @@ def _heading_to_compass(heading_deg: float) -> str:
 
 
 class LocationDisplayWidget(Widget):
-    """Renders GPS coordinates and compass heading."""
+    """Renders GPS coordinates and compass heading on dark background."""
 
     def __init__(self, x, y, width, height, theme, font_path=None):
         super().__init__(x, y, width, height, theme)
@@ -35,7 +35,14 @@ class LocationDisplayWidget(Widget):
         img = Image.new("RGBA", (self.width, self.height), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
 
-        font_size = self.height // 2 - 2
+        # Semi-transparent background panel
+        draw.rounded_rectangle(
+            [0, 0, self.width - 1, self.height - 1],
+            radius=6,
+            fill=(0, 0, 0, 140),
+        )
+
+        font_size = max(9, self.height // 2 - 4)
         try:
             if self.font_path:
                 font = ImageFont.truetype(self.font_path, font_size)
@@ -48,7 +55,7 @@ class LocationDisplayWidget(Widget):
         line1 = f"{frame.latitude_deg:.5f}, {frame.longitude_deg:.5f}"
         line2 = f"{frame.heading_deg:.0f}\u00b0 {compass}"
 
-        draw.text((2, 0), line1, fill=self.theme.text, font=font)
-        draw.text((2, self.height // 2), line2, fill=self.theme.text, font=font)
+        draw.text((6, 2), line1, fill=(220, 220, 220, 240), font=font)
+        draw.text((6, self.height // 2 + 1), line2, fill=(220, 220, 220, 240), font=font)
 
         return img

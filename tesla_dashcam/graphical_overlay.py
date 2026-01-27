@@ -11,6 +11,7 @@ import os
 import shutil
 import tempfile
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Dict, List, Optional
 
 from PIL import Image
@@ -28,19 +29,22 @@ from .widgets.accel_gauge import AccelGaugeWidget
 from .widgets.speed_display import SpeedDisplayWidget
 from .widgets.gear_indicator import GearIndicatorWidget
 from .widgets.location_display import LocationDisplayWidget
+from .widgets.datetime_display import DateTimeDisplayWidget
 
 _LOGGER = logging.getLogger(__name__)
 
 DEFAULT_FRAME_RATE = 36.0
 
-# Widget cluster dimensions per size preset: (cluster_width, cluster_height)
+# Widget cluster dimensions per size preset
 _SIZE_PRESETS = {
-    "small": {"cluster": (300, 200), "steering": 60, "font_scale": 0.7},
-    "medium": {"cluster": (450, 280), "steering": 90, "font_scale": 1.0},
-    "large": {"cluster": (600, 350), "steering": 120, "font_scale": 1.3},
+    "small": {"steering": 100, "font_scale": 0.9, "gauge_w": 32, "gauge_h": 90},
+    "medium": {"steering": 140, "font_scale": 1.2, "gauge_w": 40, "gauge_h": 120},
+    "large": {"steering": 190, "font_scale": 1.6, "gauge_w": 52, "gauge_h": 160},
 }
 
-ALL_WIDGETS = ["steering", "turn", "brake", "accel", "speed", "gear", "location"]
+ALL_WIDGETS = [
+    "steering", "turn", "brake", "accel", "speed", "gear", "location", "datetime",
+]
 
 
 @dataclass
@@ -56,6 +60,7 @@ class GraphicalOverlaySettings:
     frame_rate: float = DEFAULT_FRAME_RATE
     margin_x: int = 30
     margin_y: int = 25
+    start_time: Optional[datetime] = None
 
 
 def _resolve_widgets(widget_list: List[str]) -> List[str]:
@@ -71,104 +76,105 @@ def _build_widget_layout(
     video_width: int,
     video_height: int,
 ) -> OverlayCanvas:
-    """Create widget instances positioned within the overlay canvas."""
+    """Create widget instances positioned within the overlay canvas.
+
+    Layout inspired by TeslaClip:
+    - Top right: Date/time
+    - Top center: Speed + Gear + Turn signals
+    - Bottom center: Steering wheel with ACC/BRK vertical gauges on sides
+    - Bottom left: Location/heading
+    """
     theme = THEME_PRESETS.get(settings.theme_name, THEME_PRESETS["default"])
     size = _SIZE_PRESETS.get(settings.size_preset, _SIZE_PRESETS["medium"])
     enabled = _resolve_widgets(settings.widgets)
 
-    cluster_w, cluster_h = size["cluster"]
     steer_size = size["steering"]
     scale = size["font_scale"]
+    gauge_w = size["gauge_w"]
+    gauge_h = size["gauge_h"]
 
-    # Calculate cluster origin based on position
     mx = settings.margin_x
     my = settings.margin_y
-    pos = settings.position
-
-    if "left" in pos:
-        origin_x = mx
-    elif "right" in pos:
-        origin_x = video_width - cluster_w - mx
-    else:
-        origin_x = (video_width - cluster_w) // 2
-
-    if "top" in pos:
-        origin_y = my
-    elif "bottom" in pos:
-        origin_y = video_height - cluster_h - my
-    else:
-        origin_y = (video_height - cluster_h) // 2
 
     widgets = []
     font = settings.font_path
 
-    # Row 1: Steering wheel | Speed | Gear
-    row1_y = 0
-    col_x = 0
+    # === TOP ROW: Date/time (right), Speed (center), Gear + Turn signals ===
+    top_y = my
+
+    if "datetime" in enabled:
+        dw = int(280 * scale)
+        dh = int(30 * scale)
+        dx = video_width - dw - mx
+        widgets.append(DateTimeDisplayWidget(
+            dx, top_y, dw, dh, theme,
+            start_time=settings.start_time,
+            frame_rate=settings.frame_rate,
+            font_path=font,
+        ))
+
+    if "speed" in enabled:
+        sw = int(140 * scale)
+        sh = int(90 * scale)
+        sx = (video_width - sw) // 2
+        widgets.append(SpeedDisplayWidget(
+            sx, top_y, sw, sh, theme,
+            speed_unit=settings.speed_unit, font_path=font,
+        ))
+
+    if "gear" in enabled:
+        gw = int(120 * scale)
+        gh = int(34 * scale)
+        # Place gear to the right of speed
+        gx = (video_width + int(140 * scale)) // 2 + 10
+        widgets.append(GearIndicatorWidget(
+            gx, top_y + 6, gw, gh, theme, font_path=font,
+        ))
+
+    if "turn" in enabled:
+        tw = int(90 * scale)
+        th = int(30 * scale)
+        # Place turn signals to the right of gear
+        turn_x = (video_width + int(140 * scale)) // 2 + 10
+        turn_y = top_y + int(42 * scale)
+        widgets.append(TurnSignalWidget(
+            turn_x, turn_y, tw, th, theme,
+        ))
+
+    # === BOTTOM CENTER: Steering wheel with ACC/BRK gauges on either side ===
+    steer_y = video_height - steer_size - my - int(20 * scale)
+    steer_x = (video_width - steer_size) // 2
 
     if "steering" in enabled:
         widgets.append(SteeringWheelWidget(
-            origin_x + col_x, origin_y + row1_y,
-            steer_size, steer_size, theme,
-        ))
-        col_x += steer_size + 10
-
-    if "speed" in enabled:
-        sw = int(100 * scale)
-        sh = int(70 * scale)
-        widgets.append(SpeedDisplayWidget(
-            origin_x + col_x, origin_y + row1_y,
-            sw, sh, theme,
-            speed_unit=settings.speed_unit, font_path=font,
-        ))
-        col_x += sw + 10
-
-    if "gear" in enabled:
-        gw = int(100 * scale)
-        gh = int(30 * scale)
-        widgets.append(GearIndicatorWidget(
-            origin_x + col_x, origin_y + row1_y,
-            gw, gh, theme, font_path=font,
+            steer_x, steer_y, steer_size, steer_size, theme,
+            font_path=font,
         ))
 
-    # Row 2: Turn signals | Brake | Accel gauge
-    row2_y = steer_size + 8
-    col_x = 0
-
-    if "turn" in enabled:
-        tw = int(80 * scale)
-        th = int(30 * scale)
-        widgets.append(TurnSignalWidget(
-            origin_x + col_x, origin_y + row2_y,
-            tw, th, theme,
-        ))
-        col_x += tw + 10
-
-    if "brake" in enabled:
-        bs = int(30 * scale)
-        widgets.append(BrakeIndicatorWidget(
-            origin_x + col_x, origin_y + row2_y,
-            bs, bs, theme, font_path=font,
-        ))
-        col_x += bs + 10
-
+    # ACC gauge to the left of steering wheel
     if "accel" in enabled:
-        aw = int(140 * scale)
-        ah = int(20 * scale)
+        ax = steer_x - gauge_w - 14
+        ay = steer_y + (steer_size - gauge_h) // 2
         widgets.append(AccelGaugeWidget(
-            origin_x + col_x, origin_y + row2_y + 5,
-            aw, ah, theme,
+            ax, ay, gauge_w, gauge_h, theme, font_path=font,
         ))
 
-    # Row 3: Location
-    row3_y = row2_y + int(40 * scale)
+    # BRK gauge to the right of steering wheel
+    if "brake" in enabled:
+        bx = steer_x + steer_size + 14
+        by = steer_y + (steer_size - gauge_h) // 2
+        widgets.append(BrakeIndicatorWidget(
+            bx, by, gauge_w, gauge_h, theme, font_path=font,
+        ))
 
+    # === BOTTOM LEFT: Location/heading ===
     if "location" in enabled:
-        lw = int(280 * scale)
-        lh = int(36 * scale)
+        lw = int(300 * scale)
+        lh = int(44 * scale)
+        lx = mx
+        ly = video_height - lh - my
         widgets.append(LocationDisplayWidget(
-            origin_x, origin_y + row3_y,
-            lw, lh, theme, font_path=font,
+            lx, ly, lw, lh, theme, font_path=font,
         ))
 
     return OverlayCanvas(video_width, video_height, widgets)
@@ -207,6 +213,9 @@ def generate_graphical_overlay(
     created_dir = False
     if output_dir is None:
         output_dir = tempfile.mkdtemp(prefix="tesla_gfx_overlay_")
+        created_dir = True
+    elif not os.path.isdir(output_dir):
+        os.makedirs(output_dir, exist_ok=True)
         created_dir = True
 
     # Render unique states and build concat file

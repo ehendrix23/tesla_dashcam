@@ -8,6 +8,7 @@ from .accel_gauge import AccelGaugeWidget
 from .speed_display import SpeedDisplayWidget
 from .gear_indicator import GearIndicatorWidget
 from .location_display import LocationDisplayWidget
+from .datetime_display import DateTimeDisplayWidget
 
 __all__ = [
     "Widget",
@@ -21,4 +22,5 @@ __all__ = [
     "SpeedDisplayWidget",
     "GearIndicatorWidget",
     "LocationDisplayWidget",
+    "DateTimeDisplayWidget",
 ]

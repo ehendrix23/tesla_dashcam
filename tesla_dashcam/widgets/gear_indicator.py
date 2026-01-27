@@ -6,7 +6,7 @@ from .base import Widget, WidgetTheme
 
 
 class GearIndicatorWidget(Widget):
-    """Renders P R N D with the active gear highlighted."""
+    """Renders P R N D with the active gear highlighted, on dark background."""
 
     def __init__(self, x, y, width, height, theme, font_path=None):
         super().__init__(x, y, width, height, theme)
@@ -19,10 +19,17 @@ class GearIndicatorWidget(Widget):
         img = Image.new("RGBA", (self.width, self.height), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
 
+        # Semi-transparent background panel
+        draw.rounded_rectangle(
+            [0, 0, self.width - 1, self.height - 1],
+            radius=6,
+            fill=(0, 0, 0, 140),
+        )
+
         gears = ["P", "R", "N", "D"]
         active = frame.gear_letter
 
-        font_size = min(self.height - 4, self.width // len(gears) - 2)
+        font_size = min(self.height - 8, self.width // len(gears) - 4)
         try:
             if self.font_path:
                 font = ImageFont.truetype(self.font_path, font_size)
@@ -35,15 +42,9 @@ class GearIndicatorWidget(Widget):
         for i, g in enumerate(gears):
             x = i * slot_w
             if g == active:
-                color = self.theme.active
-                # Highlight background for active gear
-                draw.rounded_rectangle(
-                    [x + 1, 1, x + slot_w - 1, self.height - 1],
-                    radius=4,
-                    fill=(*self.theme.active[:3], 60),
-                )
+                color = (255, 255, 255, 255)
             else:
-                color = self.theme.inactive
+                color = (100, 100, 100, 160)
 
             bbox = draw.textbbox((0, 0), g, font=font)
             tw = bbox[2] - bbox[0]

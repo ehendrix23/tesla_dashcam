@@ -3117,6 +3117,7 @@ def create_intermediate_movie(
                 speed_unit=video_settings.get("sei_speed_unit", "mph"),
                 font_path=font_path if font_path else None,
                 frame_rate=video_settings.get("fps", 36),
+                start_time=starting_timestamp,
             )
             sei_gfx_concat = generate_graphical_overlay(
                 sei_frames, gfx_settings,
@@ -3264,6 +3265,8 @@ def create_intermediate_movie(
 
     ffmpeg_command = ffmpeg_command + ["-y", temp_movie_name]
     _LOGGER.debug("FFMPEG Command: %s", ffmpeg_command)
+    if sei_gfx_concat:
+        _LOGGER.debug("GFX overlay filter chain appended, map label: [%s]", final_map_label)
 
     # Run the command.
     try:
