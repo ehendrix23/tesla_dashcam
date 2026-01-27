@@ -38,6 +38,13 @@ from tzlocal import get_localzone
 if sys.platform == "win32":
     from win11toast import toast  # type: ignore[import]
 
+from .sei_extractor import extract_sei_data, has_sei_data, export_sei_to_csv
+from .telemetry_overlay import (
+    generate_telemetry_ass,
+    get_sei_overlay_stats,
+    TelemetryOverlaySettings,
+)
+
 _LOGGER = logging.getLogger(__name__)
 
 # TODO: Move everything into classes and separate files. For example,
@@ -3068,6 +3075,45 @@ def create_intermediate_movie(
     replacement_strings["event_latitude"] = event_info.event_metadata.latitude or 0.0
     replacement_strings["event_longitude"] = event_info.event_metadata.longitude or 0.0
 
+    # Extract SEI telemetry data if overlay is enabled
+    sei_frames = []
+    sei_ass_file = None
+    if video_settings.get("sei_overlay") or video_settings.get("sei_export_csv"):
+        # Try to extract SEI from front camera (most reliable source)
+        front_file = clip_filenames.get("front")
+        if front_file:
+            sei_frames = extract_sei_data(front_file)
+            if sei_frames:
+                _LOGGER.info(f"Extracted {len(sei_frames)} SEI frames from {front_file}")
+            else:
+                _LOGGER.debug(
+                    f"No SEI data in {front_file} (requires firmware 2025.44.25+, HW3+)"
+                )
+
+    # Add SEI summary stats to replacement strings
+    sei_stats = get_sei_overlay_stats(sei_frames, video_settings.get("sei_speed_unit", "mph"))
+    replacement_strings.update(sei_stats)
+
+    # Generate ASS subtitle file for SEI overlay
+    if video_settings.get("sei_overlay") and sei_frames:
+        # Get font name from layout settings
+        font_path = video_settings["video_layout"].font.font
+        font_name = os.path.basename(font_path).replace(".ttf", "").replace(".TTF", "") if font_path else "Arial"
+        # Calculate default font size based on video height if not specified
+        default_font_size = max(18, video_settings["video_layout"].video_height // 45)
+        sei_settings = TelemetryOverlaySettings(
+            format_string=video_settings.get("sei_format", "{speed} {gear} {autopilot}"),
+            position=video_settings.get("sei_position", "bottom-left"),
+            speed_unit=video_settings.get("sei_speed_unit", "mph"),
+            font_name=font_name,
+            font_size=video_settings.get("sei_font_size") or default_font_size,
+            style_preset=video_settings.get("sei_style", "default"),
+            layout_preset=video_settings.get("sei_layout", "compact"),
+        )
+        sei_ass_file = generate_telemetry_ass(sei_frames, sei_settings)
+        if sei_ass_file:
+            _LOGGER.debug(f"Generated SEI overlay ASS file: {sei_ass_file}")
+
     try:
         # Try to replace strings!
         user_formatted_text = user_formatted_text.format(**replacement_strings)
@@ -3101,6 +3147,21 @@ def create_intermediate_movie(
     ffmpeg_position: str = ""
     for ffmpeg_camera_position in ffmpeg_camera_positions:
         ffmpeg_position += ffmpeg_camera_position
+
+    # Build SEI ASS filter if available
+    # The ASS filter needs to be inserted into the filter chain properly.
+    # ffmpeg_text ends with an output label like [tmp0], so we need to insert
+    # the ass filter before that label.
+    if sei_ass_file and ffmpeg_text:
+        import re
+        # Escape the file path for FFmpeg filter
+        escaped_ass_path = sei_ass_file.replace("\\", "/").replace(":", r"\:")
+        # Insert ass filter before the output label [tmpN]
+        ffmpeg_text = re.sub(
+            r'\s*\[tmp(\d+)\]\s*$',
+            f",ass={escaped_ass_path} [tmp\\1]",
+            ffmpeg_text
+        )
 
     ffmpeg_filter += (
         ffmpeg_position
@@ -3170,10 +3231,33 @@ def create_intermediate_movie(
             f"{get_current_timestamp()}\t\t\tCommand: {exc.cmd}\n"
             f"{get_current_timestamp()}\t\t\tError: {exc.stderr}\n\n"
         )
+        # Clean up temporary ASS file on error
+        if sei_ass_file and os.path.exists(sei_ass_file):
+            try:
+                os.remove(sei_ass_file)
+            except OSError:
+                pass
         return False
     if FFMPEG_DEBUG:
         _LOGGER.debug("FFMPEG output:\n %s", ffmpeg_output.stdout)
         _LOGGER.debug("FFMPEG stderr output:\n %s", ffmpeg_output.stderr)
+
+    # Clean up temporary ASS file after successful processing
+    if sei_ass_file and os.path.exists(sei_ass_file):
+        try:
+            os.remove(sei_ass_file)
+        except OSError:
+            pass
+
+    # Export SEI data to CSV if requested
+    if video_settings.get("sei_export_csv") and sei_frames:
+        csv_path = video_settings["sei_export_csv"]
+        # Append clip timestamp to make unique if processing multiple clips
+        if os.path.exists(csv_path):
+            base, ext = os.path.splitext(csv_path)
+            csv_path = f"{base}_{local_timestamp.strftime('%Y-%m-%dT%H-%M-%S')}{ext}"
+        export_sei_to_csv(sei_frames, csv_path)
+        print(f"{get_current_timestamp()}\t\t\tExported SEI data to {csv_path}")
 
     clip_info.filename = temp_movie_name
     clip_info.start_timestamp = starting_timestamp
@@ -4415,7 +4499,7 @@ def process_folders(
                 # Only 1 movie was created.
                 print(
                     f"{get_current_timestamp()} Movie {movies_list[0][0]} with "
-                    f"duration {movies_list[0][0]} has been created."
+                    f"duration {movies_list[0][1]} has been created."
                 )
 
             else:
@@ -4506,9 +4590,11 @@ def notify_windows(title, subtitle, message):
 def notify_linux(title, subtitle, message):
     """Notification on Linux"""
     try:
-        run(["notify-send", f'"{title} {subtitle}"', f'"{message}"'], check=True)
-    except CalledProcessError as exc:
-        _LOGGER.error("Failed in notifification: %s", exc)
+        import subprocess
+        run(["notify-send", f'"{title} {subtitle}"', f'"{message}"'],
+            stderr=subprocess.DEVNULL)
+    except Exception:
+        pass  # Notifications may not work in Docker/headless environments
 
 
 def notify(title, subtitle, message):
@@ -4973,6 +5059,100 @@ def main() -> int:
         "Default is set '%%x %%X' which is locale's appropriate date and time "
         "representation"
         "More info: https://strftime.org",
+    )
+
+    sei_group = parser.add_argument_group(
+        title="SEI Telemetry Overlay",
+        description="Options for displaying embedded telemetry data from Tesla dashcam videos. "
+        "Requires firmware 2025.44.25+ and HW3/HW4.",
+    )
+    sei_group.add_argument(
+        "--sei_overlay",
+        dest="sei_overlay",
+        action="store_true",
+        help="Enable SEI telemetry overlay showing speed, gear, autopilot status, etc.",
+    )
+    sei_group.add_argument(
+        "--sei_format",
+        dest="sei_format",
+        required=False,
+        type=str,
+        default="{speed} {gear} {autopilot}",
+        help="R|Format string for SEI telemetry overlay.\n"
+        "Available variables:\n"
+        "  {speed}     - Speed with unit (e.g., '45 mph')\n"
+        "  {speed_value} - Speed value only\n"
+        "  {gear}      - Gear letter (P/R/N/D)\n"
+        "  {autopilot} - Autopilot state (FSD/AP/TACC or empty)\n"
+        "  {brake}     - 'BRAKE' if applied, empty otherwise\n"
+        "  {blinker}   - Turn signal indicator\n"
+        "  {heading}   - Compass heading in degrees\n"
+        "  {steering}  - Steering wheel angle\n"
+        "  {accel}     - Accelerator pedal position\n"
+        "  {lat}       - Latitude\n"
+        "  {lon}       - Longitude\n"
+        "  {gforce_x}  - Lateral G-force\n"
+        "  {gforce_y}  - Longitudinal G-force\n"
+        "Default: '{speed} {gear} {autopilot}'",
+    )
+    sei_group.add_argument(
+        "--sei_position",
+        dest="sei_position",
+        required=False,
+        choices=["bottom-left", "bottom-center", "bottom-right",
+                 "top-left", "top-center", "top-right"],
+        default="bottom-left",
+        help="Position for SEI telemetry overlay. Default: bottom-left",
+    )
+    sei_group.add_argument(
+        "--sei_speed_unit",
+        dest="sei_speed_unit",
+        required=False,
+        choices=["mph", "kmh", "mps"],
+        default="mph",
+        help="Speed unit for SEI overlay. Default: mph",
+    )
+    sei_group.add_argument(
+        "--sei_font_size",
+        dest="sei_font_size",
+        required=False,
+        type=int,
+        help="Font size for SEI overlay. Default is scaled based on video size.",
+    )
+    sei_group.add_argument(
+        "--sei_style",
+        dest="sei_style",
+        required=False,
+        choices=["default", "hud", "boxed", "minimal", "bold"],
+        default="default",
+        help="R|Style preset for SEI overlay appearance.\n"
+        "  default - Clean white text with black outline\n"
+        "  hud     - Green heads-up display style\n"
+        "  boxed   - White text on dark background\n"
+        "  minimal - Small, subtle gray text\n"
+        "  bold    - Large bold yellow text",
+    )
+    sei_group.add_argument(
+        "--sei_layout",
+        dest="sei_layout",
+        required=False,
+        choices=["compact", "full", "speed-only", "driving", "location", "performance"],
+        default="compact",
+        help="R|Layout preset for SEI data arrangement.\n"
+        "  compact     - Single line: speed, gear, autopilot\n"
+        "  full        - Multi-line with all key data\n"
+        "  speed-only  - Large speed display only\n"
+        "  driving     - Speed, gear, brake, blinker\n"
+        "  location    - Speed with GPS coordinates\n"
+        "  performance - Speed, throttle, g-forces",
+    )
+    sei_group.add_argument(
+        "--sei_export_csv",
+        dest="sei_export_csv",
+        required=False,
+        type=str,
+        metavar="FILENAME",
+        help="Export SEI telemetry data to a CSV file.",
     )
 
     filter_group = parser.add_argument_group(
@@ -5890,6 +6070,14 @@ def main() -> int:
         "sentry_end_offset": getattr(args, "sentry_end_offset", None),
         "sentry_offset": args.sentry_offset,
         "skip_existing": args.skip_existing,
+        "sei_overlay": args.sei_overlay,
+        "sei_format": args.sei_format,
+        "sei_position": args.sei_position,
+        "sei_speed_unit": args.sei_speed_unit,
+        "sei_font_size": getattr(args, "sei_font_size", None),
+        "sei_style": getattr(args, "sei_style", "default"),
+        "sei_layout": getattr(args, "sei_layout", "compact"),
+        "sei_export_csv": getattr(args, "sei_export_csv", None),
     }
 
     # Confirm the merge variables provided are accurate.
@@ -5917,6 +6105,10 @@ def main() -> int:
         "event_reason": "event_reason",
         "event_latitude": "event_latitude",
         "event_longitude": "event_longitude",
+        # SEI telemetry variables (static summary values)
+        "sei_available": "sei_available",
+        "sei_avg_speed": "sei_avg_speed",
+        "sei_max_speed": "sei_max_speed",
     }
 
     try:

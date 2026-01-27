@@ -992,6 +992,90 @@ added to the resulting video.
 
      0x2E8B57
 
+## SEI Telemetry Overlay
+
+Tesla vehicles with firmware 2025.44.25 or later (HW3/HW4) embed telemetry data
+directly in dashcam video files using SEI (Supplemental Enhancement Information)
+NAL units. This telemetry includes speed, GPS coordinates, steering angle, brake
+status, gear, autopilot state, and more.
+
+**\--sei\_overlay**
+
+:   Default: False
+
+    Enable SEI telemetry overlay. When enabled, telemetry data embedded in the
+    video files will be extracted and displayed as a real-time overlay.
+
+**\--sei\_format** *format\_string*
+
+:   Default: {speed} {gear} {autopilot}
+
+    Format string for SEI telemetry overlay. Use \\N for newlines.
+
+    Available format variables:
+
+    -   `{speed}` - Speed with unit (e.g., '45 mph')
+    -   `{speed_value}` - Speed value only (no unit)
+    -   `{gear}` - Gear letter (P/R/N/D)
+    -   `{autopilot}` - Autopilot state (FSD/AP/TACC or empty)
+    -   `{brake}` - 'BRAKE' if applied, empty otherwise
+    -   `{blinker}` - Turn signal indicator
+    -   `{heading}` - Compass heading in degrees
+    -   `{steering}` - Steering wheel angle in degrees
+    -   `{accel}` - Accelerator pedal position (0-100%)
+    -   `{lat}` - Latitude
+    -   `{lon}` - Longitude
+    -   `{gforce_x}` - Lateral G-force
+    -   `{gforce_y}` - Longitudinal G-force
+
+**\--sei\_position**
+
+:   Default: bottom-left
+
+    Position for SEI telemetry overlay. Valid values: bottom-left, bottom-center,
+    bottom-right, top-left, top-center, top-right.
+
+**\--sei\_speed\_unit**
+
+:   Default: mph
+
+    Speed unit for SEI overlay. Valid values: mph, kmh, mps (meters per second).
+
+**\--sei\_font\_size**
+
+:   Default: scaled based on video height
+
+    Font size for SEI overlay text.
+
+**\--sei\_style**
+
+:   Default: default
+
+    Style preset for SEI overlay appearance:
+
+    -   `default` - Clean white text with black outline
+    -   `hud` - Green heads-up display style
+    -   `boxed` - White text on semi-transparent dark background
+    -   `minimal` - Small, subtle gray text
+    -   `bold` - Large bold yellow text for visibility
+
+**\--sei\_layout**
+
+:   Default: compact
+
+    Layout preset for SEI data arrangement:
+
+    -   `compact` - Single line showing speed, gear, autopilot
+    -   `full` - Multi-line display with all key telemetry data
+    -   `speed-only` - Large speed display only
+    -   `driving` - Speed, gear, brake, and blinker indicators
+    -   `location` - Speed with GPS coordinates
+    -   `performance` - Speed, throttle, and g-forces
+
+**\--sei\_export\_csv** *filename*
+
+:   Export SEI telemetry data to a CSV file for external analysis.
+
 ## Timestamp Restriction
 
 The events/clips to be processed and thus be put in the resulting video
