@@ -13,6 +13,7 @@ from .autopilot_indicator import AutopilotIndicatorWidget
 from .gforce_display import GForceDisplayWidget
 from .compass_display import CompassDisplayWidget
 from .center_cluster import CenterClusterWidget
+from .elevation_display import ElevationDisplayWidget
 
 __all__ = [
     "Widget",
@@ -31,4 +32,5 @@ __all__ = [
     "GForceDisplayWidget",
     "CompassDisplayWidget",
     "CenterClusterWidget",
+    "ElevationDisplayWidget",
 ]

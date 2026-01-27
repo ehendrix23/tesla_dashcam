@@ -34,6 +34,7 @@ from .widgets.autopilot_indicator import AutopilotIndicatorWidget
 from .widgets.gforce_display import GForceDisplayWidget
 from .widgets.compass_display import CompassDisplayWidget
 from .widgets.center_cluster import CenterClusterWidget
+from .widgets.elevation_display import ElevationDisplayWidget
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -52,6 +53,7 @@ _CLASSIC_PRESETS = {
 ALL_WIDGETS = [
     "steering", "turn", "brake", "accel", "speed", "gear",
     "location", "datetime", "autopilot", "gforce", "compass", "cluster",
+    "elevation",
 ]
 
 
@@ -131,6 +133,9 @@ def _build_dashboard_layout(
 
     # === Position widgets ===
 
+    # Elevation indicator dimensions (placed below datetime or compass)
+    elev_h = int(bar_h * 0.30)
+
     # DateTime at top left
     if "datetime" in enabled:
         widgets.append(DateTimeDisplayWidget(
@@ -145,6 +150,15 @@ def _build_dashboard_layout(
         cx = video_width - compass_w - mx
         widgets.append(CompassDisplayWidget(
             cx, my, compass_w, compass_h, theme, font_path=font,
+        ))
+
+    # Elevation below compass
+    if "elevation" in enabled:
+        elev_y = my + compass_h + 4
+        elev_w = compass_w
+        ex = video_width - elev_w - mx
+        widgets.append(ElevationDisplayWidget(
+            ex, elev_y, elev_w, elev_h, theme, font_path=font,
         ))
 
     # Center group: [Speed+AP] [Cluster] [Gear+Turn]

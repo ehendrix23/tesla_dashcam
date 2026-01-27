@@ -1141,6 +1141,7 @@ bubble.
     -   `gforce` - G-force magnitude with directional crosshair bubble
     -   `compass` - Compass heading, direction, and GPS coordinates
     -   `cluster` - Center cluster combining steering wheel, gauges, and G-force
+    -   `elevation` - Road grade/incline estimated from z-axis accelerometer
     -   `all` - All available widgets (default)
 
     Example: `--sei_widgets speed,steering,gear`
