@@ -1165,6 +1165,51 @@ bubble.
     values: bottom-left, bottom-center, bottom-right, top-left, top-center,
     top-right.
 
+### Telemetry Panels
+
+The telemetry panel feature adds dedicated instrument and map panels as
+camera slots in the multi-camera layout. Unlike the graphical overlay which
+composites widgets onto an existing camera feed, panels occupy their own
+space in the layout alongside the front, rear, and repeater cameras.
+
+Two panels are available:
+
+-   **Instruments panel** -- steering wheel with angle readout, ACC/BRK
+    gauges, speed, gear indicator, turn signals, compass heading, G-force
+    magnitude, and longitudinal acceleration.
+-   **Map panel** -- route map rendered from GPS coordinates with a moving
+    position dot. The map zoom adapts to vehicle speed: zoomed in at low
+    speeds for neighborhood detail, zoomed out at highway speeds to show the
+    full route. Requires the `staticmap` Python package.
+
+To enable panels:
+
+    python -m tesla_dashcam /path/to/clips --sei_overlay --sei_panel
+
+To disable the map panel and show only instruments:
+
+    python -m tesla_dashcam /path/to/clips --sei_overlay --sei_panel --no-sei_panel_map
+
+Panels inherit widget selection, theme, and other graphical settings from the
+`--sei_widgets` and `--sei_widget_theme` options documented above.
+
+**\--sei\_panel**
+
+:   Default: False
+
+    Add telemetry instrument and map panels as camera slots in the
+    multi-camera layout. Each layout (FullScreen, Mosaic, Cross, Diamond,
+    Horizontal) positions the panels automatically. Requires `--sei_overlay`.
+
+**\--sei\_panel\_map**
+
+:   Default: True
+
+    Include a route map panel with a moving position dot that tracks the
+    vehicle's GPS coordinates. The map zoom level adapts to speed. Disable
+    with `--no-sei_panel_map` to show only the instruments panel. Requires
+    the `staticmap` package (`pip install staticmap`).
+
 ## Timestamp Restriction
 
 The events/clips to be processed and thus be put in the resulting video

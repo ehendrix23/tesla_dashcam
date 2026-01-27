@@ -16,42 +16,51 @@ class TurnSignalWidget(Widget):
         draw = ImageDraw.Draw(img)
 
         gap = 6
-        arrow_w = (self.width - gap) // 2
-        arrow_h = self.height
         mid_y = self.height // 2
+
+        # Constrain arrow dimensions to maintain aspect ratio.
+        # Each arrow should be roughly 2:1 (width:height).
+        max_arrow_w = (self.width - gap) // 2
+        arrow_h = min(self.height, max_arrow_w)
+        arrow_w = min(max_arrow_w, arrow_h * 2)
+
+        # Center the arrows within the widget
+        total_w = arrow_w * 2 + gap
+        x_offset = (self.width - total_w) // 2
+        y_offset = (self.height - arrow_h) // 2
+        mid_y = y_offset + arrow_h // 2
 
         # Left arrow
         left_active = frame.blinker_on_left
         left_color = (0, 220, 0, 255) if left_active else (70, 70, 70, 120)
         shaft_h = arrow_h // 3
         head_w = arrow_w * 2 // 3
-        shaft_w = arrow_w - head_w
 
-        # Left-pointing arrow
+        lx = x_offset
         left_pts = [
-            (0, mid_y),                                # tip
-            (head_w, 1),                               # top of head
-            (head_w, mid_y - shaft_h // 2),            # inner top
-            (arrow_w - 1, mid_y - shaft_h // 2),       # shaft top
-            (arrow_w - 1, mid_y + shaft_h // 2),       # shaft bottom
-            (head_w, mid_y + shaft_h // 2),            # inner bottom
-            (head_w, arrow_h - 1),                     # bottom of head
+            (lx, mid_y),
+            (lx + head_w, y_offset + 1),
+            (lx + head_w, mid_y - shaft_h // 2),
+            (lx + arrow_w - 1, mid_y - shaft_h // 2),
+            (lx + arrow_w - 1, mid_y + shaft_h // 2),
+            (lx + head_w, mid_y + shaft_h // 2),
+            (lx + head_w, y_offset + arrow_h - 1),
         ]
         draw.polygon(left_pts, fill=left_color)
 
         # Right arrow (mirrored)
         right_active = frame.blinker_on_right
         right_color = (0, 220, 0, 255) if right_active else (70, 70, 70, 120)
-        ox = arrow_w + gap
+        rx = x_offset + arrow_w + gap
 
         right_pts = [
-            (ox + arrow_w, mid_y),                         # tip
-            (ox + arrow_w - head_w, 1),                    # top of head
-            (ox + arrow_w - head_w, mid_y - shaft_h // 2), # inner top
-            (ox + 1, mid_y - shaft_h // 2),                # shaft top
-            (ox + 1, mid_y + shaft_h // 2),                # shaft bottom
-            (ox + arrow_w - head_w, mid_y + shaft_h // 2), # inner bottom
-            (ox + arrow_w - head_w, arrow_h - 1),          # bottom of head
+            (rx + arrow_w, mid_y),
+            (rx + arrow_w - head_w, y_offset + 1),
+            (rx + arrow_w - head_w, mid_y - shaft_h // 2),
+            (rx + 1, mid_y - shaft_h // 2),
+            (rx + 1, mid_y + shaft_h // 2),
+            (rx + arrow_w - head_w, mid_y + shaft_h // 2),
+            (rx + arrow_w - head_w, y_offset + arrow_h - 1),
         ]
         draw.polygon(right_pts, fill=right_color)
 

@@ -75,8 +75,13 @@ class CompassDisplayWidget(Widget):
 
         # Heading text: "81 E"
         text_x = icon_cx + icon_r + 8
+        avail_heading_w = self.width - text_x - 6
         heading_text = f"{frame.heading_deg:.0f}\u00b0 {compass}"
         bbox = draw.textbbox((0, 0), heading_text, font=heading_font)
+        # If heading text overflows, try smaller font
+        if (bbox[2] - bbox[0]) > avail_heading_w and heading_font_size > 14:
+            heading_font = get_font(heading_font_size - 4, self.font_path)
+            bbox = draw.textbbox((0, 0), heading_text, font=heading_font)
         th = bbox[3] - bbox[1]
         ty = 4 - bbox[1]
         draw.text((text_x, ty), heading_text, fill=(255, 255, 255, 240), font=heading_font)

@@ -73,10 +73,11 @@ class DateTimeDisplayWidget(Widget):
         # Date line - adapt format to fit available width
         pad = 8
         avail_w = self.width - 2 * pad
-        date_text = t.strftime("%a %b %d, %Y")
-        dbbox = draw.textbbox((0, 0), date_text, font=date_font)
-        if (dbbox[2] - dbbox[0]) > avail_w:
-            date_text = t.strftime("%b %d, %Y")
+        for fmt in ("%a %b %d, %Y", "%b %d, %Y", "%Y-%m-%d"):
+            date_text = t.strftime(fmt)
+            dbbox = draw.textbbox((0, 0), date_text, font=date_font)
+            if (dbbox[2] - dbbox[0]) <= avail_w:
+                break
 
         draw.text(
             (pad, 4), date_text,
