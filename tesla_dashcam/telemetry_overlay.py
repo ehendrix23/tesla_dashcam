@@ -335,13 +335,8 @@ def generate_telemetry_ass(
         os.close(fd)
 
     # Write ASS subtitle file (contains user-requested telemetry data for video overlay)
-    _write_ass_file(output_path, content)
-
-
-def _write_ass_file(path: str, data: str) -> None:
-    """Write ASS subtitle content to file."""
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(data)
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(content)
 
     _LOGGER.info("Generated telemetry overlay: %s (%d frames)", output_path, len(frames))
     return output_path
