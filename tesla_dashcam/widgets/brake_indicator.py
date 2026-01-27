@@ -1,8 +1,8 @@
 """Brake gauge widget - vertical bar showing brake application."""
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
-from .base import Widget, WidgetTheme
+from .base import Widget, WidgetTheme, get_font
 
 
 class BrakeIndicatorWidget(Widget):
@@ -29,13 +29,7 @@ class BrakeIndicatorWidget(Widget):
 
         # Label "BRK"
         font_size = max(9, label_h - 2)
-        try:
-            if self.font_path:
-                font = ImageFont.truetype(self.font_path, font_size)
-            else:
-                font = ImageFont.truetype("FreeSans.ttf", font_size)
-        except (OSError, IOError):
-            font = ImageFont.load_default()
+        font = get_font(font_size, self.font_path)
 
         label_color = self.theme.warning if frame.brake_applied else (180, 180, 180, 200)
         bbox = draw.textbbox((0, 0), "BRK", font=font)

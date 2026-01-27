@@ -2,9 +2,9 @@
 
 import math
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
-from .base import Widget, WidgetTheme
+from .base import Widget, WidgetTheme, get_font
 from .steering_wheel import SteeringWheelWidget
 from .accel_gauge import AccelGaugeWidget
 from .brake_indicator import BrakeIndicatorWidget
@@ -59,10 +59,16 @@ class CenterClusterWidget(Widget):
             fill=(0, 0, 0, 170),
         )
 
-        pad = 6
+        pad = 4
         ss = self.steering_size
         gw = self.gauge_w
-        gh = self.gauge_h
+        # Calculate available space for gauges and gforce
+        angle_font_size = max(10, ss // 6)
+        top_section = pad + ss + angle_font_size + 2  # steering + angle text
+        remaining = self.height - top_section - pad
+        # Split remaining between gauges (60%) and gforce (40%)
+        gh = max(30, int(remaining * 0.55))
+        gforce_h = max(24, remaining - gh - 4)
 
         # Steering wheel centered at top of panel
         steer_x = (self.width - ss) // 2
@@ -73,48 +79,38 @@ class CenterClusterWidget(Widget):
         # Angle text below steering wheel
         angle = frame.steering_wheel_angle
         angle_text = f"{angle:+.0f}\u00b0"
-        angle_font_size = max(10, ss // 5)
-        try:
-            if self.font_path:
-                angle_font = ImageFont.truetype(self.font_path, angle_font_size)
-            else:
-                angle_font = ImageFont.truetype("FreeSans.ttf", angle_font_size)
-        except (OSError, IOError):
-            angle_font = ImageFont.load_default()
+        angle_font = get_font(angle_font_size, self.font_path)
 
-        angle_draw = ImageDraw.Draw(img)
-        bbox = angle_draw.textbbox((0, 0), angle_text, font=angle_font)
+        bbox = draw.textbbox((0, 0), angle_text, font=angle_font)
         tw = bbox[2] - bbox[0]
         tx = (self.width - tw) // 2
-        ty = steer_y + ss + 2
-        angle_draw.text(
+        ty = steer_y + ss
+        draw.text(
             (tx, ty), angle_text,
             fill=(220, 220, 220, 230), font=angle_font,
         )
 
         # Gauge row below angle text
-        gauge_top = ty + angle_font_size + 6
+        gauge_top = ty + angle_font_size + 2
 
         # ACC gauge on the left
-        acc_x = self.width // 2 - gw - 8
+        acc_x = self.width // 2 - gw - 6
         accel_img = self._accel.render(frame)
-        # Resize gauge if needed
         if accel_img.size != (gw, gh):
             accel_img = accel_img.resize((gw, gh), Image.LANCZOS)
         img.paste(accel_img, (acc_x, gauge_top), accel_img)
 
         # BRK gauge on the right
-        brk_x = self.width // 2 + 8
+        brk_x = self.width // 2 + 6
         brake_img = self._brake.render(frame)
         if brake_img.size != (gw, gh):
             brake_img = brake_img.resize((gw, gh), Image.LANCZOS)
         img.paste(brake_img, (brk_x, gauge_top), brake_img)
 
         # G-force display below gauges
-        gforce_y = gauge_top + gh + 4
-        gforce_h = max(20, self.height - gforce_y - pad)
+        gforce_y = gauge_top + gh + 2
         gforce_w = self.width - 2 * pad
-        if gforce_h > 10:
+        if gforce_h > 16:
             gforce = GForceDisplayWidget(
                 0, 0, gforce_w, gforce_h, self.theme, font_path=self.font_path,
             )

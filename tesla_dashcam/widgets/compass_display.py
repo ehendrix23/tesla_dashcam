@@ -2,9 +2,9 @@
 
 import math
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
-from .base import Widget, WidgetTheme
+from .base import Widget, WidgetTheme, get_font
 
 _COMPASS_DIRS = [
     "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
@@ -46,22 +46,14 @@ class CompassDisplayWidget(Widget):
         compass = _heading_to_compass(frame.heading_deg)
 
         # Fonts
-        heading_font_size = max(12, self.height * 2 // 5)
-        coord_font_size = max(9, self.height // 4)
-        try:
-            if self.font_path:
-                heading_font = ImageFont.truetype(self.font_path, heading_font_size)
-                coord_font = ImageFont.truetype(self.font_path, coord_font_size)
-            else:
-                heading_font = ImageFont.truetype("FreeSans.ttf", heading_font_size)
-                coord_font = ImageFont.truetype("FreeSans.ttf", coord_font_size)
-        except (OSError, IOError):
-            heading_font = ImageFont.load_default()
-            coord_font = heading_font
+        heading_font_size = max(12, self.height // 3)
+        coord_font_size = max(9, self.height // 5)
+        heading_font = get_font(heading_font_size, self.font_path)
+        coord_font = get_font(coord_font_size, self.font_path)
 
-        # Draw small compass circle icon on the left
-        icon_r = min(self.height // 3, 14)
-        icon_cx = 8 + icon_r
+        # Draw compass circle icon on the left (capped to avoid eating text space)
+        icon_r = min(max(8, self.height // 4), 22)
+        icon_cx = 6 + icon_r
         icon_cy = self.height // 3
 
         draw.ellipse(
@@ -89,8 +81,13 @@ class CompassDisplayWidget(Widget):
         ty = 4 - bbox[1]
         draw.text((text_x, ty), heading_text, fill=(255, 255, 255, 240), font=heading_font)
 
-        # GPS coordinates below
-        coord_text = f"{frame.latitude_deg:.5f}, {frame.longitude_deg:.5f}"
+        # GPS coordinates below - use precision that fits available width
+        avail_text_w = self.width - text_x - 6
+        coord_text = f"{frame.latitude_deg:.4f}, {frame.longitude_deg:.4f}"
+        # Check if it fits, reduce precision if not
+        cbbox = draw.textbbox((0, 0), coord_text, font=coord_font)
+        if (cbbox[2] - cbbox[0]) > avail_text_w:
+            coord_text = f"{frame.latitude_deg:.3f}, {frame.longitude_deg:.3f}"
         coord_y = ty + th + 4
         draw.text(
             (text_x, coord_y), coord_text,

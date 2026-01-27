@@ -1,8 +1,8 @@
 """Speed display widget - large readable speed with unit and optional autopilot badge."""
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
-from .base import Widget, WidgetTheme
+from .base import Widget, WidgetTheme, get_font
 
 
 class SpeedDisplayWidget(Widget):
@@ -63,19 +63,11 @@ class SpeedDisplayWidget(Widget):
         ap_height = self.height // 5 if self.show_autopilot else 0
         speed_area_h = self.height - ap_height
 
-        # Load fonts
+        # Load fonts - speed number takes most of the available height
         big_size = speed_area_h * 3 // 5
         small_size = max(10, speed_area_h // 5)
-        try:
-            if self.font_path:
-                big_font = ImageFont.truetype(self.font_path, big_size)
-                small_font = ImageFont.truetype(self.font_path, small_size)
-            else:
-                big_font = ImageFont.truetype("FreeSans.ttf", big_size)
-                small_font = ImageFont.truetype("FreeSans.ttf", small_size)
-        except (OSError, IOError):
-            big_font = ImageFont.load_default()
-            small_font = big_font
+        big_font = get_font(big_size, self.font_path)
+        small_font = get_font(small_size, self.font_path)
 
         # Speed number - centered, large, bold white
         bbox = draw.textbbox((0, 0), speed_text, font=big_font)
@@ -107,13 +99,7 @@ class SpeedDisplayWidget(Widget):
         if self.show_autopilot:
             ap_label, ap_color = self._get_ap_label_color(frame)
             ap_font_size = max(9, ap_height - 4)
-            try:
-                if self.font_path:
-                    ap_font = ImageFont.truetype(self.font_path, ap_font_size)
-                else:
-                    ap_font = ImageFont.truetype("FreeSans.ttf", ap_font_size)
-            except (OSError, IOError):
-                ap_font = ImageFont.load_default()
+            ap_font = get_font(ap_font_size, self.font_path)
 
             # Lightning bolt + label
             bolt_text = "\u26a1 " + ap_label

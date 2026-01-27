@@ -2,9 +2,9 @@
 
 import math
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
-from .base import Widget, WidgetTheme
+from .base import Widget, WidgetTheme, get_font
 
 
 class GForceDisplayWidget(Widget):
@@ -33,13 +33,7 @@ class GForceDisplayWidget(Widget):
 
         # G-force text
         font_size = max(10, min(text_w // 3, self.height // 2 - 2))
-        try:
-            if self.font_path:
-                font = ImageFont.truetype(self.font_path, font_size)
-            else:
-                font = ImageFont.truetype("FreeSans.ttf", font_size)
-        except (OSError, IOError):
-            font = ImageFont.load_default()
+        font = get_font(font_size, self.font_path)
 
         g_text = f"{magnitude:.2f}g"
         bbox = draw.textbbox((0, 0), g_text, font=font)

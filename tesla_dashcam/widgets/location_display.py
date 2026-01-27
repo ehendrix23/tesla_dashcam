@@ -1,8 +1,8 @@
 """Location and heading display widget."""
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
-from .base import Widget, WidgetTheme
+from .base import Widget, WidgetTheme, get_font
 
 _COMPASS_DIRS = [
     "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
@@ -43,13 +43,7 @@ class LocationDisplayWidget(Widget):
         )
 
         font_size = max(9, self.height // 2 - 4)
-        try:
-            if self.font_path:
-                font = ImageFont.truetype(self.font_path, font_size)
-            else:
-                font = ImageFont.truetype("FreeSans.ttf", font_size)
-        except (OSError, IOError):
-            font = ImageFont.load_default()
+        font = get_font(font_size, self.font_path)
 
         compass = _heading_to_compass(frame.heading_deg)
         line1 = f"{frame.latitude_deg:.5f}, {frame.longitude_deg:.5f}"

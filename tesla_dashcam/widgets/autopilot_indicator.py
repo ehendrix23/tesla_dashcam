@@ -2,9 +2,9 @@
 
 import math
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
-from .base import Widget, WidgetTheme
+from .base import Widget, WidgetTheme, get_font
 
 
 class AutopilotIndicatorWidget(Widget):
@@ -49,13 +49,7 @@ class AutopilotIndicatorWidget(Widget):
         label, color = self._get_label_and_color(frame)
 
         font_size = max(10, self.height - 6)
-        try:
-            if self.font_path:
-                font = ImageFont.truetype(self.font_path, font_size)
-            else:
-                font = ImageFont.truetype("FreeSans.ttf", font_size)
-        except (OSError, IOError):
-            font = ImageFont.load_default()
+        font = get_font(font_size, self.font_path)
 
         # Draw bolt icon on the left
         bolt_size = min(self.height - 4, 16)

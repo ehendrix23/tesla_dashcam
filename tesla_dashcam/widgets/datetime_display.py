@@ -3,14 +3,14 @@
 from datetime import datetime, timedelta
 from typing import Optional
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
 try:
     from tzlocal import get_localzone
 except ImportError:
     get_localzone = None
 
-from .base import Widget, WidgetTheme
+from .base import Widget, WidgetTheme, get_font
 
 
 class DateTimeDisplayWidget(Widget):
@@ -65,22 +65,19 @@ class DateTimeDisplayWidget(Widget):
         # Two-line layout: date (smaller) + time (larger)
         date_font_size = max(10, self.height // 3 - 2)
         time_font_size = max(12, self.height * 2 // 5)
-        try:
-            if self.font_path:
-                date_font = ImageFont.truetype(self.font_path, date_font_size)
-                time_font = ImageFont.truetype(self.font_path, time_font_size)
-            else:
-                date_font = ImageFont.truetype("FreeSans.ttf", date_font_size)
-                time_font = ImageFont.truetype("FreeSans.ttf", time_font_size)
-        except (OSError, IOError):
-            date_font = ImageFont.load_default()
-            time_font = date_font
+        date_font = get_font(date_font_size, self.font_path)
+        time_font = get_font(time_font_size, self.font_path)
 
-        date_text = t.strftime("%a, %b %d, %Y")
         time_text = t.strftime("%H:%M:%S")
 
-        # Date line (dimmer, smaller)
+        # Date line - adapt format to fit available width
         pad = 8
+        avail_w = self.width - 2 * pad
+        date_text = t.strftime("%a %b %d, %Y")
+        dbbox = draw.textbbox((0, 0), date_text, font=date_font)
+        if (dbbox[2] - dbbox[0]) > avail_w:
+            date_text = t.strftime("%b %d, %Y")
+
         draw.text(
             (pad, 4), date_text,
             fill=(180, 180, 180, 200), font=date_font,

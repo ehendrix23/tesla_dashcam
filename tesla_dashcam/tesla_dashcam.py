@@ -5244,7 +5244,8 @@ def main() -> int:
         required=False,
         default="all",
         help="R|Comma-separated list of widgets to display.\n"
-        "Options: steering, turn, brake, accel, speed, gear, location, all\n"
+        "Options: steering, turn, brake, accel, speed, gear,\n"
+        "  location, datetime, autopilot, gforce, compass, cluster, all\n"
         "Default: all",
     )
     sei_group.add_argument(

@@ -1,8 +1,8 @@
 """Gear state indicator widget with highlighted active gear."""
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
-from .base import Widget, WidgetTheme
+from .base import Widget, WidgetTheme, get_font
 
 
 class GearIndicatorWidget(Widget):
@@ -30,13 +30,7 @@ class GearIndicatorWidget(Widget):
         active = frame.gear_letter
 
         font_size = min(self.height - 10, self.width // len(gears) - 4)
-        try:
-            if self.font_path:
-                font = ImageFont.truetype(self.font_path, font_size)
-            else:
-                font = ImageFont.truetype("FreeSans.ttf", font_size)
-        except (OSError, IOError):
-            font = ImageFont.load_default()
+        font = get_font(font_size, self.font_path)
 
         slot_w = self.width // len(gears)
         for i, g in enumerate(gears):

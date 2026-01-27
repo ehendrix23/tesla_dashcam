@@ -18,55 +18,56 @@ class SteeringWheelWidget(Widget):
         return ("steering", round(frame.steering_wheel_angle))
 
     def render(self, frame) -> Image.Image:
-        # Render at 2x for antialiasing, then downscale
-        scale = 2
-        size = self.width * scale
+        # Render at 3x for smooth antialiasing, then downscale
+        ss = 3
+        size = self.width * ss
         img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
 
         cx = cy = size // 2
-        r = cx - 6 * scale
-        rim_width = max(4 * scale, r // 6)
-        spoke_width = max(3 * scale, r // 8)
-        hub_r = r // 5
+        r = cx - 8 * ss
+        rim_width = max(6 * ss, r // 4)  # thick rim for yoke look
+        spoke_width = max(4 * ss, r // 5)
+        hub_r = r // 4
 
-        # Tesla yoke: draw the rim as arcs (open top and bottom)
-        # Left arc: from ~210 to ~330 degrees (bottom-left to top-left)
-        # Right arc: from ~30 to ~150 degrees (top-right to bottom-right)
-        # This creates the yoke shape with flat top and bottom
-
-        # Draw left side arc
+        # Tesla yoke shape: two side grips with wide open top and bottom.
+        # PIL arc angles: 0=3 o'clock, clockwise.
+        # Left grip (9 o'clock area): 135 to 225 degrees
+        # Right grip (3 o'clock area): -45 to 45 degrees
         bbox = [cx - r, cy - r, cx + r, cy + r]
-        draw.arc(bbox, start=150, end=250, fill=self.theme.primary, width=rim_width)
-        # Draw right side arc
-        draw.arc(bbox, start=-70, end=30, fill=self.theme.primary, width=rim_width)
+        draw.arc(bbox, start=135, end=225, fill=self.theme.primary, width=rim_width)
+        draw.arc(bbox, start=-45, end=45, fill=self.theme.primary, width=rim_width)
 
-        # Draw horizontal crossbar (connecting left and right at center)
-        bar_y = cy
-        bar_half = int(r * 0.65)
+        # Rounded end caps at arc endpoints for polished look
+        cap_r = rim_width // 2
+        for angle in [135, 225, -45, 45]:
+            rad = math.radians(angle)
+            ex = cx + int(r * math.cos(rad))
+            ey = cy + int(r * math.sin(rad))
+            draw.ellipse(
+                [ex - cap_r, ey - cap_r, ex + cap_r, ey + cap_r],
+                fill=self.theme.primary,
+            )
+
+        # Horizontal crossbar connecting the two grips
+        bar_left = cx - int(r * 0.72)
+        bar_right = cx + int(r * 0.72)
         draw.line(
-            [cx - bar_half, bar_y, cx + bar_half, bar_y],
+            [bar_left, cy, bar_right, cy],
             fill=self.theme.primary,
             width=spoke_width,
         )
 
-        # Small center hub/dot
+        # Center hub (outer ring)
         draw.ellipse(
             [cx - hub_r, cy - hub_r, cx + hub_r, cy + hub_r],
             fill=self.theme.primary,
         )
-
-        # Left spoke (from hub to left arc)
-        draw.line(
-            [cx - hub_r, cy, cx - bar_half, cy],
-            fill=self.theme.primary,
-            width=spoke_width,
-        )
-        # Right spoke (from hub to right arc)
-        draw.line(
-            [cx + hub_r, cy, cx + bar_half, cy],
-            fill=self.theme.primary,
-            width=spoke_width,
+        # Inner hub (darker center, Tesla logo area)
+        inner_r = hub_r * 2 // 3
+        draw.ellipse(
+            [cx - inner_r, cy - inner_r, cx + inner_r, cy + inner_r],
+            fill=(40, 40, 40, 200),
         )
 
         # Rotate by steering angle
@@ -79,7 +80,6 @@ class SteeringWheelWidget(Widget):
         # Downscale for antialiasing
         img = img.resize((self.width, self.height), Image.LANCZOS)
 
-        # Draw angle text below (not rotated)
         final = Image.new("RGBA", (self.width, self.height), (0, 0, 0, 0))
         final.paste(img, (0, 0), img)
 

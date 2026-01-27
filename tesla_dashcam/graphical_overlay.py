@@ -39,33 +39,8 @@ _LOGGER = logging.getLogger(__name__)
 
 DEFAULT_FRAME_RATE = 36.0
 
-# Dashboard layout size presets
-_DASHBOARD_PRESETS = {
-    "small": {
-        "cluster_h": 120, "speed_w": 100, "speed_h": 80,
-        "gear_w": 90, "gear_h": 32, "turn_w": 70, "turn_h": 24,
-        "datetime_w": 160, "datetime_h": 55,
-        "compass_w": 170, "compass_h": 55,
-        "steering": 70, "gauge_w": 22, "gauge_h": 55,
-        "ap_h": 16, "font_scale": 0.9,
-    },
-    "medium": {
-        "cluster_h": 160, "speed_w": 140, "speed_h": 110,
-        "gear_w": 120, "gear_h": 40, "turn_w": 90, "turn_h": 30,
-        "datetime_w": 210, "datetime_h": 70,
-        "compass_w": 230, "compass_h": 70,
-        "steering": 90, "gauge_w": 28, "gauge_h": 70,
-        "ap_h": 20, "font_scale": 1.2,
-    },
-    "large": {
-        "cluster_h": 210, "speed_w": 180, "speed_h": 145,
-        "gear_w": 150, "gear_h": 50, "turn_w": 110, "turn_h": 36,
-        "datetime_w": 270, "datetime_h": 90,
-        "compass_w": 280, "compass_h": 90,
-        "steering": 120, "gauge_w": 36, "gauge_h": 90,
-        "ap_h": 24, "font_scale": 1.5,
-    },
-}
+# Height scale factors per size preset (relative to "medium" = 1.0)
+_HEIGHT_SCALE = {"small": 0.75, "medium": 1.0, "large": 1.35}
 
 # Classic layout presets (backward compat)
 _CLASSIC_PRESETS = {
@@ -114,62 +89,78 @@ def _build_dashboard_layout(
 
     All telemetry widgets arranged in a horizontal bar across the top:
     [DateTime] [Speed+AP] [Cluster: Steering+Gauges+GForce] [Gear+Turn] [Compass]
+
+    Fully proportional layout that adapts to any video width (1280, 1920, etc).
     """
     theme = THEME_PRESETS.get(settings.theme_name, THEME_PRESETS["default"])
-    sz = _DASHBOARD_PRESETS.get(settings.size_preset, _DASHBOARD_PRESETS["medium"])
     enabled = _resolve_widgets(settings.widgets)
-
-    mx = settings.margin_x
-    my = settings.margin_y
     font = settings.font_path
+
+    # Proportional margins based on video size
+    mx = max(8, video_width // 100)
+    my = max(8, video_height // 80)
+    usable_w = video_width - 2 * mx
+
+    # Bar height: ~21% of video height, scaled by size preset
+    hs = _HEIGHT_SCALE.get(settings.size_preset, 1.0)
+    bar_h = int(video_height * 0.21 * hs)
+    gap = max(6, int(usable_w * 0.006))
 
     widgets = []
 
-    # Calculate total bar height from the cluster height
-    bar_h = sz["cluster_h"]
+    # === Proportional widget sizes (fractions of usable width) ===
+    datetime_w = int(usable_w * 0.175)
+    datetime_h = int(bar_h * 0.52)
 
-    # === TOP LEFT: Date/Time ===
+    speed_w = int(usable_w * 0.125)
+    speed_h = int(bar_h * 0.88)
+
+    cluster_w = int(usable_w * 0.155)
+    cluster_h = bar_h
+    steer_sz = int(bar_h * 0.48)
+    gw = max(18, int(cluster_w * 0.15))
+    gh = int(bar_h * 0.36)
+
+    gear_w = int(usable_w * 0.08)
+    gear_h = int(bar_h * 0.27)
+    turn_w = int(usable_w * 0.065)
+    turn_h = int(bar_h * 0.19)
+
+    compass_w = int(usable_w * 0.195)
+    compass_h = int(bar_h * 0.52)
+
+    # === Position widgets ===
+
+    # DateTime at top left
     if "datetime" in enabled:
-        dw = sz["datetime_w"]
-        dh = sz["datetime_h"]
         widgets.append(DateTimeDisplayWidget(
-            mx, my, dw, dh, theme,
+            mx, my, datetime_w, datetime_h, theme,
             start_time=settings.start_time,
             frame_rate=settings.frame_rate,
             font_path=font,
         ))
 
-    # === Calculate center zone positions ===
-    # Speed goes left of center, cluster at center, gear+turn right of center
-    speed_w = sz["speed_w"]
-    speed_h = sz["speed_h"]
-    gear_w = sz["gear_w"]
-    gear_h = sz["gear_h"]
-    turn_w = sz["turn_w"]
-    turn_h = sz["turn_h"]
+    # Compass at top right
+    if "compass" in enabled:
+        cx = video_width - compass_w - mx
+        widgets.append(CompassDisplayWidget(
+            cx, my, compass_w, compass_h, theme, font_path=font,
+        ))
 
-    # Cluster dimensions
-    steer_sz = sz["steering"]
-    gw = sz["gauge_w"]
-    gh = sz["gauge_h"]
-    # Cluster width: steering + padding + gauges area
-    cluster_w = steer_sz + 40  # enough for steering + ACC/BRK below
-    cluster_w = max(cluster_w, gw * 2 + 24)  # at least wide enough for gauges
-    cluster_h = bar_h
-
-    # Center the whole group: [speed] [gap] [cluster] [gap] [gear+turn]
-    gap = 12
+    # Center group: [Speed+AP] [Cluster] [Gear+Turn]
+    # Positioned in the space between datetime and compass
+    left_edge = mx + datetime_w + gap
+    right_edge = video_width - mx - compass_w - gap
     gear_block_w = max(gear_w, turn_w)
-    total_center_w = speed_w + gap + cluster_w + gap + gear_block_w
-    center_start_x = (video_width - total_center_w) // 2
+    total_center = speed_w + gap + cluster_w + gap + gear_block_w
+    center_start = left_edge + (right_edge - left_edge - total_center) // 2
+    center_start = max(left_edge, center_start)
 
     # Speed + autopilot badge
     if "speed" in enabled:
         show_ap = "autopilot" in enabled
-        sx = center_start_x
-        sy = my
         widgets.append(SpeedDisplayWidget(
-            sx, sy, speed_w, speed_h, theme,
+            center_start, my, speed_w, speed_h, theme,
             speed_unit=settings.speed_unit,
             show_autopilot=show_ap,
             font_path=font,
@@ -177,34 +168,23 @@ def _build_dashboard_layout(
 
     # Center cluster (steering + angle + ACC/BRK + G-force)
     if "cluster" in enabled:
-        cx = center_start_x + speed_w + gap
-        cy = my
+        ccx = center_start + speed_w + gap
         widgets.append(CenterClusterWidget(
-            cx, cy, cluster_w, cluster_h, theme,
+            ccx, my, cluster_w, cluster_h, theme,
             steering_size=steer_sz, gauge_w=gw, gauge_h=gh,
             font_path=font,
         ))
 
     # Gear indicator + turn signals (stacked vertically)
-    gear_block_x = center_start_x + speed_w + gap + cluster_w + gap
+    gear_x = center_start + speed_w + gap + cluster_w + gap
     if "gear" in enabled:
         widgets.append(GearIndicatorWidget(
-            gear_block_x, my, gear_w, gear_h, theme, font_path=font,
+            gear_x, my, gear_w, gear_h, theme, font_path=font,
         ))
 
     if "turn" in enabled:
-        turn_y = my + gear_h + 4
         widgets.append(TurnSignalWidget(
-            gear_block_x, turn_y, turn_w, turn_h, theme,
-        ))
-
-    # === TOP RIGHT: Compass/heading ===
-    if "compass" in enabled:
-        cw = sz["compass_w"]
-        ch = sz["compass_h"]
-        cx = video_width - cw - mx
-        widgets.append(CompassDisplayWidget(
-            cx, my, cw, ch, theme, font_path=font,
+            gear_x, my + gear_h + 4, turn_w, turn_h, theme,
         ))
 
     return OverlayCanvas(video_width, video_height, widgets)

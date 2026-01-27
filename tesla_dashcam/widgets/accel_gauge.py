@@ -1,8 +1,8 @@
 """Accelerator pedal gauge widget - vertical bar matching brake gauge style."""
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
-from .base import Widget, WidgetTheme
+from .base import Widget, WidgetTheme, get_font
 
 
 class AccelGaugeWidget(Widget):
@@ -30,13 +30,7 @@ class AccelGaugeWidget(Widget):
 
         # Label "ACC"
         font_size = max(9, label_h - 2)
-        try:
-            if self.font_path:
-                font = ImageFont.truetype(self.font_path, font_size)
-            else:
-                font = ImageFont.truetype("FreeSans.ttf", font_size)
-        except (OSError, IOError):
-            font = ImageFont.load_default()
+        font = get_font(font_size, self.font_path)
 
         has_input = frame.accelerator_pedal_position > 0.02
         label_color = (80, 220, 80, 240) if has_input else (180, 180, 180, 200)

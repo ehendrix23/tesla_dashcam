@@ -1076,6 +1076,94 @@ status, gear, autopilot state, and more.
 
 :   Export SEI telemetry data to a CSV file for external analysis.
 
+### Graphical Overlay
+
+The graphical overlay renders telemetry data as visual widgets (steering wheel,
+gauges, speed display, etc.) composited directly onto the video. This provides
+a dashboard-style heads-up display similar to third-party tools like TeslaClip.
+
+To enable the graphical overlay, use `--sei_overlay` together with
+`--sei_graphical`:
+
+    python -m tesla_dashcam /path/to/clips --sei_overlay --sei_graphical
+
+The default layout arranges widgets in a top bar across the video:
+
+    [Date/Time] [Speed + AP Status] [Steering Cluster] [Gear + Turn] [Compass + GPS]
+
+The steering cluster contains a Tesla yoke-style steering wheel with angle
+readout, accelerator and brake gauges, and a G-force indicator with directional
+bubble.
+
+**\--sei\_graphical**
+
+:   Default: False
+
+    Enable graphical telemetry overlay with steering wheel, gauges, and
+    indicators. Replaces the text overlay when used with `--sei_overlay`.
+
+**\--sei\_overlay\_layout**
+
+:   Default: dashboard
+
+    Layout style for the graphical overlay:
+
+    -   `dashboard` - Horizontal top bar with clustered widgets. Date/time on
+        the left, speed and autopilot status left of center, steering cluster
+        with gauges and G-force at center, gear and turn signals right of
+        center, compass heading and GPS coordinates on the right.
+    -   `classic` - Scattered widget placement with speed at top center,
+        steering wheel at bottom center, and other data around the edges.
+
+**\--sei\_widget\_size**
+
+:   Default: medium
+
+    Size preset for graphical widgets. Controls the overall height of the
+    overlay bar and all widget dimensions. Valid values: small, medium, large.
+
+**\--sei\_widgets** *widget\_list*
+
+:   Default: all
+
+    Comma-separated list of widgets to display. Use this to show only the
+    telemetry data you care about. Available widgets:
+
+    -   `steering` - Tesla yoke steering wheel that rotates with steering angle
+    -   `turn` - Turn signal direction arrows
+    -   `brake` - Brake application gauge (red when braking)
+    -   `accel` - Accelerator pedal position gauge (green fill)
+    -   `speed` - Large speed number with unit (MPH/KM/H)
+    -   `gear` - Gear state indicator (P R N D) with active gear highlighted
+    -   `location` - GPS coordinates and heading (classic layout)
+    -   `datetime` - Date and time display
+    -   `autopilot` - Autopilot status badge (OFF/TACC/AP/FSD)
+    -   `gforce` - G-force magnitude with directional crosshair bubble
+    -   `compass` - Compass heading, direction, and GPS coordinates
+    -   `cluster` - Center cluster combining steering wheel, gauges, and G-force
+    -   `all` - All available widgets (default)
+
+    Example: `--sei_widgets speed,steering,gear`
+
+**\--sei\_widget\_theme**
+
+:   Default: default
+
+    Color theme for graphical widgets:
+
+    -   `default` - White elements on semi-transparent dark backgrounds
+    -   `hud` - Green heads-up display style
+    -   `minimal` - Subtle, semi-transparent appearance
+    -   `performance` - Red/orange racing style
+
+**\--sei\_widget\_position**
+
+:   Default: bottom-left
+
+    Position for graphical widget cluster (used with classic layout). Valid
+    values: bottom-left, bottom-center, bottom-right, top-left, top-center,
+    top-right.
+
 ## Timestamp Restriction
 
 The events/clips to be processed and thus be put in the resulting video

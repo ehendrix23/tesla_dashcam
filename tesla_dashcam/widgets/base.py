@@ -1,9 +1,64 @@
 """Base classes for graphical overlay widgets."""
 
+import os
+import sys
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 
-from PIL import Image
+from PIL import Image, ImageFont
+
+# System font search paths (platform-dependent)
+_FONT_CANDIDATES = [
+    "FreeSans.ttf",  # Linux
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",  # Linux alt
+]
+if sys.platform == "darwin":
+    _FONT_CANDIDATES = [
+        "/System/Library/Fonts/Helvetica.ttc",
+        "/Library/Fonts/Arial.ttf",
+    ] + _FONT_CANDIDATES
+elif sys.platform == "win32":
+    _FONT_CANDIDATES = [
+        "C:/Windows/Fonts/arial.ttf",
+    ] + _FONT_CANDIDATES
+
+_RESOLVED_FONT: Optional[str] = None
+
+
+def get_font(size: int, font_path: Optional[str] = None) -> ImageFont.FreeTypeFont:
+    """Load a TrueType font at the given size.
+
+    Tries user-specified path, then system fonts, then Pillow's built-in default.
+    """
+    global _RESOLVED_FONT
+
+    if font_path:
+        try:
+            return ImageFont.truetype(font_path, size)
+        except (OSError, IOError):
+            pass
+
+    # Use cached system font if already resolved
+    if _RESOLVED_FONT is not None:
+        try:
+            return ImageFont.truetype(_RESOLVED_FONT, size)
+        except (OSError, IOError):
+            _RESOLVED_FONT = None
+
+    # Search for a system font
+    for candidate in _FONT_CANDIDATES:
+        try:
+            f = ImageFont.truetype(candidate, size)
+            _RESOLVED_FONT = candidate
+            return f
+        except (OSError, IOError):
+            continue
+
+    # Last resort: Pillow built-in (supports size in Pillow >= 10.1)
+    try:
+        return ImageFont.load_default(size=size)
+    except TypeError:
+        return ImageFont.load_default()
 
 
 @dataclass
