@@ -3256,7 +3256,12 @@ def create_intermediate_movie(
     # Extract SEI telemetry data if overlay is enabled
     sei_frames = []
     sei_ass_file = None
-    if video_settings.get("sei_overlay") or video_settings.get("sei_export_csv"):
+    sei_requested = (
+        video_settings.get("sei_overlay")
+        or video_settings.get("sei_export_csv")
+        or video_settings.get("sei_panel")
+    )
+    if sei_requested:
         # Try to extract SEI from front camera (most reliable source)
         front_file = clip_filenames.get("front")
         if front_file:
@@ -3264,9 +3269,23 @@ def create_intermediate_movie(
             if sei_frames:
                 _LOGGER.info(f"Extracted {len(sei_frames)} SEI frames from {front_file}")
             else:
-                _LOGGER.debug(
-                    f"No SEI data in {front_file} (requires firmware 2025.44.25+, HW3+)"
+                _LOGGER.warning(
+                    f"No SEI telemetry data found in {front_file}. "
+                    "SEI data requires Tesla firmware 2025.44.25+ and HW3/HW4 hardware. "
+                    "Video will be processed without telemetry overlay."
                 )
+                # Disable telemetry panel cameras if no data available
+                if video_settings.get("sei_panel"):
+                    video_layout.cameras("telemetry").include = False
+                    video_layout.cameras("telemetry_map").include = False
+        else:
+            _LOGGER.warning(
+                "No front camera file found. SEI telemetry extraction requires front camera. "
+                "Video will be processed without telemetry overlay."
+            )
+            if video_settings.get("sei_panel"):
+                video_layout.cameras("telemetry").include = False
+                video_layout.cameras("telemetry_map").include = False
 
     # Add SEI summary stats to replacement strings
     sei_stats = get_sei_overlay_stats(sei_frames, video_settings.get("sei_speed_unit", "mph"))
