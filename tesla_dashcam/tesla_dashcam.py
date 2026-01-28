@@ -867,18 +867,13 @@ class Event(object):
             template = ""
 
         if template == "":
-            template = (
-                f"{
-                    self.start_timestamp.astimezone(get_localzone()).strftime(
-                        timestamp_format
-                    )
-                } - "
-                f"{
-                    self.end_timestamp.astimezone(get_localzone()).strftime(
-                        timestamp_format
-                    )
-                }"
+            start_str = self.start_timestamp.astimezone(get_localzone()).strftime(
+                timestamp_format
             )
+            end_str = self.end_timestamp.astimezone(get_localzone()).strftime(
+                timestamp_format
+            )
+            template = f"{start_str} - {end_str}"
         return template
 
 
@@ -3508,15 +3503,13 @@ def create_intermediate_movie(
     try:
         ffmpeg_output = run(ffmpeg_command, capture_output=True, check=True, text=True)
     except CalledProcessError as exc:
+        clip_path = os.path.join(
+            event_info.folder,
+            local_timestamp.strftime('%Y-%m-%dT%H-%M-%S') + '.mp4',
+        )
         print(
             f"{get_current_timestamp()}\t\t\tError trying to create clip for "
-            f"{
-                os.path.join(
-                    event_info.folder,
-                    local_timestamp.strftime('%Y-%m-%dT%H-%M-%S') + '.mp4',
-                )
-            }."
-            f"RC: {exc.returncode}\n"
+            f"{clip_path}. RC: {exc.returncode}\n"
             f"{get_current_timestamp()}\t\t\tCommand: {exc.cmd}\n"
             f"{get_current_timestamp()}\t\t\tError: {exc.stderr}\n\n"
         )
@@ -3888,26 +3881,20 @@ def create_movie(
             f"{title_timestamp}"
         )
     else:
-        title = (
-            f"{
-                start_timestamp.astimezone(get_localzone()).strftime(
-                    user_timestamp_format
-                )
-            } - "
-            f"{
-                end_timestamp.astimezone(get_localzone()).strftime(
-                    user_timestamp_format
-                )
-            }"
+        start_str = start_timestamp.astimezone(get_localzone()).strftime(
+            user_timestamp_format
         )
+        end_str = end_timestamp.astimezone(get_localzone()).strftime(
+            user_timestamp_format
+        )
+        title = f"{start_str} - {end_str}"
 
+    creation_time = start_timestamp.astimezone(timezone.utc).strftime(
+        '%Y-%m-%dT%H:%M:%S.000000Z'
+    )
     ffmpeg_metadata = [
         "-metadata",
-        f"creation_time={
-            start_timestamp.astimezone(timezone.utc).strftime(
-                '%Y-%m-%dT%H:%M:%S.000000Z'
-            )
-        }",
+        f"creation_time={creation_time}",
         "-metadata",
         f"description=Created by tesla_dashcam {VERSION_STR}",
         "-metadata",
