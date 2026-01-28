@@ -3465,13 +3465,12 @@ def create_intermediate_movie(
         else title_timestamp
     )
 
+    creation_time_utc = starting_timestamp.astimezone(timezone.utc).strftime(
+        '%Y-%m-%dT%H:%M:%S.000000Z'
+    )
     ffmpeg_metadata: list[str] = [
         "-metadata",
-        f"creation_time={
-            starting_timestamp.astimezone(timezone.utc).strftime(
-                '%Y-%m-%dT%H:%M:%S.000000Z'
-            )
-        }",
+        f"creation_time={creation_time_utc}",
         "-metadata",
         f"description=Created by tesla_dashcam {VERSION_STR}",
         "-metadata",
