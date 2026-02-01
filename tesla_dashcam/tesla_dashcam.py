@@ -4574,6 +4574,10 @@ def process_folders(
         delete_folder_files: bool = delete_source
         delete_file_list: list[str] = []
 
+        # Initialize SEI panel variables (generated inside create_intermediate_movie)
+        sei_panel_concat: str | None = None
+        sei_map_concat: str | None = None
+
         for clip_number, clip_timestamp in enumerate(event_info.sorted):
             if (clip_info := event_info.clip(clip_timestamp)) is None:
                 _LOGGER.warning(
