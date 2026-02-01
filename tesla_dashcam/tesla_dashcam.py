@@ -2926,6 +2926,8 @@ def create_intermediate_movie(
     folder_timestamps: tuple[datetime, datetime],
     video_settings: dict[str, Any],
     clip_number: int,
+    sei_panel_concat: str | None = None,
+    sei_map_concat: str | None = None,
 ) -> bool:
     """Create intermediate movie files. This is the merging of the camera
 
@@ -4587,6 +4589,8 @@ def process_folders(
                 (event_start_timestamp, event_end_timestamp),
                 video_settings,
                 clip_number,
+                sei_panel_concat=sei_panel_concat,
+                sei_map_concat=sei_map_concat,
             ):
                 if (
                     clip_info.filename is not None
