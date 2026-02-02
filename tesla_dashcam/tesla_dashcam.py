@@ -1727,6 +1727,103 @@ class FullScreen(MovieLayout):
         return self._bottom_row_height
 
 
+class TelemetryGrid(MovieLayout):
+    """TelemetryGrid Movie Layout - 3x2 grid with telemetry panels in top corners
+
+    [TELEMETRY_MAP][FRONT_CAMERA][TELEMETRY_INSTRUMENTS]
+    [ LEFT_CAMERA ][ REAR_CAMERA][    RIGHT_CAMERA     ]
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.scale = 1 / 2
+        # Disable pillars - we use their positions for telemetry
+        self._cameras["left_pillar"]._include = False
+        self._cameras["right_pillar"]._include = False
+        # Enable telemetry panels by default for this layout
+        self._cameras["telemetry"]._include = True
+        self._cameras["telemetry_map"]._include = True
+
+    @property
+    def _cell_width(self) -> int:
+        return self.cameras("front").width
+
+    @property
+    def _cell_height(self) -> int:
+        return self.cameras("front").height
+
+    @property
+    def _row_width(self) -> int:
+        return self._cell_width * 3
+
+    @property
+    def _row_height(self) -> int:
+        return self._cell_height * 2
+
+    # Top row: telemetry_map, front, telemetry
+    def telemetry_map_xpos(self) -> int:
+        return 0
+
+    def telemetry_map_ypos(self) -> int:
+        return 0
+
+    def telemetry_map_width(self) -> int:
+        return self._cell_width
+
+    def telemetry_map_height(self) -> int:
+        return self._cell_height
+
+    def front_xpos(self) -> int:
+        return self._cell_width
+
+    def front_ypos(self) -> int:
+        return 0
+
+    def telemetry_xpos(self) -> int:
+        return self._cell_width * 2
+
+    def telemetry_ypos(self) -> int:
+        return 0
+
+    def telemetry_width(self) -> int:
+        return self._cell_width
+
+    def telemetry_height(self) -> int:
+        return self._cell_height
+
+    # Bottom row: left, rear, right
+    def left_xpos(self) -> int:
+        return 0
+
+    def left_ypos(self) -> int:
+        return self._cell_height
+
+    def rear_xpos(self) -> int:
+        return self._cell_width
+
+    def rear_ypos(self) -> int:
+        return self._cell_height
+
+    def right_xpos(self) -> int:
+        return self._cell_width * 2
+
+    def right_ypos(self) -> int:
+        return self._cell_height
+
+    # Pillars are disabled but need positions to avoid errors
+    def left_pillar_xpos(self) -> int:
+        return 0
+
+    def left_pillar_ypos(self) -> int:
+        return 0
+
+    def right_pillar_xpos(self) -> int:
+        return 0
+
+    def right_pillar_ypos(self) -> int:
+        return 0
+
+
 class Mosaic(FullScreen):
     """Mosaic Movie Layout
 
@@ -5042,10 +5139,11 @@ def main() -> int:
             "CROSS",
             "DIAMOND",
             "HORIZONTAL",
+            "TELEMETRYGRID",
         ],
         default="FULLSCREEN",
         type=str.upper,
-        metavar="MOSAIC|FULLSCREEN|PERSPECTIVE|CROSS|DIAMOND|HORIZONTAL",
+        metavar="MOSAIC|FULLSCREEN|PERSPECTIVE|CROSS|DIAMOND|HORIZONTAL|TELEMETRYGRID",
         help="R|Layout of the created video.\n"
         "    FULLSCREEN: Front camera center top with side and rear cameras smaller "
         "underneath it.\n"
@@ -5059,7 +5157,9 @@ def main() -> int:
         "smaller, side cameras below on left/right of rear smaller, and rear camera "
         "center bottom.\n"
         "    HORIZONTAL: All cameras in horizontal line: left, left pillar, front, "
-        "rear, right pillar, right.\n",
+        "rear, right pillar, right.\n"
+        "    TELEMETRYGRID: 3x2 grid with telemetry map top-left, front top-center, "
+        "instruments top-right, left/rear/right on bottom row.\n",
     )
     layout_group.add_argument(
         "--camera_position",
@@ -6002,6 +6102,8 @@ def main() -> int:
             layout_settings = Diamond()
         elif layout_name == "HORIZONTAL":
             layout_settings = Horizontal()
+        elif layout_name == "TELEMETRYGRID":
+            layout_settings = TelemetryGrid()
         else:
             layout_settings = FullScreen()
 
