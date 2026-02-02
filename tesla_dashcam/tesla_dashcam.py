@@ -3223,8 +3223,7 @@ def create_intermediate_movie(
             # Telemetry panels: use pre-rendered concat demuxer as input
             if camera == "telemetry_map" and sei_map_concat:
                 ffmpeg_camera_commands.extend(
-                    ["-r", str(video_settings.get("fps", 36)),
-                     "-safe", "0", "-f", "concat", "-i", sei_map_concat]
+                    ["-safe", "0", "-f", "concat", "-i", sei_map_concat]
                 )
                 ffmpeg_camera_filters.append(
                     f";[{input_counter}:v] "
@@ -3244,8 +3243,7 @@ def create_intermediate_movie(
                 input_clip = f"{camera}1"
             elif camera == "telemetry" and sei_panel_concat:
                 ffmpeg_camera_commands.extend(
-                    ["-r", str(video_settings.get("fps", 36)),
-                     "-safe", "0", "-f", "concat", "-i", sei_panel_concat]
+                    ["-safe", "0", "-f", "concat", "-i", sei_panel_concat]
                 )
                 ffmpeg_camera_filters.append(
                     f";[{input_counter}:v] "
@@ -3425,86 +3423,11 @@ def create_intermediate_movie(
     replacement_strings["event_latitude"] = event_info.event_metadata.latitude or 0.0
     replacement_strings["event_longitude"] = event_info.event_metadata.longitude or 0.0
 
-    # Extract SEI telemetry data if overlay is enabled
-    sei_frames = []
+    # SEI data was already extracted earlier for panel generation
+    # Add SEI summary stats to replacement strings (use sei_frames from earlier block)
     sei_ass_file = None
-    sei_requested = (
-        video_settings.get("sei_overlay")
-        or video_settings.get("sei_export_csv")
-        or video_settings.get("sei_panel")
-    )
-    if sei_requested:
-        # Try to extract SEI from front camera (most reliable source)
-        front_file = clip_filenames.get("front")
-        if front_file:
-            sei_frames = extract_sei_data(front_file)
-            if sei_frames:
-                _LOGGER.info(f"Extracted {len(sei_frames)} SEI frames from {front_file}")
-            else:
-                _LOGGER.warning(
-                    f"No SEI telemetry data found in {front_file}. "
-                    "SEI data requires Tesla firmware 2025.44.25+ and HW3/HW4 hardware. "
-                    "Video will be processed without telemetry overlay."
-                )
-                # Disable telemetry panel cameras if no data available
-                if video_settings.get("sei_panel"):
-                    video_layout.cameras("telemetry").include = False
-                    video_layout.cameras("telemetry_map").include = False
-        else:
-            _LOGGER.warning(
-                "No front camera file found. SEI telemetry extraction requires front camera. "
-                "Video will be processed without telemetry overlay."
-            )
-            if video_settings.get("sei_panel"):
-                video_layout.cameras("telemetry").include = False
-                video_layout.cameras("telemetry_map").include = False
-
-    # Add SEI summary stats to replacement strings
     sei_stats = get_sei_overlay_stats(sei_frames, video_settings.get("sei_speed_unit", "mph"))
     replacement_strings.update(sei_stats)
-
-    # Generate telemetry panels (camera slots) if enabled
-    sei_panel_concat = None
-    sei_map_concat = None
-    if video_settings.get("sei_panel") and sei_frames:
-        font_path = video_layout.font.font
-        widget_list = [
-            w.strip()
-            for w in video_settings.get("sei_widgets", "all").split(",")
-        ]
-        panel_settings = GraphicalOverlaySettings(
-            size_preset=video_settings.get("sei_widget_size", "medium"),
-            widgets=widget_list,
-            theme_name=video_settings.get("sei_widget_theme", "default"),
-            speed_unit=video_settings.get("sei_speed_unit", "mph"),
-            font_path=font_path if font_path else None,
-            frame_rate=video_settings.get("fps", 36),
-            start_time=starting_timestamp,
-        )
-
-        # Instruments panel
-        telemetry_cam = video_layout.cameras("telemetry")
-        if telemetry_cam.include and telemetry_cam.width > 0 and telemetry_cam.height > 0:
-            sei_panel_concat = generate_instruments_panel(
-                sei_frames,
-                panel_width=telemetry_cam.width,
-                panel_height=telemetry_cam.height,
-                settings=panel_settings,
-            )
-            if sei_panel_concat:
-                _LOGGER.debug(f"Generated instruments panel: {sei_panel_concat}")
-
-        # Map panel
-        map_cam = video_layout.cameras("telemetry_map")
-        if map_cam.include and map_cam.width > 0 and map_cam.height > 0:
-            sei_map_concat = generate_map_panel(
-                sei_frames,
-                panel_width=map_cam.width,
-                panel_height=map_cam.height,
-                settings=panel_settings,
-            )
-            if sei_map_concat:
-                _LOGGER.debug(f"Generated map panel: {sei_map_concat}")
 
     # Generate SEI overlay (graphical or text-based ASS)
     sei_gfx_concat = None
