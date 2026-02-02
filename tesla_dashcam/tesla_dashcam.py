@@ -3223,7 +3223,8 @@ def create_intermediate_movie(
             # Telemetry panels: use pre-rendered concat demuxer as input
             if camera == "telemetry_map" and sei_map_concat:
                 ffmpeg_camera_commands.extend(
-                    ["-safe", "0", "-f", "concat", "-i", sei_map_concat]
+                    ["-r", str(video_settings.get("fps", 36)),
+                     "-safe", "0", "-f", "concat", "-i", sei_map_concat]
                 )
                 ffmpeg_camera_filters.append(
                     f";[{input_counter}:v] "
@@ -3243,7 +3244,8 @@ def create_intermediate_movie(
                 input_clip = f"{camera}1"
             elif camera == "telemetry" and sei_panel_concat:
                 ffmpeg_camera_commands.extend(
-                    ["-safe", "0", "-f", "concat", "-i", sei_panel_concat]
+                    ["-r", str(video_settings.get("fps", 36)),
+                     "-safe", "0", "-f", "concat", "-i", sei_panel_concat]
                 )
                 ffmpeg_camera_filters.append(
                     f";[{input_counter}:v] "
