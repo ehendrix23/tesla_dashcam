@@ -3216,10 +3216,6 @@ def create_intermediate_movie(
     input_clip: str = "base"
     camera: str = ""
     input_counter: int = 0
-    # Debug: trace telemetry panel inclusion
-    _LOGGER.info(f"DEBUG: sei_panel_concat={sei_panel_concat}, sei_map_concat={sei_map_concat}")
-    _LOGGER.info(f"DEBUG: telemetry.include={video_layout.cameras('telemetry').include}, telemetry_map.include={video_layout.cameras('telemetry_map').include}")
-    _LOGGER.info(f"DEBUG: telemetry.width={video_layout.cameras('telemetry').width}, telemetry.height={video_layout.cameras('telemetry').height}")
     for camera in video_layout.clip_order:
         # Is this camera to be included?
         camera_element = video_layout.cameras(camera)
