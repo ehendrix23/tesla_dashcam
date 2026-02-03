@@ -3222,12 +3222,13 @@ def create_intermediate_movie(
         if camera_element.include:
             # Telemetry panels: use pre-rendered concat demuxer as input
             if camera == "telemetry_map" and sei_map_concat:
+                fps = video_settings.get("fps", 36)
                 ffmpeg_camera_commands.extend(
                     ["-safe", "0", "-f", "concat", "-i", sei_map_concat]
                 )
                 ffmpeg_camera_filters.append(
                     f";[{input_counter}:v] "
-                    f"setpts=PTS-STARTPTS, setsar=1, "
+                    f"fps={fps}, setpts=PTS-STARTPTS, setsar=1, "
                     f"scale={camera_element.width}x"
                     f"{camera_element.height}"
                     f" [{camera}]"
@@ -3242,12 +3243,13 @@ def create_intermediate_movie(
                 )
                 input_clip = f"{camera}1"
             elif camera == "telemetry" and sei_panel_concat:
+                fps = video_settings.get("fps", 36)
                 ffmpeg_camera_commands.extend(
                     ["-safe", "0", "-f", "concat", "-i", sei_panel_concat]
                 )
                 ffmpeg_camera_filters.append(
                     f";[{input_counter}:v] "
-                    f"setpts=PTS-STARTPTS, setsar=1, "
+                    f"fps={fps}, setpts=PTS-STARTPTS, setsar=1, "
                     f"scale={camera_element.width}x"
                     f"{camera_element.height}"
                     f" [{camera}]"
@@ -3490,7 +3492,7 @@ def create_intermediate_movie(
     ffmpeg_text = ffmpeg_text.replace("__USERTEXT__", user_formatted_text)
 
     # DEBUG: Log layout dimensions and camera positions
-    _LOGGER.info(f"DEBUG layout_type={type(video_layout).__name__}")
+    _LOGGER.info(f"DEBUG layout_type={type(video_layout).__name__}, fps={video_settings.get('fps', 36)}")
     _LOGGER.info(f"DEBUG video_layout.video_width={video_layout.video_width}, video_height={video_layout.video_height}")
     for cam_name in ['front', 'left', 'right', 'rear', 'left_pillar', 'right_pillar', 'telemetry', 'telemetry_map']:
         cam = video_layout.cameras(cam_name)
