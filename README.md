@@ -254,7 +254,7 @@ docker run --rm \
 ``` bash
 usage: tesla_dashcam.py [-h] [--version] [--loglevel {DEBUG,INFO,WARNING,ERROR,CRITICAL}] [--ffmpeg_debug] [--temp_dir TEMP_DIR] [--no-notification] [--display_ts] [--skip_existing]
                         [--delete_source] [--exclude_subdirs] [--monitor] [--monitor_once] [--monitor_trigger MONITOR_TRIGGER]
-                        [--layout {MOSAIC,FULLSCREEN,PERSPECTIVE,CROSS,DIAMOND,HORIZONTAL}] [--perspective] [--scale CLIP_SCALE [CLIP_SCALE ...]] [--mirror] [--rear] [--swap] [--no-swap]
+                        [--layout {MOSAIC,FULLSCREEN,PERSPECTIVE,CROSS,DIAMOND,HORIZONTAL,TELEMETRYGRID}] [--perspective] [--scale CLIP_SCALE [CLIP_SCALE ...]] [--mirror] [--rear] [--swap] [--no-swap]
                         [--swap_frontrear] [--background BACKGROUND] [--title_screen_map] [--no-front] [--no-left] [--no-right] [--no-rear] [--no-left-pillar] [--no-right-pillar] [--no-timestamp]
                         [--halign {LEFT,CENTER,RIGHT}] [--valign {TOP,MIDDLE,BOTTOM}] [--font FONT] [--fontsize FONTSIZE] [--fontcolor FONTCOLOR]
                         [--text_overlay_fmt TEXT_OVERLAY_FMT] [--timestamp_format TIMESTAMP_FORMAT] [--start_timestamp START_TIMESTAMP] [--end_timestamp END_TIMESTAMP]
@@ -299,7 +299,7 @@ Trigger Monitor:
 Video Layout:
   Set what the layout of the resulting video should be
 
-  --layout {MOSAIC,FULLSCREEN,PERSPECTIVE,CROSS,DIAMOND,HORIZONTAL}
+  --layout {MOSAIC,FULLSCREEN,PERSPECTIVE,CROSS,DIAMOND,HORIZONTAL,TELEMETRYGRID}
                         Layout of the created video.
                             FULLSCREEN: Front camera center top with side and rear cameras smaller underneath it.
                             MOSAIC: Front and rear cameras on top with pillars and side cameras smaller underneath it.
@@ -307,6 +307,7 @@ Video Layout:
                             CROSS: Front camera center top, pillar cameras underneath, then repeater cameras underneath, and rear camera center bottom.
                             DIAMOND: Front camera center top, pillar cameras on left/right of front smaller, side cameras below on left/right of rear smaller, and rear camera center bottom.
                             HORIZONTAL: All cameras in horizontal line: left, left pillar, front, rear, right pillar, right.
+                            TELEMETRYGRID: 3x2 grid with SEI telemetry panels. Top row: map, front, instruments. Bottom row: left, rear, right. Best used with --sei_panel.
                         (default: FULLSCREEN)
   --camera_position CLIP_POS [CLIP_POS ...]
                         Set camera clip position within video. Selecting this will override the layout selected!
@@ -349,6 +350,7 @@ Video Layout:
                             CROSS: 1/2 (640x480, video is 1280x1920)
                             DIAMOND: 1/2 (640x480, video is 2560x1920)
                             HORIZONTAL: 1/2 (640x480, video is 3840x480)
+                            TELEMETRYGRID: 1/2 (640x480, video is 1920x960, top: map/front/instruments, bottom: left/rear/right)
                         (default: None)
   --mirror              Video from side and rear cameras as if being viewed through the mirror. Default when not providing parameter --no-front. Cannot be used in combination with
                         --rear. (default: None)
@@ -1182,9 +1184,9 @@ Two panels are available:
     speeds for neighborhood detail, zoomed out at highway speeds to show the
     full route. Requires the `staticmap` Python package.
 
-To enable panels:
+To enable panels with the recommended TELEMETRYGRID layout:
 
-    python -m tesla_dashcam /path/to/clips --sei_overlay --sei_panel
+    python -m tesla_dashcam /path/to/clips --layout TELEMETRYGRID --sei_overlay --sei_panel
 
 To disable the map panel and show only instruments:
 
@@ -1199,7 +1201,9 @@ Panels inherit widget selection, theme, and other graphical settings from the
 
     Add telemetry instrument and map panels as camera slots in the
     multi-camera layout. Each layout (FullScreen, Mosaic, Cross, Diamond,
-    Horizontal) positions the panels automatically. Requires `--sei_overlay`.
+    Horizontal, TelemetryGrid) positions the panels automatically. Use
+    `--layout TELEMETRYGRID` for best results with a dedicated 3x2 grid
+    placing map and instruments alongside camera views. Requires `--sei_overlay`.
 
 **\--sei\_panel\_map**
 
