@@ -3159,13 +3159,16 @@ def create_intermediate_movie(
                         w.strip()
                         for w in video_settings.get("sei_widgets", "all").split(",")
                     ]
+                    # Use source frame rate (36fps for Tesla) not output fps
+                    # Panels are generated per SEI frame which matches source frames
+                    source_fps = 36  # Tesla dashcam source frame rate
                     panel_settings = GraphicalOverlaySettings(
                         size_preset=video_settings.get("sei_widget_size", "medium"),
                         widgets=widget_list,
                         theme_name=video_settings.get("sei_widget_theme", "default"),
                         speed_unit=video_settings.get("sei_speed_unit", "mph"),
                         font_path=font_path if font_path else None,
-                        frame_rate=video_settings.get("fps", 36),
+                        frame_rate=source_fps,
                         start_time=starting_timestamp,
                     )
                     # Instruments panel
@@ -3222,13 +3225,15 @@ def create_intermediate_movie(
         if camera_element.include:
             # Telemetry panels: use pre-rendered concat demuxer as input
             if camera == "telemetry_map" and sei_map_concat:
-                fps = video_settings.get("fps", 36)
+                # Panels are at source fps (36), convert to output fps
+                source_fps = 36
+                output_fps = video_settings.get("fps", 24)
                 ffmpeg_camera_commands.extend(
                     ["-safe", "0", "-f", "concat", "-i", sei_map_concat]
                 )
                 ffmpeg_camera_filters.append(
                     f";[{input_counter}:v] "
-                    f"fps={fps}, setpts=PTS-STARTPTS, setsar=1, "
+                    f"fps={output_fps}, setpts=PTS-STARTPTS, setsar=1, "
                     f"scale={camera_element.width}x"
                     f"{camera_element.height}"
                     f" [{camera}]"
@@ -3243,13 +3248,14 @@ def create_intermediate_movie(
                 )
                 input_clip = f"{camera}1"
             elif camera == "telemetry" and sei_panel_concat:
-                fps = video_settings.get("fps", 36)
+                # Panels are at source fps (36), convert to output fps
+                output_fps = video_settings.get("fps", 24)
                 ffmpeg_camera_commands.extend(
                     ["-safe", "0", "-f", "concat", "-i", sei_panel_concat]
                 )
                 ffmpeg_camera_filters.append(
                     f";[{input_counter}:v] "
-                    f"fps={fps}, setpts=PTS-STARTPTS, setsar=1, "
+                    f"fps={output_fps}, setpts=PTS-STARTPTS, setsar=1, "
                     f"scale={camera_element.width}x"
                     f"{camera_element.height}"
                     f" [{camera}]"
@@ -3441,6 +3447,8 @@ def create_intermediate_movie(
                 w.strip()
                 for w in video_settings.get("sei_widgets", "all").split(",")
             ]
+            # Use source fps (36) for graphical overlay - matches SEI frame rate
+            source_fps = 36
             gfx_settings = GraphicalOverlaySettings(
                 position=video_settings.get("sei_widget_position", "bottom-left"),
                 size_preset=video_settings.get("sei_widget_size", "medium"),
@@ -3448,7 +3456,7 @@ def create_intermediate_movie(
                 theme_name=video_settings.get("sei_widget_theme", "default"),
                 speed_unit=video_settings.get("sei_speed_unit", "mph"),
                 font_path=font_path if font_path else None,
-                frame_rate=video_settings.get("fps", 36),
+                frame_rate=source_fps,
                 start_time=starting_timestamp,
                 layout_name=video_settings.get("sei_overlay_layout", "dashboard"),
             )
@@ -3464,6 +3472,8 @@ def create_intermediate_movie(
             font_path = video_settings["video_layout"].font.font
             font_name = os.path.basename(font_path).replace(".ttf", "").replace(".TTF", "") if font_path else "Arial"
             default_font_size = max(18, video_settings["video_layout"].video_height // 45)
+            # Use source fps (36) for ASS timing - matches SEI frame rate
+            source_fps = 36
             sei_settings = TelemetryOverlaySettings(
                 format_string=video_settings.get("sei_format", "{speed} {gear} {autopilot}"),
                 position=video_settings.get("sei_position", "bottom-left"),
@@ -3472,7 +3482,7 @@ def create_intermediate_movie(
                 font_size=video_settings.get("sei_font_size") or default_font_size,
                 style_preset=video_settings.get("sei_style", "default"),
                 layout_preset=video_settings.get("sei_layout", "compact"),
-                frame_rate=video_settings.get("fps", 36),
+                frame_rate=source_fps,
             )
             sei_ass_file = generate_telemetry_ass(sei_frames, sei_settings)
             if sei_ass_file:
