@@ -6832,9 +6832,9 @@ def main() -> int:
     return 0
 
 
-if sys.version_info < (3, 13):
+if sys.version_info < (3, 9):
     print(
-        f"{get_current_timestamp()}Python version 3.13 or higher is required, you have: "
+        f"{get_current_timestamp()}Python version 3.9 or higher is required, you have: "
         f"{sys.version}. Please update your Python version."
     )
     sys.exit(1)
