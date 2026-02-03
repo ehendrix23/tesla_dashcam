@@ -6159,12 +6159,14 @@ def main() -> int:
 
     layout_settings.swap_pillar = args.swap_pillar
 
-    if layout_settings.swap_pillar:
-        layout_settings.cameras("left_pillar").include = not args.no_right_pillar
-        layout_settings.cameras("right_pillar").include = not args.no_left_pillar
-    else:
-        layout_settings.cameras("left_pillar").include = not args.no_left_pillar
-        layout_settings.cameras("right_pillar").include = not args.no_right_pillar
+    # TelemetryGrid uses telemetry panels instead of pillars - don't override
+    if not isinstance(layout_settings, TelemetryGrid):
+        if layout_settings.swap_pillar:
+            layout_settings.cameras("left_pillar").include = not args.no_right_pillar
+            layout_settings.cameras("right_pillar").include = not args.no_left_pillar
+        else:
+            layout_settings.cameras("left_pillar").include = not args.no_left_pillar
+            layout_settings.cameras("right_pillar").include = not args.no_right_pillar
 
     # Enable telemetry panel camera slots when --sei_panel is active
     if getattr(args, "sei_panel", False):
