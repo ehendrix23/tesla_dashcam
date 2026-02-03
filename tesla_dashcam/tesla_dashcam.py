@@ -6092,8 +6092,10 @@ def main() -> int:
         )
         return 1
 
+    _LOGGER.info(f"DEBUG args.layout={args.layout}, args.clip_pos={args.clip_pos}")
     if args.clip_pos:
         # If clip positions have been provided it is custom.
+        _LOGGER.info("DEBUG: Using MovieLayout because clip_pos is set")
         layout_settings = MovieLayout()
     elif args.layout == "PERSPECTIVE":
         layout_settings = FullScreen()
