@@ -3501,13 +3501,6 @@ def create_intermediate_movie(
 
     ffmpeg_text = ffmpeg_text.replace("__USERTEXT__", user_formatted_text)
 
-    # DEBUG: Log layout dimensions and camera positions
-    _LOGGER.info(f"DEBUG layout_type={type(video_layout).__name__}, fps={video_settings.get('fps', 36)}")
-    _LOGGER.info(f"DEBUG video_layout.video_width={video_layout.video_width}, video_height={video_layout.video_height}")
-    for cam_name in ['front', 'left', 'right', 'rear', 'left_pillar', 'right_pillar', 'telemetry', 'telemetry_map']:
-        cam = video_layout.cameras(cam_name)
-        _LOGGER.info(f"DEBUG {cam_name}: include={cam.include}, xpos={cam.xpos}, ypos={cam.ypos}, width={cam.width}, height={cam.height}")
-
     ffmpeg_base: str = (
         black_base
         + black_size.format(
@@ -6104,10 +6097,8 @@ def main() -> int:
         )
         return 1
 
-    _LOGGER.info(f"DEBUG args.layout={args.layout}, args.clip_pos={args.clip_pos}")
     if args.clip_pos:
         # If clip positions have been provided it is custom.
-        _LOGGER.info("DEBUG: Using MovieLayout because clip_pos is set")
         layout_settings = MovieLayout()
     elif args.layout == "PERSPECTIVE":
         layout_settings = FullScreen()
