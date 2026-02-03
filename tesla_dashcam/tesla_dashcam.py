@@ -3489,6 +3489,12 @@ def create_intermediate_movie(
 
     ffmpeg_text = ffmpeg_text.replace("__USERTEXT__", user_formatted_text)
 
+    # DEBUG: Log layout dimensions and camera positions
+    _LOGGER.info(f"DEBUG video_layout.video_width={video_layout.video_width}, video_height={video_layout.video_height}")
+    for cam_name in ['front', 'left', 'right', 'rear', 'left_pillar', 'right_pillar', 'telemetry', 'telemetry_map']:
+        cam = video_layout.cameras(cam_name)
+        _LOGGER.info(f"DEBUG {cam_name}: include={cam.include}, xpos={cam.xpos}, ypos={cam.ypos}, width={cam.width}, height={cam.height}")
+
     ffmpeg_base: str = (
         black_base
         + black_size.format(
