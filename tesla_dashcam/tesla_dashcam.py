@@ -3470,6 +3470,7 @@ def create_intermediate_movie(
                 font_size=video_settings.get("sei_font_size") or default_font_size,
                 style_preset=video_settings.get("sei_style", "default"),
                 layout_preset=video_settings.get("sei_layout", "compact"),
+                frame_rate=video_settings.get("fps", 36),
             )
             sei_ass_file = generate_telemetry_ass(sei_frames, sei_settings)
             if sei_ass_file:
