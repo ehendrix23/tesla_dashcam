@@ -4401,7 +4401,7 @@ def process_folders(
         if movies_list is None:
             # No merging of movies occurred.
             message = (
-                "{total_folders} folder{folders} with {total_clips} clip{clips} have"
+                "{total_folders} folder{folders} with {total_clips} clip{clips} have "
                 "been processed, {target_folder} contains resulting files.".format(
                     folders="" if len(event_list) < 2 else "s",
                     total_folders=len(event_list),
