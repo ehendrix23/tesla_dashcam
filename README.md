@@ -254,10 +254,18 @@ docker run --rm \
 ``` bash
 usage: tesla_dashcam.py [-h] [--version] [--loglevel {DEBUG,INFO,WARNING,ERROR,CRITICAL}] [--ffmpeg_debug] [--temp_dir TEMP_DIR] [--no-notification] [--display_ts] [--skip_existing]
                         [--delete_source] [--exclude_subdirs] [--monitor] [--monitor_once] [--monitor_trigger MONITOR_TRIGGER]
-                        [--layout {MOSAIC,FULLSCREEN,PERSPECTIVE,CROSS,DIAMOND,HORIZONTAL,TELEMETRYGRID}] [--perspective] [--scale CLIP_SCALE [CLIP_SCALE ...]] [--mirror] [--rear] [--swap] [--no-swap]
-                        [--swap_frontrear] [--background BACKGROUND] [--title_screen_map] [--no-front] [--no-left] [--no-right] [--no-rear] [--no-left-pillar] [--no-right-pillar] [--no-timestamp]
+                        [--layout {MOSAIC,FULLSCREEN,PERSPECTIVE,CROSS,DIAMOND,HORIZONTAL,TELEMETRYGRID}] [--camera_position CLIP_POS [CLIP_POS ...]] [--camera_order CLIP_ORDER]
+                        [--perspective] [--scale CLIP_SCALE [CLIP_SCALE ...]] [--mirror] [--rear] [--swap] [--no-swap]
+                        [--swap_frontrear] [--swap_pillar] [--background BACKGROUND] [--title_screen_map] [--no-front] [--no-left] [--no-right] [--no-rear] [--no-left-pillar] [--no-right-pillar] [--no-timestamp]
                         [--halign {LEFT,CENTER,RIGHT}] [--valign {TOP,MIDDLE,BOTTOM}] [--font FONT] [--fontsize FONTSIZE] [--fontcolor FONTCOLOR]
-                        [--text_overlay_fmt TEXT_OVERLAY_FMT] [--timestamp_format TIMESTAMP_FORMAT] [--start_timestamp START_TIMESTAMP] [--end_timestamp END_TIMESTAMP]
+                        [--text_overlay_fmt TEXT_OVERLAY_FMT] [--timestamp_format TIMESTAMP_FORMAT]
+                        [--sei_overlay] [--sei_format SEI_FORMAT] [--sei_position {bottom-left,bottom-center,bottom-right,top-left,top-center,top-right}]
+                        [--sei_speed_unit {mph,kmh,mps}] [--sei_font_size SEI_FONT_SIZE] [--sei_style {default,hud,boxed,minimal,bold}]
+                        [--sei_layout {compact,full,speed-only,driving,location,performance}] [--sei_export_csv FILENAME]
+                        [--sei_graphical] [--sei_overlay_layout {dashboard,classic}] [--sei_widget_position {bottom-left,bottom-center,bottom-right,top-left,top-center,top-right}]
+                        [--sei_widget_size {small,medium,large}] [--sei_widgets SEI_WIDGETS] [--sei_widget_theme {default,hud,minimal,performance}]
+                        [--sei_panel] [--sei_panel_map | --no-sei_panel_map]
+                        [--start_timestamp START_TIMESTAMP] [--end_timestamp END_TIMESTAMP]
                         [--start_offset START_OFFSET] [--end_offset END_OFFSET] [--sentry_offset] [--sentry_start_offset START_OFFSET] [--sentry_end_offset END_OFFSET] [--output OUTPUT] [--motion_only] [--slowdown SLOW_DOWN] [--speedup SPEED_UP]
                         [--chapter_offset CHAPTER_OFFSET] [--merge [MERGE_GROUP_TEMPLATE]] [--merge_timestamp_format MERGE_TIMESTAMP_FORMAT] [--keep-intermediate] [--keep-events]
                         [--set_moviefile_timestamp {START,STOP,SENTRY,RENDER}] [--no-gpu] [--gpu] [--gpu_type {nvidia,intel,qsv,rpi,vaapi}] [--no-faststart]
@@ -413,6 +421,42 @@ Text Overlay:
   --timestamp_format TIMESTAMP_FORMAT
                         Format for timestamps.
                         Determines how timestamps should be represented. Any valid value from strftime is accepted.Default is set '%x %X' which is locale's appropriate date and time representationMore info: https://strftime.org (default: %x %X)
+
+SEI Telemetry Overlay:
+  Overlay telemetry data embedded in dashcam video SEI NAL units (firmware 2025.44.25+).
+
+  --sei_overlay         Enable SEI telemetry overlay showing speed, gear, autopilot status, etc. (default: False)
+  --sei_format SEI_FORMAT
+                        Format string for SEI telemetry overlay. Available variables: {speed}, {speed_value}, {gear}, {autopilot}, {brake},
+                        {blinker}, {heading}, {steering}, {accel}, {lat}, {lon}, {gforce_x}, {gforce_y}. (default: {speed} {gear} {autopilot})
+  --sei_position {bottom-left,bottom-center,bottom-right,top-left,top-center,top-right}
+                        Position for SEI telemetry overlay. (default: bottom-left)
+  --sei_speed_unit {mph,kmh,mps}
+                        Speed unit for SEI overlay. (default: mph)
+  --sei_font_size SEI_FONT_SIZE
+                        Font size for SEI overlay text. Default is scaled based on video size.
+  --sei_style {default,hud,boxed,minimal,bold}
+                        Style preset for SEI overlay appearance. (default: default)
+  --sei_layout {compact,full,speed-only,driving,location,performance}
+                        Layout preset for SEI data arrangement. (default: compact)
+  --sei_export_csv FILENAME
+                        Export SEI telemetry data to a CSV file for external analysis.
+  --sei_graphical       Enable graphical telemetry overlay with steering wheel, gauges, and indicators.
+                        Replaces the text overlay when used with --sei_overlay. (default: False)
+  --sei_overlay_layout {dashboard,classic}
+                        Layout style for graphical overlay. (default: dashboard)
+  --sei_widget_position {bottom-left,bottom-center,bottom-right,top-left,top-center,top-right}
+                        Position for graphical widget cluster. (default: bottom-left)
+  --sei_widget_size {small,medium,large}
+                        Size preset for graphical widgets. (default: medium)
+  --sei_widgets SEI_WIDGETS
+                        Comma-separated list of widgets to display. Options: steering, turn, brake, accel, speed, gear, location,
+                        datetime, autopilot, gforce, compass, cluster, elevation, all. (default: all)
+  --sei_widget_theme {default,hud,minimal,performance}
+                        Color theme for graphical widgets. (default: default)
+  --sei_panel           Add telemetry panel as camera slot in layout. Requires --sei_overlay. (default: False)
+  --sei_panel_map, --no-sei_panel_map
+                        Include route map panel. Requires staticmap package. (default: True)
 
 Timestamp Restriction:
   Restrict video to be between start and/or end timestamps. Timestamp to be provided in a ISO-8601 format (see https://fits.gsfc.nasa.gov/iso-time.html for examples)
@@ -702,6 +746,18 @@ examples).
     |   Left   |   Left    |   Front   |   Rear    |   Right   |  Right   |
     |  Camera  |  Pillar   |  Camera   |  Camera   |  Pillar   |  Camera  |
     +----------+-----------+-----------+-----------+-----------+----------+
+```
+-   TELEMETRYGRID: Resolution: 1920x960
+
+    3x2 grid designed for use with `--sei_panel`. The top row places the
+    telemetry map and instrument panels alongside the front camera. The
+    bottom row contains the left, rear, and right cameras.
+```
+    +----------------+----------------+----------------+
+    | Telemetry Map  | Front Camera   |  Instruments   |
+    +----------------+----------------+----------------+
+    | Left Camera    |  Rear Camera   |  Right Camera  |
+    +----------------+----------------+----------------+
 ```
 *\--camera_position*
 
