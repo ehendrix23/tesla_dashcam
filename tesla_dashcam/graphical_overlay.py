@@ -408,11 +408,13 @@ def generate_graphical_overlay(
     with open(concat_path, "w", encoding="utf-8") as f:
         f.write("ffconcat version 1.0\n")
         for png_path, duration in concat_entries:
-            rel = os.path.basename(png_path)
-            f.write(f"file {rel}\n")
+            # Use full path with forward slashes for Windows compatibility
+            safe_path = png_path.replace(os.sep, "/")
+            f.write(f"file {safe_path}\n")
             f.write(f"duration {duration:.6f}\n")
         if concat_entries:
-            f.write(f"file {os.path.basename(concat_entries[-1][0])}\n")
+            safe_path = concat_entries[-1][0].replace(os.sep, "/")
+            f.write(f"file {safe_path}\n")
 
     _LOGGER.info(
         "Generated graphical overlay: %d unique states, %d frames, dir=%s",
@@ -427,5 +429,16 @@ def cleanup_overlay_dir(concat_path: str) -> None:
     if concat_path:
         overlay_dir = os.path.dirname(concat_path)
         if overlay_dir and os.path.isdir(overlay_dir):
+            # Retry cleanup for Windows where files may still be locked by FFmpeg
+            for attempt in range(3):
+                try:
+                    shutil.rmtree(overlay_dir)
+                    _LOGGER.debug("Cleaned up overlay dir: %s", overlay_dir)
+                    return
+                except OSError:
+                    if attempt < 2:
+                        import time
+                        time.sleep(0.5)
+            # Final attempt with ignore_errors
             shutil.rmtree(overlay_dir, ignore_errors=True)
-            _LOGGER.debug("Cleaned up overlay dir: %s", overlay_dir)
+            _LOGGER.debug("Cleaned up overlay dir (with errors ignored): %s", overlay_dir)

@@ -175,6 +175,8 @@ class TestMovieLayout:
             "rear",
             "left_pillar",
             "right_pillar",
+            "telemetry",
+            "telemetry_map",
         ]
 
         assert layout.clip_order == expected_clip_order
@@ -202,6 +204,8 @@ class TestMovieLayout:
                 "rear",
                 "left_pillar",
                 "right_pillar",
+                "telemetry",
+                "telemetry_map",
             ]
         )
         # Confirm all cameras are included in the clip order
@@ -219,6 +223,8 @@ class TestMovieLayout:
             "right_pillar",
             "rear",
             "right",
+            "telemetry",
+            "telemetry_map",
         ]
 
         layout.clip_order = expected_clip_order
@@ -1083,7 +1089,7 @@ class TestDiamond:
 
 
 class TestEdgeCases:
-    def test_create_movie_no_clips_returns_false(self):
+    def test_create_movie_no_clips_returns_false(self, tmp_path):
         from tesla_dashcam.tesla_dashcam import Movie, create_movie
 
         # Prepare minimal args; early return should only depend on movie.count
@@ -1096,7 +1102,7 @@ class TestEdgeCases:
         result = create_movie(
             movie=movie,
             event_info=event_info,
-            movie_filename="/tmp/output.mp4",
+            movie_filename=str(tmp_path / "output.mp4"),
             video_settings=video_settings,
             chapter_offset=0,
             title_screen_map=False,

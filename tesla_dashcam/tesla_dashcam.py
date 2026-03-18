@@ -129,7 +129,7 @@ MOVIE_ENCODING = {
 
 DEFAULT_FONT = {
     "darwin": "/Library/Fonts/Arial Unicode.ttf",
-    "win32": "/Windows/Fonts/arial.ttf",
+    "win32": "Windows/Fonts/arial.ttf",
     "cygwin": "/cygdrive/c/Windows/Fonts/arial.ttf",
     "linux": "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
     "freebsd11": "/usr/share/local/fonts/freefont-ttf/FreeSans.ttf",
@@ -6290,8 +6290,10 @@ def main() -> int:
                 )
             return 0
 
+        # Escape font path for FFmpeg filter syntax (colons need escaping)
+        ffmpeg_font = temp_font_file.replace("\\", "/").replace(":", r"\:")
         ffmpeg_timestamp = (
-            ffmpeg_timestamp + f"drawtext=fontfile={layout_settings.font.font}:"
+            ffmpeg_timestamp + f"drawtext=fontfile={ffmpeg_font}:"
             f"fontcolor={layout_settings.font.color}:"
             f"fontsize={layout_settings.font.size}:borderw=2:bordercolor=black@1.0:"
             f"x={layout_settings.font.halign}:y={layout_settings.font.valign}:"
