@@ -6263,11 +6263,11 @@ def main() -> int:
             )
             return 0
 
-        temp_font_file = (
-            rf"c:\{layout_settings.font.font}"
-            if PLATFORM == "win32"
-            else layout_settings.font.font
-        )
+        font_path = layout_settings.font.font
+        if PLATFORM == "win32" and font_path and not os.path.isabs(font_path):
+            temp_font_file = os.path.join("c:\\", font_path)
+        else:
+            temp_font_file = font_path
         if temp_font_file is None or temp_font_file == "":
             print(
                 f"{get_current_timestamp()}Font file is not set for platform "
