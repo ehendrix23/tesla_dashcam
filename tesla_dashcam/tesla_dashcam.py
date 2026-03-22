@@ -38,6 +38,24 @@ from tzlocal import get_localzone
 if sys.platform == "win32":
     from win11toast import toast  # type: ignore[import]
 
+from .sei_extractor import extract_sei_data, has_sei_data, export_sei_to_csv
+from .telemetry_overlay import (
+    generate_telemetry_ass,
+    get_sei_overlay_stats,
+    TelemetryOverlaySettings,
+)
+from .graphical_overlay import (
+    generate_graphical_overlay,
+    cleanup_overlay_dir,
+    GraphicalOverlaySettings,
+)
+from .telemetry_panel import (
+    generate_telemetry_panel,
+    generate_instruments_panel,
+    generate_map_panel,
+    cleanup_panel_dir,
+)
+
 _LOGGER = logging.getLogger(__name__)
 
 # TODO: Move everything into classes and separate files. For example,
@@ -111,7 +129,7 @@ MOVIE_ENCODING = {
 
 DEFAULT_FONT = {
     "darwin": "/Library/Fonts/Arial Unicode.ttf",
-    "win32": "/Windows/Fonts/arial.ttf",
+    "win32": "Windows/Fonts/arial.ttf",
     "cygwin": "/cygdrive/c/Windows/Fonts/arial.ttf",
     "linux": "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
     "freebsd11": "/usr/share/local/fonts/freefont-ttf/FreeSans.ttf",
@@ -849,18 +867,13 @@ class Event(object):
             template = ""
 
         if template == "":
-            template = (
-                f"{
-                    self.start_timestamp.astimezone(get_localzone()).strftime(
-                        timestamp_format
-                    )
-                } - "
-                f"{
-                    self.end_timestamp.astimezone(get_localzone()).strftime(
-                        timestamp_format
-                    )
-                }"
+            start_str = self.start_timestamp.astimezone(get_localzone()).strftime(
+                timestamp_format
             )
+            end_str = self.end_timestamp.astimezone(get_localzone()).strftime(
+                timestamp_format
+            )
+            template = f"{start_str} - {end_str}"
         return template
 
 
@@ -1150,6 +1163,10 @@ class Camera(object):
         if not self._include:
             return False
 
+        # Telemetry panels are synthetic cameras - no clip file to check
+        if self._camera in ("telemetry", "telemetry_map"):
+            return self._include
+
         # Make sure layout has an event.
         if self._layout.event is not None:
             return self._layout.event.has_camera_clip(self.camera)
@@ -1316,7 +1333,12 @@ class MovieLayout(object):
             "rear": Camera(layout=self, camera="rear"),
             "left_pillar": Camera(layout=self, camera="left_pillar"),
             "right_pillar": Camera(layout=self, camera="right_pillar"),
+            "telemetry": Camera(layout=self, camera="telemetry"),
+            "telemetry_map": Camera(layout=self, camera="telemetry_map"),
         }
+        # Telemetry panels are excluded by default; enabled via --sei_panel
+        self._cameras["telemetry"]._include = False
+        self._cameras["telemetry_map"]._include = False
         self._clip_order: list[str] = [
             "left",
             "right",
@@ -1324,6 +1346,8 @@ class MovieLayout(object):
             "rear",
             "left_pillar",
             "right_pillar",
+            "telemetry",
+            "telemetry_map",
         ]
         self._font: Font = Font(layout=self)
 
@@ -1358,6 +1382,8 @@ class MovieLayout(object):
                 "rear",
                 "left_pillar",
                 "right_pillar",
+                "telemetry",
+                "telemetry_map",
             ]:
                 self._clip_order.append(camera)
 
@@ -1374,6 +1400,10 @@ class MovieLayout(object):
             self._clip_order.append("left_pillar")
         if "right_pillar" not in self._clip_order:
             self._clip_order.append("right_pillar")
+        if "telemetry" not in self._clip_order:
+            self._clip_order.append("telemetry")
+        if "telemetry_map" not in self._clip_order:
+            self._clip_order.append("telemetry_map")
 
     @property
     def font(self) -> Font:
@@ -1466,6 +1496,8 @@ class MovieLayout(object):
                 self.cameras("right_pillar").xpos + self.cameras("right_pillar").width,
                 self.cameras("left").xpos + self.cameras("left").width,
                 self.cameras("rear").xpos + self.cameras("rear").width,
+                self.cameras("telemetry").xpos + self.cameras("telemetry").width,
+                self.cameras("telemetry_map").xpos + self.cameras("telemetry_map").width,
             )
         )
 
@@ -1479,6 +1511,8 @@ class MovieLayout(object):
                 self.cameras("right_pillar").ypos + self.cameras("right_pillar").height,
                 self.cameras("left").ypos + self.cameras("left").height,
                 self.cameras("right").ypos + self.cameras("right").height,
+                self.cameras("telemetry").ypos + self.cameras("telemetry").height,
+                self.cameras("telemetry_map").ypos + self.cameras("telemetry_map").height,
             )
         )
 
@@ -1664,6 +1698,130 @@ class FullScreen(MovieLayout):
         return self._bottom_row_ypos + int(
             (self._bottom_row_height - self.cameras("right").height) / 2
         )
+
+    # Telemetry instruments panel: extra column, top half
+    def telemetry_xpos(self) -> int:
+        return max(self._top_row_xpos + self._top_row_width,
+                   self._bottom_row_xpos + self._bottom_row_width)
+
+    def telemetry_ypos(self) -> int:
+        return 0
+
+    def telemetry_width(self) -> int:
+        return self.cameras("rear").width
+
+    def telemetry_height(self) -> int:
+        return self._top_row_height
+
+    # Telemetry map panel: below instruments in the same column
+    def telemetry_map_xpos(self) -> int:
+        return self.telemetry_xpos()
+
+    def telemetry_map_ypos(self) -> int:
+        return self._bottom_row_ypos
+
+    def telemetry_map_width(self) -> int:
+        return self.telemetry_width()
+
+    def telemetry_map_height(self) -> int:
+        return self._bottom_row_height
+
+
+class TelemetryGrid(MovieLayout):
+    """TelemetryGrid Movie Layout - 3x2 grid with telemetry panels in top corners
+
+    [TELEMETRY_MAP][FRONT_CAMERA][TELEMETRY_INSTRUMENTS]
+    [ LEFT_CAMERA ][ REAR_CAMERA][    RIGHT_CAMERA     ]
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.scale = 1 / 2
+        # Disable pillars - we use their positions for telemetry
+        self._cameras["left_pillar"]._include = False
+        self._cameras["right_pillar"]._include = False
+        # Enable telemetry panels by default for this layout
+        self._cameras["telemetry"]._include = True
+        self._cameras["telemetry_map"]._include = True
+
+    @property
+    def _cell_width(self) -> int:
+        return self.cameras("front").width
+
+    @property
+    def _cell_height(self) -> int:
+        return self.cameras("front").height
+
+    @property
+    def _row_width(self) -> int:
+        return self._cell_width * 3
+
+    @property
+    def _row_height(self) -> int:
+        return self._cell_height * 2
+
+    # Top row: telemetry_map, front, telemetry
+    def telemetry_map_xpos(self) -> int:
+        return 0
+
+    def telemetry_map_ypos(self) -> int:
+        return 0
+
+    def telemetry_map_width(self) -> int:
+        return self._cell_width
+
+    def telemetry_map_height(self) -> int:
+        return self._cell_height
+
+    def front_xpos(self) -> int:
+        return self._cell_width
+
+    def front_ypos(self) -> int:
+        return 0
+
+    def telemetry_xpos(self) -> int:
+        return self._cell_width * 2
+
+    def telemetry_ypos(self) -> int:
+        return 0
+
+    def telemetry_width(self) -> int:
+        return self._cell_width
+
+    def telemetry_height(self) -> int:
+        return self._cell_height
+
+    # Bottom row: left, rear, right
+    def left_xpos(self) -> int:
+        return 0
+
+    def left_ypos(self) -> int:
+        return self._cell_height
+
+    def rear_xpos(self) -> int:
+        return self._cell_width
+
+    def rear_ypos(self) -> int:
+        return self._cell_height
+
+    def right_xpos(self) -> int:
+        return self._cell_width * 2
+
+    def right_ypos(self) -> int:
+        return self._cell_height
+
+    # Pillars are disabled but need positions to avoid errors
+    def left_pillar_xpos(self) -> int:
+        return 0
+
+    def left_pillar_ypos(self) -> int:
+        return 0
+
+    def right_pillar_xpos(self) -> int:
+        return 0
+
+    def right_pillar_ypos(self) -> int:
+        return 0
 
 
 class Mosaic(FullScreen):
@@ -1886,6 +2044,32 @@ class Cross(MovieLayout):
             + self._repeater_row_height
         )
 
+    # Telemetry instruments: to the right of the rear camera, top half
+    def telemetry_xpos(self) -> int:
+        return int(self._row_width / 2) + int(self.cameras("rear").width / 2)
+
+    def telemetry_ypos(self) -> int:
+        return self.rear_ypos()
+
+    def telemetry_width(self) -> int:
+        return self.cameras("rear").width
+
+    def telemetry_height(self) -> int:
+        return self.cameras("rear").height // 2
+
+    # Telemetry map: below instruments
+    def telemetry_map_xpos(self) -> int:
+        return self.telemetry_xpos()
+
+    def telemetry_map_ypos(self) -> int:
+        return self.telemetry_ypos() + self.telemetry_height()
+
+    def telemetry_map_width(self) -> int:
+        return self.telemetry_width()
+
+    def telemetry_map_height(self) -> int:
+        return self.cameras("rear").height - self.telemetry_height()
+
 
 class Diamond(MovieLayout):
     """Diamond Movie Layout
@@ -2008,6 +2192,32 @@ class Diamond(MovieLayout):
             + self.cameras("front").height
         )
 
+    # Telemetry instruments: right column, below right camera
+    def telemetry_xpos(self) -> int:
+        return self.right_xpos()
+
+    def telemetry_ypos(self) -> int:
+        return self.right_ypos() + self.cameras("right").height
+
+    def telemetry_width(self) -> int:
+        return self._right_column_width
+
+    def telemetry_height(self) -> int:
+        return self.cameras("right").height // 2
+
+    # Telemetry map: below instruments
+    def telemetry_map_xpos(self) -> int:
+        return self.telemetry_xpos()
+
+    def telemetry_map_ypos(self) -> int:
+        return self.telemetry_ypos() + self.telemetry_height()
+
+    def telemetry_map_width(self) -> int:
+        return self.telemetry_width()
+
+    def telemetry_map_height(self) -> int:
+        return self.cameras("right").height - self.telemetry_height()
+
 
 class Horizontal(MovieLayout):
     """Horizontal Movie Layout
@@ -2078,6 +2288,32 @@ class Horizontal(MovieLayout):
 
     def right_ypos(self) -> int:
         return int((self._row_height - self.cameras("right").height) / 2)
+
+    # Telemetry instruments: appended after right camera, top half
+    def telemetry_xpos(self) -> int:
+        return self.right_xpos() + self.cameras("right").width
+
+    def telemetry_ypos(self) -> int:
+        return 0
+
+    def telemetry_width(self) -> int:
+        return self.cameras("rear").width
+
+    def telemetry_height(self) -> int:
+        return self._row_height // 2
+
+    # Telemetry map: below instruments
+    def telemetry_map_xpos(self) -> int:
+        return self.telemetry_xpos()
+
+    def telemetry_map_ypos(self) -> int:
+        return self.telemetry_height()
+
+    def telemetry_map_width(self) -> int:
+        return self.telemetry_width()
+
+    def telemetry_map_height(self) -> int:
+        return self._row_height - self.telemetry_height()
 
 
 class MyArgumentParser(argparse.ArgumentParser):
@@ -2787,6 +3023,8 @@ def create_intermediate_movie(
     folder_timestamps: tuple[datetime, datetime],
     video_settings: dict[str, Any],
     clip_number: int,
+    sei_panel_concat: str | None = None,
+    sei_map_concat: str | None = None,
 ) -> bool:
     """Create intermediate movie files. This is the merging of the camera
 
@@ -2898,6 +3136,85 @@ def create_intermediate_movie(
     )
     ffmpeg_black_video = ";" + black_base + black_size
 
+    # Extract SEI telemetry data and generate panels BEFORE building ffmpeg filter
+    sei_frames = []
+    local_sei_panel_concat = sei_panel_concat  # Use passed-in value or generate new
+    local_sei_map_concat = sei_map_concat
+    sei_requested = (
+        video_settings.get("sei_overlay")
+        or video_settings.get("sei_export_csv")
+        or video_settings.get("sei_panel")
+    )
+    if sei_requested and local_sei_panel_concat is None:
+        # Try to extract SEI from front camera (most reliable source)
+        front_file = clip_filenames.get("front")
+        if front_file:
+            sei_frames = extract_sei_data(front_file)
+            if sei_frames:
+                _LOGGER.info(f"Extracted {len(sei_frames)} SEI frames from {front_file}")
+                # Generate panels if enabled
+                if video_settings.get("sei_panel"):
+                    font_path = video_layout.font.font
+                    widget_list = [
+                        w.strip()
+                        for w in video_settings.get("sei_widgets", "all").split(",")
+                    ]
+                    # Use source frame rate (36fps for Tesla) not output fps
+                    # Panels are generated per SEI frame which matches source frames
+                    source_fps = 36  # Tesla dashcam source frame rate
+                    panel_settings = GraphicalOverlaySettings(
+                        size_preset=video_settings.get("sei_widget_size", "medium"),
+                        widgets=widget_list,
+                        theme_name=video_settings.get("sei_widget_theme", "default"),
+                        speed_unit=video_settings.get("sei_speed_unit", "mph"),
+                        font_path=font_path if font_path else None,
+                        frame_rate=source_fps,
+                        start_time=starting_timestamp,
+                    )
+                    # Instruments panel
+                    telemetry_cam = video_layout.cameras("telemetry")
+                    if telemetry_cam.include and telemetry_cam.width > 0 and telemetry_cam.height > 0:
+                        local_sei_panel_concat = generate_instruments_panel(
+                            sei_frames,
+                            panel_width=telemetry_cam.width,
+                            panel_height=telemetry_cam.height,
+                            settings=panel_settings,
+                        )
+                        if local_sei_panel_concat:
+                            _LOGGER.info(f"Generated instruments panel: {local_sei_panel_concat}")
+                    # Map panel
+                    map_cam = video_layout.cameras("telemetry_map")
+                    if map_cam.include and map_cam.width > 0 and map_cam.height > 0:
+                        local_sei_map_concat = generate_map_panel(
+                            sei_frames,
+                            panel_width=map_cam.width,
+                            panel_height=map_cam.height,
+                            settings=panel_settings,
+                        )
+                        if local_sei_map_concat:
+                            _LOGGER.info(f"Generated map panel: {local_sei_map_concat}")
+            else:
+                _LOGGER.warning(
+                    f"No SEI telemetry data found in {front_file}. "
+                    "SEI data requires Tesla firmware 2025.44.25+ and HW3/HW4 hardware. "
+                    "Video will be processed without telemetry overlay."
+                )
+                if video_settings.get("sei_panel"):
+                    video_layout.cameras("telemetry").include = False
+                    video_layout.cameras("telemetry_map").include = False
+        else:
+            _LOGGER.warning(
+                "No front camera file found. SEI telemetry extraction requires front camera. "
+                "Video will be processed without telemetry overlay."
+            )
+            if video_settings.get("sei_panel"):
+                video_layout.cameras("telemetry").include = False
+                video_layout.cameras("telemetry_map").include = False
+
+    # Use local panel paths for ffmpeg filter construction
+    sei_panel_concat = local_sei_panel_concat
+    sei_map_concat = local_sei_map_concat
+
     # Always starting from base.
     input_clip: str = "base"
     camera: str = ""
@@ -2906,8 +3223,54 @@ def create_intermediate_movie(
         # Is this camera to be included?
         camera_element = video_layout.cameras(camera)
         if camera_element.include:
+            # Telemetry panels: use pre-rendered concat demuxer as input
+            if camera == "telemetry_map" and sei_map_concat:
+                # Panels are at source fps (36), convert to output fps
+                source_fps = 36
+                output_fps = video_settings.get("fps", 24)
+                ffmpeg_camera_commands.extend(
+                    ["-safe", "0", "-f", "concat", "-i", sei_map_concat]
+                )
+                ffmpeg_camera_filters.append(
+                    f";[{input_counter}:v] "
+                    f"fps={output_fps}, setpts=PTS-STARTPTS, setsar=1, "
+                    f"scale={camera_element.width}x"
+                    f"{camera_element.height}"
+                    f" [{camera}]"
+                )
+                input_counter += 1
+                ffmpeg_camera_positions.append(
+                    f";[{input_clip}][{camera}]"
+                    + " overlay=eof_action=pass:repeatlast=0"
+                    + f":x={str(camera_element.xpos)}"
+                    + f":y={str(camera_element.ypos)}"
+                    + f" [{camera}1]"
+                )
+                input_clip = f"{camera}1"
+            elif camera == "telemetry" and sei_panel_concat:
+                # Panels are at source fps (36), convert to output fps
+                output_fps = video_settings.get("fps", 24)
+                ffmpeg_camera_commands.extend(
+                    ["-safe", "0", "-f", "concat", "-i", sei_panel_concat]
+                )
+                ffmpeg_camera_filters.append(
+                    f";[{input_counter}:v] "
+                    f"fps={output_fps}, setpts=PTS-STARTPTS, setsar=1, "
+                    f"scale={camera_element.width}x"
+                    f"{camera_element.height}"
+                    f" [{camera}]"
+                )
+                input_counter += 1
+                ffmpeg_camera_positions.append(
+                    f";[{input_clip}][{camera}]"
+                    + " overlay=eof_action=pass:repeatlast=0"
+                    + f":x={str(camera_element.xpos)}"
+                    + f":y={str(camera_element.ypos)}"
+                    + f" [{camera}1]"
+                )
+                input_clip = f"{camera}1"
             # We have a camera clip for this camera, use it.
-            if (clip_filename := clip_filenames.get(camera)) is None:
+            elif (clip_filename := clip_filenames.get(camera)) is None:
                 # We do not have a camera clip for this camera, use background instead.
                 ffmpeg_camera_filters.append(
                     ffmpeg_black_video.format(
@@ -3068,6 +3431,63 @@ def create_intermediate_movie(
     replacement_strings["event_latitude"] = event_info.event_metadata.latitude or 0.0
     replacement_strings["event_longitude"] = event_info.event_metadata.longitude or 0.0
 
+    # SEI data was already extracted earlier for panel generation
+    # Add SEI summary stats to replacement strings (use sei_frames from earlier block)
+    sei_ass_file = None
+    sei_stats = get_sei_overlay_stats(sei_frames, video_settings.get("sei_speed_unit", "mph"))
+    replacement_strings.update(sei_stats)
+
+    # Generate SEI overlay (graphical or text-based ASS)
+    sei_gfx_concat = None
+    if video_settings.get("sei_overlay") and sei_frames:
+        if video_settings.get("sei_graphical"):
+            # Graphical overlay: render PNG frames with concat demuxer
+            font_path = video_settings["video_layout"].font.font
+            widget_list = [
+                w.strip()
+                for w in video_settings.get("sei_widgets", "all").split(",")
+            ]
+            # Use source fps (36) for graphical overlay - matches SEI frame rate
+            source_fps = 36
+            gfx_settings = GraphicalOverlaySettings(
+                position=video_settings.get("sei_widget_position", "bottom-left"),
+                size_preset=video_settings.get("sei_widget_size", "medium"),
+                widgets=widget_list,
+                theme_name=video_settings.get("sei_widget_theme", "default"),
+                speed_unit=video_settings.get("sei_speed_unit", "mph"),
+                font_path=font_path if font_path else None,
+                frame_rate=source_fps,
+                start_time=starting_timestamp,
+                layout_name=video_settings.get("sei_overlay_layout", "dashboard"),
+            )
+            sei_gfx_concat = generate_graphical_overlay(
+                sei_frames, gfx_settings,
+                video_width=video_layout.video_width,
+                video_height=video_layout.video_height,
+            )
+            if sei_gfx_concat:
+                _LOGGER.debug(f"Generated graphical overlay: {sei_gfx_concat}")
+        else:
+            # Text-based ASS overlay
+            font_path = video_settings["video_layout"].font.font
+            font_name = os.path.basename(font_path).replace(".ttf", "").replace(".TTF", "") if font_path else "Arial"
+            default_font_size = max(18, video_settings["video_layout"].video_height // 45)
+            # Use source fps (36) for ASS timing - matches SEI frame rate
+            source_fps = 36
+            sei_settings = TelemetryOverlaySettings(
+                format_string=video_settings.get("sei_format", "{speed} {gear} {autopilot}"),
+                position=video_settings.get("sei_position", "bottom-left"),
+                speed_unit=video_settings.get("sei_speed_unit", "mph"),
+                font_name=font_name,
+                font_size=video_settings.get("sei_font_size") or default_font_size,
+                style_preset=video_settings.get("sei_style", "default"),
+                layout_preset=video_settings.get("sei_layout", "compact"),
+                frame_rate=source_fps,
+            )
+            sei_ass_file = generate_telemetry_ass(sei_frames, sei_settings)
+            if sei_ass_file:
+                _LOGGER.debug(f"Generated SEI overlay ASS file: {sei_ass_file}")
+
     try:
         # Try to replace strings!
         user_formatted_text = user_formatted_text.format(**replacement_strings)
@@ -3102,6 +3522,23 @@ def create_intermediate_movie(
     for ffmpeg_camera_position in ffmpeg_camera_positions:
         ffmpeg_position += ffmpeg_camera_position
 
+    # Build SEI ASS filter if available (text overlay mode)
+    # The ASS filter needs to be inserted into the filter chain properly.
+    # ffmpeg_text ends with an output label like [tmp0], so we need to insert
+    # the ass filter before that label.
+    if sei_ass_file and ffmpeg_text:
+        import re
+        # Quote the file path for FFmpeg filter (single quotes protect
+        # Windows drive letter colons from being parsed as option separators)
+        escaped_ass_path = sei_ass_file.replace("\\", "/")
+        # Insert ass filter before the output label [tmpN]
+        ffmpeg_text = re.sub(
+            r'\s*\[tmp(\d+)\]\s*$',
+            f",ass='{escaped_ass_path}' [tmp\\1]",
+            ffmpeg_text
+        )
+
+    # Build the main filter chain
     ffmpeg_filter += (
         ffmpeg_position
         + ffmpeg_text
@@ -3109,6 +3546,26 @@ def create_intermediate_movie(
         + video_settings["ffmpeg_motiononly"].format(input_clip=input_clip)
         + video_settings["ffmpeg_hwupload"].format(input_clip=input_clip)
     )
+
+    # Append graphical overlay at the end of the filter chain
+    final_map_label = video_settings["input_clip"]
+    if sei_gfx_concat:
+        # Add concat demuxer as additional FFmpeg input
+        ffmpeg_camera_commands.extend([
+            "-safe", "0", "-f", "concat", "-i", sei_gfx_concat,
+        ])
+        gfx_input_idx = input_counter
+        input_counter += 1
+
+        # Composite overlay onto the final video output
+        gfx_out = "gfx_out"
+        ffmpeg_filter += (
+            f";[{gfx_input_idx}:v] format=rgba [gfx_in]"
+            f";[{final_map_label}][gfx_in]"
+            f" overlay=eof_action=pass:repeatlast=0:format=auto"
+            f" [{gfx_out}]"
+        )
+        final_map_label = gfx_out
 
     title_timestamp: str = str(
         replacement_strings["event_timestamp"]
@@ -3122,13 +3579,12 @@ def create_intermediate_movie(
         else title_timestamp
     )
 
+    creation_time_utc = starting_timestamp.astimezone(timezone.utc).strftime(
+        '%Y-%m-%dT%H:%M:%S.000000Z'
+    )
     ffmpeg_metadata: list[str] = [
         "-metadata",
-        f"creation_time={
-            starting_timestamp.astimezone(timezone.utc).strftime(
-                '%Y-%m-%dT%H:%M:%S.000000Z'
-            )
-        }",
+        f"creation_time={creation_time_utc}",
         "-metadata",
         f"description=Created by tesla_dashcam {VERSION_STR}",
         "-metadata",
@@ -3146,34 +3602,69 @@ def create_intermediate_movie(
 
     ffmpeg_command += (
         ["-filter_complex", ffmpeg_filter]
-        + ["-map", f"[{video_settings['input_clip']}]"]
+        + ["-map", f"[{final_map_label}]"]
         + video_settings["other_params"]
         + ffmpeg_metadata
     )
 
     ffmpeg_command = ffmpeg_command + ["-y", temp_movie_name]
     _LOGGER.debug("FFMPEG Command: %s", ffmpeg_command)
+    if sei_gfx_concat:
+        _LOGGER.debug("GFX overlay filter chain appended, map label: [%s]", final_map_label)
 
     # Run the command.
     try:
         ffmpeg_output = run(ffmpeg_command, capture_output=True, check=True, text=True)
     except CalledProcessError as exc:
+        clip_path = os.path.join(
+            event_info.folder,
+            local_timestamp.strftime('%Y-%m-%dT%H-%M-%S') + '.mp4',
+        )
         print(
             f"{get_current_timestamp()}\t\t\tError trying to create clip for "
-            f"{
-                os.path.join(
-                    event_info.folder,
-                    local_timestamp.strftime('%Y-%m-%dT%H-%M-%S') + '.mp4',
-                )
-            }."
-            f"RC: {exc.returncode}\n"
+            f"{clip_path}. RC: {exc.returncode}\n"
             f"{get_current_timestamp()}\t\t\tCommand: {exc.cmd}\n"
             f"{get_current_timestamp()}\t\t\tError: {exc.stderr}\n\n"
         )
+        # Clean up temporary overlay files on error
+        if sei_ass_file and os.path.exists(sei_ass_file):
+            try:
+                os.remove(sei_ass_file)
+            except OSError:
+                pass
+        if sei_gfx_concat:
+            cleanup_overlay_dir(sei_gfx_concat)
+        if sei_panel_concat:
+            cleanup_panel_dir(sei_panel_concat)
+        if sei_map_concat:
+            cleanup_panel_dir(sei_map_concat)
         return False
     if FFMPEG_DEBUG:
         _LOGGER.debug("FFMPEG output:\n %s", ffmpeg_output.stdout)
         _LOGGER.debug("FFMPEG stderr output:\n %s", ffmpeg_output.stderr)
+
+    # Clean up temporary overlay files after successful processing
+    if sei_ass_file and os.path.exists(sei_ass_file):
+        try:
+            os.remove(sei_ass_file)
+        except OSError:
+            pass
+    if sei_gfx_concat:
+        cleanup_overlay_dir(sei_gfx_concat)
+    if sei_panel_concat:
+        cleanup_panel_dir(sei_panel_concat)
+    if sei_map_concat:
+        cleanup_panel_dir(sei_map_concat)
+
+    # Export SEI data to CSV if requested
+    if video_settings.get("sei_export_csv") and sei_frames:
+        csv_path = video_settings["sei_export_csv"]
+        # Append clip timestamp to make unique if processing multiple clips
+        if os.path.exists(csv_path):
+            base, ext = os.path.splitext(csv_path)
+            csv_path = f"{base}_{local_timestamp.strftime('%Y-%m-%dT%H-%M-%S')}{ext}"
+        export_sei_to_csv(sei_frames, csv_path)
+        print(f"{get_current_timestamp()}\t\t\tExported SEI data to {csv_path}")
 
     clip_info.filename = temp_movie_name
     clip_info.start_timestamp = starting_timestamp
@@ -3503,26 +3994,20 @@ def create_movie(
             f"{title_timestamp}"
         )
     else:
-        title = (
-            f"{
-                start_timestamp.astimezone(get_localzone()).strftime(
-                    user_timestamp_format
-                )
-            } - "
-            f"{
-                end_timestamp.astimezone(get_localzone()).strftime(
-                    user_timestamp_format
-                )
-            }"
+        start_str = start_timestamp.astimezone(get_localzone()).strftime(
+            user_timestamp_format
         )
+        end_str = end_timestamp.astimezone(get_localzone()).strftime(
+            user_timestamp_format
+        )
+        title = f"{start_str} - {end_str}"
 
+    creation_time = start_timestamp.astimezone(timezone.utc).strftime(
+        '%Y-%m-%dT%H:%M:%S.000000Z'
+    )
     ffmpeg_metadata = [
         "-metadata",
-        f"creation_time={
-            start_timestamp.astimezone(timezone.utc).strftime(
-                '%Y-%m-%dT%H:%M:%S.000000Z'
-            )
-        }",
+        f"creation_time={creation_time}",
         "-metadata",
         f"description=Created by tesla_dashcam {VERSION_STR}",
         "-metadata",
@@ -4201,6 +4686,10 @@ def process_folders(
         delete_folder_files: bool = delete_source
         delete_file_list: list[str] = []
 
+        # Initialize SEI panel variables (generated inside create_intermediate_movie)
+        sei_panel_concat: str | None = None
+        sei_map_concat: str | None = None
+
         for clip_number, clip_timestamp in enumerate(event_info.sorted):
             if (clip_info := event_info.clip(clip_timestamp)) is None:
                 _LOGGER.warning(
@@ -4216,6 +4705,8 @@ def process_folders(
                 (event_start_timestamp, event_end_timestamp),
                 video_settings,
                 clip_number,
+                sei_panel_concat=sei_panel_concat,
+                sei_map_concat=sei_map_concat,
             ):
                 if (
                     clip_info.filename is not None
@@ -4415,7 +4906,7 @@ def process_folders(
                 # Only 1 movie was created.
                 print(
                     f"{get_current_timestamp()} Movie {movies_list[0][0]} with "
-                    f"duration {movies_list[0][0]} has been created."
+                    f"duration {movies_list[0][1]} has been created."
                 )
 
             else:
@@ -4506,9 +4997,11 @@ def notify_windows(title, subtitle, message):
 def notify_linux(title, subtitle, message):
     """Notification on Linux"""
     try:
-        run(["notify-send", f'"{title} {subtitle}"', f'"{message}"'], check=True)
-    except CalledProcessError as exc:
-        _LOGGER.error("Failed in notifification: %s", exc)
+        import subprocess
+        run(["notify-send", f'"{title} {subtitle}"', f'"{message}"'],
+            stderr=subprocess.DEVNULL)
+    except Exception:
+        pass  # Notifications may not work in Docker/headless environments
 
 
 def notify(title, subtitle, message):
@@ -4661,10 +5154,11 @@ def main() -> int:
             "CROSS",
             "DIAMOND",
             "HORIZONTAL",
+            "TELEMETRYGRID",
         ],
         default="FULLSCREEN",
         type=str.upper,
-        metavar="MOSAIC|FULLSCREEN|PERSPECTIVE|CROSS|DIAMOND|HORIZONTAL",
+        metavar="MOSAIC|FULLSCREEN|PERSPECTIVE|CROSS|DIAMOND|HORIZONTAL|TELEMETRYGRID",
         help="R|Layout of the created video.\n"
         "    FULLSCREEN: Front camera center top with side and rear cameras smaller "
         "underneath it.\n"
@@ -4678,7 +5172,9 @@ def main() -> int:
         "smaller, side cameras below on left/right of rear smaller, and rear camera "
         "center bottom.\n"
         "    HORIZONTAL: All cameras in horizontal line: left, left pillar, front, "
-        "rear, right pillar, right.\n",
+        "rear, right pillar, right.\n"
+        "    TELEMETRYGRID: 3x2 grid with telemetry map top-left, front top-center, "
+        "instruments top-right, left/rear/right on bottom row.\n",
     )
     layout_group.add_argument(
         "--camera_position",
@@ -4973,6 +5469,174 @@ def main() -> int:
         "Default is set '%%x %%X' which is locale's appropriate date and time "
         "representation"
         "More info: https://strftime.org",
+    )
+
+    sei_group = parser.add_argument_group(
+        title="SEI Telemetry Overlay",
+        description="Options for displaying embedded telemetry data from Tesla dashcam videos. "
+        "Requires firmware 2025.44.25+ and HW3/HW4.",
+    )
+    sei_group.add_argument(
+        "--sei_overlay",
+        dest="sei_overlay",
+        action="store_true",
+        help="Enable SEI telemetry overlay showing speed, gear, autopilot status, etc.",
+    )
+    sei_group.add_argument(
+        "--sei_format",
+        dest="sei_format",
+        required=False,
+        type=str,
+        default="{speed} {gear} {autopilot}",
+        help="R|Format string for SEI telemetry overlay.\n"
+        "Available variables:\n"
+        "  {speed}     - Speed with unit (e.g., '45 mph')\n"
+        "  {speed_value} - Speed value only\n"
+        "  {gear}      - Gear letter (P/R/N/D)\n"
+        "  {autopilot} - Autopilot state (FSD/AP/TACC or empty)\n"
+        "  {brake}     - 'BRAKE' if applied, empty otherwise\n"
+        "  {blinker}   - Turn signal indicator\n"
+        "  {heading}   - Compass heading in degrees\n"
+        "  {steering}  - Steering wheel angle\n"
+        "  {accel}     - Accelerator pedal position\n"
+        "  {lat}       - Latitude\n"
+        "  {lon}       - Longitude\n"
+        "  {gforce_x}  - Lateral G-force\n"
+        "  {gforce_y}  - Longitudinal G-force\n"
+        "Default: '{speed} {gear} {autopilot}'",
+    )
+    sei_group.add_argument(
+        "--sei_position",
+        dest="sei_position",
+        required=False,
+        choices=["bottom-left", "bottom-center", "bottom-right",
+                 "top-left", "top-center", "top-right"],
+        default="bottom-left",
+        help="Position for SEI telemetry overlay. Default: bottom-left",
+    )
+    sei_group.add_argument(
+        "--sei_speed_unit",
+        dest="sei_speed_unit",
+        required=False,
+        choices=["mph", "kmh", "mps"],
+        default="mph",
+        help="Speed unit for SEI overlay. Default: mph",
+    )
+    sei_group.add_argument(
+        "--sei_font_size",
+        dest="sei_font_size",
+        required=False,
+        type=int,
+        help="Font size for SEI overlay. Default is scaled based on video size.",
+    )
+    sei_group.add_argument(
+        "--sei_style",
+        dest="sei_style",
+        required=False,
+        choices=["default", "hud", "boxed", "minimal", "bold"],
+        default="default",
+        help="R|Style preset for SEI overlay appearance.\n"
+        "  default - Clean white text with black outline\n"
+        "  hud     - Green heads-up display style\n"
+        "  boxed   - White text on dark background\n"
+        "  minimal - Small, subtle gray text\n"
+        "  bold    - Large bold yellow text",
+    )
+    sei_group.add_argument(
+        "--sei_layout",
+        dest="sei_layout",
+        required=False,
+        choices=["compact", "full", "speed-only", "driving", "location", "performance"],
+        default="compact",
+        help="R|Layout preset for SEI data arrangement.\n"
+        "  compact     - Single line: speed, gear, autopilot\n"
+        "  full        - Multi-line with all key data\n"
+        "  speed-only  - Large speed display only\n"
+        "  driving     - Speed, gear, brake, blinker\n"
+        "  location    - Speed with GPS coordinates\n"
+        "  performance - Speed, throttle, g-forces",
+    )
+    sei_group.add_argument(
+        "--sei_export_csv",
+        dest="sei_export_csv",
+        required=False,
+        type=str,
+        metavar="FILENAME",
+        help="Export SEI telemetry data to a CSV file.",
+    )
+    sei_group.add_argument(
+        "--sei_graphical",
+        dest="sei_graphical",
+        action="store_true",
+        help="Enable graphical telemetry overlay with steering wheel, gauges, and indicators. "
+        "Replaces the text overlay when used with --sei_overlay.",
+    )
+    sei_group.add_argument(
+        "--sei_widget_position",
+        dest="sei_widget_position",
+        required=False,
+        choices=[
+            "bottom-left", "bottom-center", "bottom-right",
+            "top-left", "top-center", "top-right",
+        ],
+        default="bottom-left",
+        help="Position for graphical widget cluster. Default: bottom-left",
+    )
+    sei_group.add_argument(
+        "--sei_widget_size",
+        dest="sei_widget_size",
+        required=False,
+        choices=["small", "medium", "large"],
+        default="medium",
+        help="Size preset for graphical widgets. Default: medium",
+    )
+    sei_group.add_argument(
+        "--sei_widgets",
+        dest="sei_widgets",
+        required=False,
+        default="all",
+        help="R|Comma-separated list of widgets to display.\n"
+        "Options: steering, turn, brake, accel, speed, gear, location,\n"
+        "  datetime, autopilot, gforce, compass, cluster, elevation, all\n"
+        "Default: all",
+    )
+    sei_group.add_argument(
+        "--sei_widget_theme",
+        dest="sei_widget_theme",
+        required=False,
+        choices=["default", "hud", "minimal", "performance"],
+        default="default",
+        help="R|Color theme for graphical widgets.\n"
+        "  default     - White with dark background\n"
+        "  hud         - Green heads-up display style\n"
+        "  minimal     - Subtle, semi-transparent\n"
+        "  performance - Red/orange racing style",
+    )
+    sei_group.add_argument(
+        "--sei_overlay_layout",
+        dest="sei_overlay_layout",
+        required=False,
+        choices=["dashboard", "classic"],
+        default="dashboard",
+        help="R|Layout style for graphical overlay.\n"
+        "  dashboard - Top bar with clustered controls (default)\n"
+        "  classic   - Scattered overlay widgets",
+    )
+    sei_group.add_argument(
+        "--sei_panel",
+        dest="sei_panel",
+        action="store_true",
+        default=False,
+        help="Add a telemetry panel as a camera slot in the multi-camera layout. "
+        "Shows widgets and optional route map. Requires --sei_overlay.",
+    )
+    sei_group.add_argument(
+        "--sei_panel_map",
+        dest="sei_panel_map",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Include a route map with moving position dot in the telemetry panel. "
+        "Requires staticmap package. Default: enabled.",
     )
 
     filter_group = parser.add_argument_group(
@@ -5453,6 +6117,8 @@ def main() -> int:
             layout_settings = Diamond()
         elif layout_name == "HORIZONTAL":
             layout_settings = Horizontal()
+        elif layout_name == "TELEMETRYGRID":
+            layout_settings = TelemetryGrid()
         else:
             layout_settings = FullScreen()
 
@@ -5506,12 +6172,20 @@ def main() -> int:
 
     layout_settings.swap_pillar = args.swap_pillar
 
-    if layout_settings.swap_pillar:
-        layout_settings.cameras("left_pillar").include = not args.no_right_pillar
-        layout_settings.cameras("right_pillar").include = not args.no_left_pillar
-    else:
-        layout_settings.cameras("left_pillar").include = not args.no_left_pillar
-        layout_settings.cameras("right_pillar").include = not args.no_right_pillar
+    # TelemetryGrid uses telemetry panels instead of pillars - don't override
+    if not isinstance(layout_settings, TelemetryGrid):
+        if layout_settings.swap_pillar:
+            layout_settings.cameras("left_pillar").include = not args.no_right_pillar
+            layout_settings.cameras("right_pillar").include = not args.no_left_pillar
+        else:
+            layout_settings.cameras("left_pillar").include = not args.no_left_pillar
+            layout_settings.cameras("right_pillar").include = not args.no_right_pillar
+
+    # Enable telemetry panel camera slots when --sei_panel is active
+    if getattr(args, "sei_panel", False):
+        layout_settings.cameras("telemetry").include = True
+        if getattr(args, "sei_panel_map", True):
+            layout_settings.cameras("telemetry_map").include = True
 
     # For scale first set the main clip one if provided, this than allows camera
     # specific ones to override for that camera.
@@ -5589,11 +6263,11 @@ def main() -> int:
             )
             return 0
 
-        temp_font_file = (
-            rf"c:\{layout_settings.font.font}"
-            if PLATFORM == "win32"
-            else layout_settings.font.font
-        )
+        font_path = layout_settings.font.font
+        if PLATFORM == "win32" and font_path and not os.path.isabs(font_path):
+            temp_font_file = os.path.join("c:\\", font_path)
+        else:
+            temp_font_file = font_path
         if temp_font_file is None or temp_font_file == "":
             print(
                 f"{get_current_timestamp()}Font file is not set for platform "
@@ -5617,8 +6291,11 @@ def main() -> int:
                 )
             return 0
 
+        # Quote font path for FFmpeg filter syntax (single quotes protect
+        # Windows drive letter colons from being parsed as option separators)
+        ffmpeg_font = temp_font_file.replace("\\", "/")
         ffmpeg_timestamp = (
-            ffmpeg_timestamp + f"drawtext=fontfile={layout_settings.font.font}:"
+            ffmpeg_timestamp + f"drawtext=fontfile='{ffmpeg_font}':"
             f"fontcolor={layout_settings.font.color}:"
             f"fontsize={layout_settings.font.size}:borderw=2:bordercolor=black@1.0:"
             f"x={layout_settings.font.halign}:y={layout_settings.font.valign}:"
@@ -5890,6 +6567,22 @@ def main() -> int:
         "sentry_end_offset": getattr(args, "sentry_end_offset", None),
         "sentry_offset": args.sentry_offset,
         "skip_existing": args.skip_existing,
+        "sei_overlay": args.sei_overlay,
+        "sei_format": args.sei_format,
+        "sei_position": args.sei_position,
+        "sei_speed_unit": args.sei_speed_unit,
+        "sei_font_size": getattr(args, "sei_font_size", None),
+        "sei_style": getattr(args, "sei_style", "default"),
+        "sei_layout": getattr(args, "sei_layout", "compact"),
+        "sei_export_csv": getattr(args, "sei_export_csv", None),
+        "sei_graphical": getattr(args, "sei_graphical", False),
+        "sei_widget_position": getattr(args, "sei_widget_position", "bottom-left"),
+        "sei_widget_size": getattr(args, "sei_widget_size", "medium"),
+        "sei_widgets": getattr(args, "sei_widgets", "all"),
+        "sei_widget_theme": getattr(args, "sei_widget_theme", "default"),
+        "sei_overlay_layout": getattr(args, "sei_overlay_layout", "dashboard"),
+        "sei_panel": getattr(args, "sei_panel", False),
+        "sei_panel_map": getattr(args, "sei_panel_map", True),
     }
 
     # Confirm the merge variables provided are accurate.
@@ -5917,6 +6610,10 @@ def main() -> int:
         "event_reason": "event_reason",
         "event_latitude": "event_latitude",
         "event_longitude": "event_longitude",
+        # SEI telemetry variables (static summary values)
+        "sei_available": "sei_available",
+        "sei_avg_speed": "sei_avg_speed",
+        "sei_max_speed": "sei_max_speed",
     }
 
     try:
@@ -6141,7 +6838,7 @@ def main() -> int:
 
 if sys.version_info < (3, 13):
     print(
-        f"{get_current_timestamp()}Python version 3.8 or higher is required, you have: "
+        f"{get_current_timestamp()}Python version 3.13 or higher is required, you have: "
         f"{sys.version}. Please update your Python version."
     )
     sys.exit(1)

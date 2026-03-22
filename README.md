@@ -254,10 +254,18 @@ docker run --rm \
 ``` bash
 usage: tesla_dashcam.py [-h] [--version] [--loglevel {DEBUG,INFO,WARNING,ERROR,CRITICAL}] [--ffmpeg_debug] [--temp_dir TEMP_DIR] [--no-notification] [--display_ts] [--skip_existing]
                         [--delete_source] [--exclude_subdirs] [--monitor] [--monitor_once] [--monitor_trigger MONITOR_TRIGGER]
-                        [--layout {MOSAIC,FULLSCREEN,PERSPECTIVE,CROSS,DIAMOND,HORIZONTAL}] [--perspective] [--scale CLIP_SCALE [CLIP_SCALE ...]] [--mirror] [--rear] [--swap] [--no-swap]
-                        [--swap_frontrear] [--background BACKGROUND] [--title_screen_map] [--no-front] [--no-left] [--no-right] [--no-rear] [--no-left-pillar] [--no-right-pillar] [--no-timestamp]
+                        [--layout {MOSAIC,FULLSCREEN,PERSPECTIVE,CROSS,DIAMOND,HORIZONTAL,TELEMETRYGRID}] [--camera_position CLIP_POS [CLIP_POS ...]] [--camera_order CLIP_ORDER]
+                        [--perspective] [--scale CLIP_SCALE [CLIP_SCALE ...]] [--mirror] [--rear] [--swap] [--no-swap]
+                        [--swap_frontrear] [--swap_pillar] [--background BACKGROUND] [--title_screen_map] [--no-front] [--no-left] [--no-right] [--no-rear] [--no-left-pillar] [--no-right-pillar] [--no-timestamp]
                         [--halign {LEFT,CENTER,RIGHT}] [--valign {TOP,MIDDLE,BOTTOM}] [--font FONT] [--fontsize FONTSIZE] [--fontcolor FONTCOLOR]
-                        [--text_overlay_fmt TEXT_OVERLAY_FMT] [--timestamp_format TIMESTAMP_FORMAT] [--start_timestamp START_TIMESTAMP] [--end_timestamp END_TIMESTAMP]
+                        [--text_overlay_fmt TEXT_OVERLAY_FMT] [--timestamp_format TIMESTAMP_FORMAT]
+                        [--sei_overlay] [--sei_format SEI_FORMAT] [--sei_position {bottom-left,bottom-center,bottom-right,top-left,top-center,top-right}]
+                        [--sei_speed_unit {mph,kmh,mps}] [--sei_font_size SEI_FONT_SIZE] [--sei_style {default,hud,boxed,minimal,bold}]
+                        [--sei_layout {compact,full,speed-only,driving,location,performance}] [--sei_export_csv FILENAME]
+                        [--sei_graphical] [--sei_overlay_layout {dashboard,classic}] [--sei_widget_position {bottom-left,bottom-center,bottom-right,top-left,top-center,top-right}]
+                        [--sei_widget_size {small,medium,large}] [--sei_widgets SEI_WIDGETS] [--sei_widget_theme {default,hud,minimal,performance}]
+                        [--sei_panel] [--sei_panel_map | --no-sei_panel_map]
+                        [--start_timestamp START_TIMESTAMP] [--end_timestamp END_TIMESTAMP]
                         [--start_offset START_OFFSET] [--end_offset END_OFFSET] [--sentry_offset] [--sentry_start_offset START_OFFSET] [--sentry_end_offset END_OFFSET] [--output OUTPUT] [--motion_only] [--slowdown SLOW_DOWN] [--speedup SPEED_UP]
                         [--chapter_offset CHAPTER_OFFSET] [--merge [MERGE_GROUP_TEMPLATE]] [--merge_timestamp_format MERGE_TIMESTAMP_FORMAT] [--keep-intermediate] [--keep-events]
                         [--set_moviefile_timestamp {START,STOP,SENTRY,RENDER}] [--no-gpu] [--gpu] [--gpu_type {nvidia,intel,qsv,rpi,vaapi}] [--no-faststart]
@@ -299,7 +307,7 @@ Trigger Monitor:
 Video Layout:
   Set what the layout of the resulting video should be
 
-  --layout {MOSAIC,FULLSCREEN,PERSPECTIVE,CROSS,DIAMOND,HORIZONTAL}
+  --layout {MOSAIC,FULLSCREEN,PERSPECTIVE,CROSS,DIAMOND,HORIZONTAL,TELEMETRYGRID}
                         Layout of the created video.
                             FULLSCREEN: Front camera center top with side and rear cameras smaller underneath it.
                             MOSAIC: Front and rear cameras on top with pillars and side cameras smaller underneath it.
@@ -307,6 +315,7 @@ Video Layout:
                             CROSS: Front camera center top, pillar cameras underneath, then repeater cameras underneath, and rear camera center bottom.
                             DIAMOND: Front camera center top, pillar cameras on left/right of front smaller, side cameras below on left/right of rear smaller, and rear camera center bottom.
                             HORIZONTAL: All cameras in horizontal line: left, left pillar, front, rear, right pillar, right.
+                            TELEMETRYGRID: 3x2 grid with SEI telemetry panels. Top row: map, front, instruments. Bottom row: left, rear, right. Best used with --sei_panel.
                         (default: FULLSCREEN)
   --camera_position CLIP_POS [CLIP_POS ...]
                         Set camera clip position within video. Selecting this will override the layout selected!
@@ -349,6 +358,7 @@ Video Layout:
                             CROSS: 1/2 (640x480, video is 1280x1920)
                             DIAMOND: 1/2 (640x480, video is 2560x1920)
                             HORIZONTAL: 1/2 (640x480, video is 3840x480)
+                            TELEMETRYGRID: 1/2 (640x480, video is 1920x960, top: map/front/instruments, bottom: left/rear/right)
                         (default: None)
   --mirror              Video from side and rear cameras as if being viewed through the mirror. Default when not providing parameter --no-front. Cannot be used in combination with
                         --rear. (default: None)
@@ -411,6 +421,42 @@ Text Overlay:
   --timestamp_format TIMESTAMP_FORMAT
                         Format for timestamps.
                         Determines how timestamps should be represented. Any valid value from strftime is accepted.Default is set '%x %X' which is locale's appropriate date and time representationMore info: https://strftime.org (default: %x %X)
+
+SEI Telemetry Overlay:
+  Overlay telemetry data embedded in dashcam video SEI NAL units (firmware 2025.44.25+).
+
+  --sei_overlay         Enable SEI telemetry overlay showing speed, gear, autopilot status, etc. (default: False)
+  --sei_format SEI_FORMAT
+                        Format string for SEI telemetry overlay. Available variables: {speed}, {speed_value}, {gear}, {autopilot}, {brake},
+                        {blinker}, {heading}, {steering}, {accel}, {lat}, {lon}, {gforce_x}, {gforce_y}. (default: {speed} {gear} {autopilot})
+  --sei_position {bottom-left,bottom-center,bottom-right,top-left,top-center,top-right}
+                        Position for SEI telemetry overlay. (default: bottom-left)
+  --sei_speed_unit {mph,kmh,mps}
+                        Speed unit for SEI overlay. (default: mph)
+  --sei_font_size SEI_FONT_SIZE
+                        Font size for SEI overlay text. Default is scaled based on video size.
+  --sei_style {default,hud,boxed,minimal,bold}
+                        Style preset for SEI overlay appearance. (default: default)
+  --sei_layout {compact,full,speed-only,driving,location,performance}
+                        Layout preset for SEI data arrangement. (default: compact)
+  --sei_export_csv FILENAME
+                        Export SEI telemetry data to a CSV file for external analysis.
+  --sei_graphical       Enable graphical telemetry overlay with steering wheel, gauges, and indicators.
+                        Replaces the text overlay when used with --sei_overlay. (default: False)
+  --sei_overlay_layout {dashboard,classic}
+                        Layout style for graphical overlay. (default: dashboard)
+  --sei_widget_position {bottom-left,bottom-center,bottom-right,top-left,top-center,top-right}
+                        Position for graphical widget cluster. (default: bottom-left)
+  --sei_widget_size {small,medium,large}
+                        Size preset for graphical widgets. (default: medium)
+  --sei_widgets SEI_WIDGETS
+                        Comma-separated list of widgets to display. Options: steering, turn, brake, accel, speed, gear, location,
+                        datetime, autopilot, gforce, compass, cluster, elevation, all. (default: all)
+  --sei_widget_theme {default,hud,minimal,performance}
+                        Color theme for graphical widgets. (default: default)
+  --sei_panel           Add telemetry panel as camera slot in layout. Requires --sei_overlay. (default: False)
+  --sei_panel_map, --no-sei_panel_map
+                        Include route map panel. Requires staticmap package. (default: True)
 
 Timestamp Restriction:
   Restrict video to be between start and/or end timestamps. Timestamp to be provided in a ISO-8601 format (see https://fits.gsfc.nasa.gov/iso-time.html for examples)
@@ -700,6 +746,18 @@ examples).
     |   Left   |   Left    |   Front   |   Rear    |   Right   |  Right   |
     |  Camera  |  Pillar   |  Camera   |  Camera   |  Pillar   |  Camera  |
     +----------+-----------+-----------+-----------+-----------+----------+
+```
+-   TELEMETRYGRID: Resolution: 1920x960
+
+    3x2 grid designed for use with `--sei_panel`. The top row places the
+    telemetry map and instrument panels alongside the front camera. The
+    bottom row contains the left, rear, and right cameras.
+```
+    +----------------+----------------+----------------+
+    | Telemetry Map  | Front Camera   |  Instruments   |
+    +----------------+----------------+----------------+
+    | Left Camera    |  Rear Camera   |  Right Camera  |
+    +----------------+----------------+----------------+
 ```
 *\--camera_position*
 
@@ -991,6 +1049,226 @@ added to the resulting video.
      Red
 
      0x2E8B57
+
+## SEI Telemetry Overlay
+
+Tesla vehicles with firmware 2025.44.25 or later (HW3/HW4) embed telemetry data
+directly in dashcam video files using SEI (Supplemental Enhancement Information)
+NAL units. This telemetry includes speed, GPS coordinates, steering angle, brake
+status, gear, autopilot state, and more.
+
+**\--sei\_overlay**
+
+:   Default: False
+
+    Enable SEI telemetry overlay. When enabled, telemetry data embedded in the
+    video files will be extracted and displayed as a real-time overlay.
+
+**\--sei\_format** *format\_string*
+
+:   Default: {speed} {gear} {autopilot}
+
+    Format string for SEI telemetry overlay. Use \\N for newlines.
+
+    Available format variables:
+
+    -   `{speed}` - Speed with unit (e.g., '45 mph')
+    -   `{speed_value}` - Speed value only (no unit)
+    -   `{gear}` - Gear letter (P/R/N/D)
+    -   `{autopilot}` - Autopilot state (FSD/AP/TACC or empty)
+    -   `{brake}` - 'BRAKE' if applied, empty otherwise
+    -   `{blinker}` - Turn signal indicator
+    -   `{heading}` - Compass heading in degrees
+    -   `{steering}` - Steering wheel angle in degrees
+    -   `{accel}` - Accelerator pedal position (0-100%)
+    -   `{lat}` - Latitude
+    -   `{lon}` - Longitude
+    -   `{gforce_x}` - Lateral G-force
+    -   `{gforce_y}` - Longitudinal G-force
+
+**\--sei\_position**
+
+:   Default: bottom-left
+
+    Position for SEI telemetry overlay. Valid values: bottom-left, bottom-center,
+    bottom-right, top-left, top-center, top-right.
+
+**\--sei\_speed\_unit**
+
+:   Default: mph
+
+    Speed unit for SEI overlay. Valid values: mph, kmh, mps (meters per second).
+
+**\--sei\_font\_size**
+
+:   Default: scaled based on video height
+
+    Font size for SEI overlay text.
+
+**\--sei\_style**
+
+:   Default: default
+
+    Style preset for SEI overlay appearance:
+
+    -   `default` - Clean white text with black outline
+    -   `hud` - Green heads-up display style
+    -   `boxed` - White text on semi-transparent dark background
+    -   `minimal` - Small, subtle gray text
+    -   `bold` - Large bold yellow text for visibility
+
+**\--sei\_layout**
+
+:   Default: compact
+
+    Layout preset for SEI data arrangement:
+
+    -   `compact` - Single line showing speed, gear, autopilot
+    -   `full` - Multi-line display with all key telemetry data
+    -   `speed-only` - Large speed display only
+    -   `driving` - Speed, gear, brake, and blinker indicators
+    -   `location` - Speed with GPS coordinates
+    -   `performance` - Speed, throttle, and g-forces
+
+**\--sei\_export\_csv** *filename*
+
+:   Export SEI telemetry data to a CSV file for external analysis.
+
+### Graphical Overlay
+
+The graphical overlay renders telemetry data as visual widgets (steering wheel,
+gauges, speed display, etc.) composited directly onto the video. This provides
+a dashboard-style heads-up display similar to third-party tools like TeslaClip.
+
+To enable the graphical overlay, use `--sei_overlay` together with
+`--sei_graphical`:
+
+    python -m tesla_dashcam /path/to/clips --sei_overlay --sei_graphical
+
+The default layout arranges widgets in a top bar across the video:
+
+    [Date/Time] [Speed + AP Status] [Steering Cluster] [Gear + Turn] [Compass + GPS]
+
+The steering cluster contains a Tesla yoke-style steering wheel with angle
+readout, accelerator and brake gauges, and a G-force indicator with directional
+bubble.
+
+**\--sei\_graphical**
+
+:   Default: False
+
+    Enable graphical telemetry overlay with steering wheel, gauges, and
+    indicators. Replaces the text overlay when used with `--sei_overlay`.
+
+**\--sei\_overlay\_layout**
+
+:   Default: dashboard
+
+    Layout style for the graphical overlay:
+
+    -   `dashboard` - Horizontal top bar with clustered widgets. Date/time on
+        the left, speed and autopilot status left of center, steering cluster
+        with gauges and G-force at center, gear and turn signals right of
+        center, compass heading and GPS coordinates on the right.
+    -   `classic` - Scattered widget placement with speed at top center,
+        steering wheel at bottom center, and other data around the edges.
+
+**\--sei\_widget\_size**
+
+:   Default: medium
+
+    Size preset for graphical widgets. Controls the overall height of the
+    overlay bar and all widget dimensions. Valid values: small, medium, large.
+
+**\--sei\_widgets** *widget\_list*
+
+:   Default: all
+
+    Comma-separated list of widgets to display. Use this to show only the
+    telemetry data you care about. Available widgets:
+
+    -   `steering` - Tesla yoke steering wheel that rotates with steering angle
+    -   `turn` - Turn signal direction arrows
+    -   `brake` - Brake application gauge (red when braking)
+    -   `accel` - Accelerator pedal position gauge (green fill)
+    -   `speed` - Large speed number with unit (MPH/KM/H)
+    -   `gear` - Gear state indicator (P R N D) with active gear highlighted
+    -   `location` - GPS coordinates and heading (classic layout)
+    -   `datetime` - Date and time display
+    -   `autopilot` - Autopilot status badge (OFF/TACC/AP/FSD)
+    -   `gforce` - G-force magnitude with directional crosshair bubble
+    -   `compass` - Compass heading, direction, and GPS coordinates
+    -   `cluster` - Center cluster combining steering wheel, gauges, and G-force
+    -   `elevation` - Road grade/incline estimated from z-axis accelerometer
+    -   `all` - All available widgets (default)
+
+    Example: `--sei_widgets speed,steering,gear`
+
+**\--sei\_widget\_theme**
+
+:   Default: default
+
+    Color theme for graphical widgets:
+
+    -   `default` - White elements on semi-transparent dark backgrounds
+    -   `hud` - Green heads-up display style
+    -   `minimal` - Subtle, semi-transparent appearance
+    -   `performance` - Red/orange racing style
+
+**\--sei\_widget\_position**
+
+:   Default: bottom-left
+
+    Position for graphical widget cluster (used with classic layout). Valid
+    values: bottom-left, bottom-center, bottom-right, top-left, top-center,
+    top-right.
+
+### Telemetry Panels
+
+The telemetry panel feature adds dedicated instrument and map panels as
+camera slots in the multi-camera layout. Unlike the graphical overlay which
+composites widgets onto an existing camera feed, panels occupy their own
+space in the layout alongside the front, rear, and repeater cameras.
+
+Two panels are available:
+
+-   **Instruments panel** -- steering wheel with angle readout, ACC/BRK
+    gauges, speed, gear indicator, turn signals, compass heading, G-force
+    magnitude, and longitudinal acceleration.
+-   **Map panel** -- route map rendered from GPS coordinates with a moving
+    position dot. The map zoom adapts to vehicle speed: zoomed in at low
+    speeds for neighborhood detail, zoomed out at highway speeds to show the
+    full route. Requires the `staticmap` Python package.
+
+To enable panels with the recommended TELEMETRYGRID layout:
+
+    python -m tesla_dashcam /path/to/clips --layout TELEMETRYGRID --sei_overlay --sei_panel
+
+To disable the map panel and show only instruments:
+
+    python -m tesla_dashcam /path/to/clips --sei_overlay --sei_panel --no-sei_panel_map
+
+Panels inherit widget selection, theme, and other graphical settings from the
+`--sei_widgets` and `--sei_widget_theme` options documented above.
+
+**\--sei\_panel**
+
+:   Default: False
+
+    Add telemetry instrument and map panels as camera slots in the
+    multi-camera layout. Each layout (FullScreen, Mosaic, Cross, Diamond,
+    Horizontal, TelemetryGrid) positions the panels automatically. Use
+    `--layout TELEMETRYGRID` for best results with a dedicated 3x2 grid
+    placing map and instruments alongside camera views. Requires `--sei_overlay`.
+
+**\--sei\_panel\_map**
+
+:   Default: True
+
+    Include a route map panel with a moving position dot that tracks the
+    vehicle's GPS coordinates. The map zoom level adapts to speed. Disable
+    with `--no-sei_panel_map` to show only the instruments panel. Requires
+    the `staticmap` package (`pip install staticmap`).
 
 ## Timestamp Restriction
 

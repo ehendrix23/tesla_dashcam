@@ -29,6 +29,7 @@ REQUIRED = [  # type: ignore
     "psutil",
     "python-dateutil",
     "staticmap",
+    "protobuf",
 ]
 
 # The rest you shouldn't have to touch too much :)
@@ -198,9 +199,8 @@ setup(
         "License :: OSI Approved :: Apache Software License",
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.13",
         "Programming Language :: Python :: Implementation :: CPython",
-        "Programming Language :: Python :: Implementation :: PyPy",
         "Topic :: Multimedia :: Video :: Conversion",
     ],
     # $ setup.py publish support.
