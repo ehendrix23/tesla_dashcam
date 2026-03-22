@@ -3528,12 +3528,13 @@ def create_intermediate_movie(
     # the ass filter before that label.
     if sei_ass_file and ffmpeg_text:
         import re
-        # Escape the file path for FFmpeg filter
-        escaped_ass_path = sei_ass_file.replace("\\", "/").replace(":", r"\:")
+        # Quote the file path for FFmpeg filter (single quotes protect
+        # Windows drive letter colons from being parsed as option separators)
+        escaped_ass_path = sei_ass_file.replace("\\", "/")
         # Insert ass filter before the output label [tmpN]
         ffmpeg_text = re.sub(
             r'\s*\[tmp(\d+)\]\s*$',
-            f",ass={escaped_ass_path} [tmp\\1]",
+            f",ass='{escaped_ass_path}' [tmp\\1]",
             ffmpeg_text
         )
 
@@ -6290,10 +6291,11 @@ def main() -> int:
                 )
             return 0
 
-        # Escape font path for FFmpeg filter syntax (colons need escaping)
-        ffmpeg_font = temp_font_file.replace("\\", "/").replace(":", r"\:")
+        # Quote font path for FFmpeg filter syntax (single quotes protect
+        # Windows drive letter colons from being parsed as option separators)
+        ffmpeg_font = temp_font_file.replace("\\", "/")
         ffmpeg_timestamp = (
-            ffmpeg_timestamp + f"drawtext=fontfile={ffmpeg_font}:"
+            ffmpeg_timestamp + f"drawtext=fontfile='{ffmpeg_font}':"
             f"fontcolor={layout_settings.font.color}:"
             f"fontsize={layout_settings.font.size}:borderw=2:bordercolor=black@1.0:"
             f"x={layout_settings.font.halign}:y={layout_settings.font.valign}:"
