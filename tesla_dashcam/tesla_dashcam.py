@@ -33,6 +33,11 @@ from PIL.Image import Image
 from psutil import disk_partitions
 from tzlocal import get_localzone
 
+try:
+    from tesla_dashcam.interrupted_recording import diagnose_file as diagnose_recording
+except ImportError:  # run as a script from its own folder
+    from interrupted_recording import diagnose_file as diagnose_recording  # type: ignore[no-redef]
+
 # Import on Windows only
 # pylint: disable=import-error
 if sys.platform == "win32":
@@ -2777,6 +2782,12 @@ def get_metadata(ffmpeg: str, filenames: list[str]) -> list[Video_Metadata]:  #
             # 4. FPS
             if m := search(r"([\d.]+)\s*fps", line):
                 metadata_item.fps = float(m.group(1) or 24.0)
+
+    # Say why a clip ffmpeg couldn't read is left out when its recording was interrupted (the
+    # car lost power or the drive was removed before the clip's index was written).
+    for item in metadata:
+        if not item.include and (reason := diagnose_recording(item.filename)):
+            _LOGGER.warning("Clip %s will be excluded: %s.", item.filename, reason)
 
     return metadata
 
